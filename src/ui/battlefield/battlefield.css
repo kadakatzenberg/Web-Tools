@@ -1,0 +1,353 @@
+.wartable {
+  padding: var(--s3);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Fine map lines: the table is a surveyed surface, not a card. */
+.wartable::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 23px, rgba(140, 150, 190, 0.035) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 23px, rgba(140, 150, 190, 0.035) 23px 24px);
+  mask-image: radial-gradient(120% 90% at 50% 50%, #000 40%, transparent 100%);
+}
+
+.wartable__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+}
+
+.wartable__title {
+  font-size: var(--fs-md);
+  color: var(--ash);
+}
+
+.wartable__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.wartable__selected {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--fs-sm);
+  color: var(--phase);
+  border: 1px solid var(--phase-dim);
+  border-radius: 999px;
+  padding: 0.1rem 0.3rem 0.1rem 0.6rem;
+}
+
+.wartable__clear {
+  color: inherit;
+  opacity: 0.7;
+  font-size: var(--fs-xs);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.wartable__clear:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.wartable__collapse {
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  min-height: 32px;
+  padding: 0 var(--s2);
+}
+.wartable__collapse:hover {
+  color: var(--bone);
+}
+
+.wartable__field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.wartable__side {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.wartable__sidelabel {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: var(--smoke);
+  padding: var(--s2) 0;
+}
+
+.wartable__side[data-side="enemy"] .wartable__sidelabel {
+  color: var(--violet);
+}
+.wartable__side[data-side="player"] .wartable__sidelabel {
+  color: var(--moonlit);
+}
+
+.wartable__lanes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s2);
+  min-width: 0;
+}
+
+/* The centre line: where the two forces meet. */
+.wartable__divide {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--seal), transparent);
+  opacity: 0.55;
+  position: relative;
+}
+
+.wartable__divide span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--seal);
+  opacity: 0.8;
+}
+
+/* ── Lane ── */
+
+.lane {
+  position: relative;
+  background: rgba(5, 5, 10, 0.45);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-md);
+  padding: var(--s2);
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.lane[data-position="Out"] {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.lane__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.lane__count {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.lane__slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  flex: 1;
+  align-content: flex-start;
+}
+
+.lane__empty {
+  color: var(--faint);
+  font-size: var(--fs-sm);
+}
+
+/* Overlaid, not appended: selecting a combatant must not change the height of
+   the war table. Growing it here pushes the whole card list down and can steal
+   the click the GM is in the middle of making. */
+.lane__move {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--phase);
+  background: color-mix(in srgb, var(--lacquer-900) 76%, transparent);
+  border: 1px dashed var(--phase-dim);
+  border-radius: var(--r-md);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.lane:hover .lane__move,
+.lane__move:focus-visible {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  /* No hover on touch — keep the target permanently visible but quiet. */
+  .lane__move {
+    opacity: 1;
+    background: color-mix(in srgb, var(--lacquer-900) 55%, transparent);
+  }
+}
+
+/* ── Token ── */
+
+.token {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 74px;
+  padding: var(--s2) 0.2rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--metal-700);
+  background: linear-gradient(180deg, var(--lacquer-600), var(--lacquer-800));
+  transition: border-color var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
+}
+
+.token:hover {
+  transform: translateY(-2px);
+  border-color: var(--metal-400);
+}
+
+.token[data-side="player"] {
+  border-bottom: 2px solid rgba(107, 159, 224, 0.55);
+}
+.token[data-side="enemy"] {
+  border-bottom: 2px solid rgba(154, 122, 224, 0.55);
+}
+
+.token[data-selected="1"] {
+  border-color: var(--phase);
+  box-shadow: 0 0 0 1px var(--phase), 0 0 18px var(--phase-glow);
+}
+
+.token[data-done="1"] {
+  opacity: 0.5;
+}
+
+.token[data-band="unconscious"] {
+  filter: grayscale(0.65);
+}
+
+/* The ring is a vessel that fills from the bottom — health as volume. */
+.token__ring {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--metal-500);
+  background: var(--lacquer-900);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.token__fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  opacity: 0.55;
+  transition: height var(--t-slow) var(--ease-out);
+}
+
+.token__glyph {
+  position: relative;
+  font-size: var(--fs-sm);
+  color: var(--bone);
+  text-shadow: 0 1px 3px #000;
+}
+
+.token__name {
+  font-size: 0.625rem;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ash);
+}
+
+.token__meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.token__shield {
+  color: var(--shield);
+}
+
+.token__done {
+  color: var(--jade);
+}
+
+.token__conditions {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.token__condition {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--candle);
+  background: rgba(232, 169, 60, 0.13);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+@media (max-width: 720px) {
+  /* Stacking the lanes made the table taller than the viewport. Keep the three
+     positions side by side and let each lane scroll its own tokens. */
+  .wartable__lanes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s1);
+  }
+  .wartable__side {
+    grid-template-columns: 1fr;
+  }
+  .token {
+    width: 100%;
+    min-width: 0;
+  }
+  .wartable__sidelabel {
+    writing-mode: horizontal-tb;
+    padding: 0;
+  }
+  .lane {
+    min-height: 0;
+  }
+  .lane__slots {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--s1);
+  }
+  .token {
+    flex: 0 0 auto;
+  }
+}

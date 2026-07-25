@@ -1,0 +1,151 @@
+/**
+ * The complete set of encounter mutations, expressed as explicit commands.
+ *
+ * Every state change flows through one of these so that undo/redo, the combat
+ * log, and persistence all observe the same stream. UI-only concerns (which
+ * panel is open, which tab is active) deliberately live outside this union.
+ */
+
+import type {
+  Ability,
+  Combatant,
+  DamageType,
+  Dot,
+  EncounterState,
+  Position,
+  Regen,
+  StatusEffect,
+  Stats,
+  TempMod,
+  TempShield,
+} from "@/domain/types";
+
+export type Command =
+  /* roster */
+  | { type: "COMBATANTS_ADDED"; combatants: Combatant[] }
+  | { type: "COMBATANT_REMOVED"; id: string }
+  | { type: "COMBATANT_RESTORED"; combatant: Combatant; index: number }
+  | { type: "COMBATANT_DUPLICATED"; id: string }
+  | { type: "COMBATANT_RENAMED"; id: string; name: string }
+  | { type: "COMBATANT_MOVED"; id: string; direction: -1 | 1 }
+  | { type: "COMBATANT_POSITION_SET"; id: string; position: Position }
+  | { type: "COMBATANT_DONE_TOGGLED"; id: string; done?: boolean }
+  | { type: "COMBATANT_STATS_SET"; id: string; stats: Stats }
+  | { type: "COMBATANT_NOTES_SET"; id: string; notes: string }
+  | { type: "COMBATANT_MAXHP_SET"; id: string; maxHp: number }
+  /* health */
+  | { type: "DAMAGE_APPLIED"; ids: string[]; amount: number; damageType: DamageType }
+  | { type: "HEAL_APPLIED"; ids: string[]; amount: number }
+  | { type: "FULL_HEAL_APPLIED"; ids: string[] }
+  /* shields */
+  | { type: "SHIELD_ADJUSTED"; id: string; delta: number }
+  | { type: "TEMP_SHIELD_ADDED"; id: string; shield: TempShield }
+  | { type: "TEMP_SHIELD_REMOVED"; id: string; shieldId: string }
+  /* conditions */
+  | { type: "STATUS_ADDED"; id: string; status: StatusEffect }
+  | { type: "STATUS_REMOVED"; id: string; statusId: string }
+  | { type: "DOT_ADDED"; id: string; dot: Dot }
+  | { type: "DOT_REMOVED"; id: string; dotId: string }
+  | { type: "REGEN_ADDED"; id: string; regen: Regen }
+  | { type: "REGEN_REMOVED"; id: string; regenId: string }
+  | { type: "TEMP_MOD_ADDED"; id: string; mod: TempMod }
+  | { type: "TEMP_MOD_REMOVED"; id: string; modId: string }
+  /* abilities */
+  | { type: "ABILITY_ADDED"; id: string; ability: Ability }
+  | { type: "ABILITY_UPDATED"; id: string; ability: Ability }
+  | { type: "ABILITY_REMOVED"; id: string; abilityId: string }
+  | {
+      type: "ABILITY_USED";
+      id: string;
+      abilityId: string;
+      patch: Partial<Ability>;
+      marksDone: boolean;
+    }
+  /* flow */
+  | { type: "PHASE_ADVANCED" }
+  | { type: "INITIATIVE_LOCKED"; enemyFirst: boolean }
+  | { type: "INITIATIVE_RESET" }
+  /* wholesale */
+  | { type: "ENCOUNTER_LOADED"; state: EncounterState }
+  | { type: "ENCOUNTER_CLEARED" };
+
+/** Commands that must not create an undo entry. */
+export const NON_UNDOABLE: ReadonlySet<Command["type"]> = new Set([
+  "ENCOUNTER_LOADED",
+]);
+
+/** Human-readable label for the undo affordance. */
+export function commandLabel(cmd: Command): string {
+  switch (cmd.type) {
+    case "COMBATANTS_ADDED":
+      return cmd.combatants.length === 1
+        ? `add ${cmd.combatants[0]!.name}`
+        : `add ${cmd.combatants.length} combatants`;
+    case "COMBATANT_REMOVED":
+      return "remove combatant";
+    case "COMBATANT_RESTORED":
+      return "restore combatant";
+    case "COMBATANT_DUPLICATED":
+      return "duplicate combatant";
+    case "COMBATANT_RENAMED":
+      return "rename";
+    case "COMBATANT_MOVED":
+      return "reorder";
+    case "COMBATANT_POSITION_SET":
+      return `move to ${cmd.position}`;
+    case "COMBATANT_DONE_TOGGLED":
+      return "toggle done";
+    case "COMBATANT_STATS_SET":
+      return "edit stats";
+    case "COMBATANT_NOTES_SET":
+      return "edit notes";
+    case "COMBATANT_MAXHP_SET":
+      return "edit max HP";
+    case "DAMAGE_APPLIED":
+      return `${cmd.amount} ${cmd.damageType} damage`;
+    case "HEAL_APPLIED":
+      return `heal ${cmd.amount}`;
+    case "FULL_HEAL_APPLIED":
+      return "full heal";
+    case "SHIELD_ADJUSTED":
+      return "adjust shield";
+    case "TEMP_SHIELD_ADDED":
+      return "add temp shield";
+    case "TEMP_SHIELD_REMOVED":
+      return "remove temp shield";
+    case "STATUS_ADDED":
+      return `add ${cmd.status.name}`;
+    case "STATUS_REMOVED":
+      return "remove status";
+    case "DOT_ADDED":
+      return "add DoT";
+    case "DOT_REMOVED":
+      return "remove DoT";
+    case "REGEN_ADDED":
+      return "add regen";
+    case "REGEN_REMOVED":
+      return "remove regen";
+    case "TEMP_MOD_ADDED":
+      return "add modifier";
+    case "TEMP_MOD_REMOVED":
+      return "remove modifier";
+    case "ABILITY_ADDED":
+      return "add ability";
+    case "ABILITY_UPDATED":
+      return "edit ability";
+    case "ABILITY_REMOVED":
+      return "remove ability";
+    case "ABILITY_USED":
+      return "use ability";
+    case "PHASE_ADVANCED":
+      return "advance phase";
+    case "INITIATIVE_LOCKED":
+      return "lock initiative";
+    case "INITIATIVE_RESET":
+      return "reset initiative";
+    case "ENCOUNTER_LOADED":
+      return "load session";
+    case "ENCOUNTER_CLEARED":
+      return "clear encounter";
+  }
+}

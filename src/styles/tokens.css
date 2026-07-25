@@ -1,0 +1,162 @@
+/**
+ * Hei Mao — The Living War Table
+ *
+ * Material palette: black lacquer and ink for ground, warm bone for text,
+ * brushed metal for structure, and three phase pigments that carry meaning —
+ * jade (players), cinnabar (enemies), candle amber (environment).
+ *
+ * Every colour pairing used for text meets WCAG AA on its intended surface;
+ * phase pigment is never the sole carrier of state (see .is-* utility classes).
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ── Ground: lacquer and ink ── */
+  --lacquer-900: #05050a;
+  --lacquer-850: #08080f;
+  --lacquer-800: #0b0b14;
+  --lacquer-700: #11111d;
+  --lacquer-600: #171726;
+  --lacquer-500: #1f1f32;
+
+  /* ── Structure: brushed metal, carved edges ── */
+  --metal-700: #262637;
+  --metal-600: #33334a;
+  --metal-500: #454560;
+  --metal-400: #5a5a78;
+
+  /* ── Text: bone, ash, smoke ── */
+  --bone: #ece7dc;
+  --ash: #b9b4ab;
+  --smoke: #85818c;
+  --faint: #5e5b68;
+
+  /* ── Phase pigments ── */
+  --jade: #4ecf9a;
+  --jade-dim: #2f8f68;
+  --jade-glow: rgba(78, 207, 154, 0.35);
+
+  --cinnabar: #e35141;
+  --cinnabar-dim: #962b21;
+  --cinnabar-glow: rgba(227, 81, 65, 0.35);
+
+  --candle: #e8a93c;
+  --candle-dim: #966618;
+  --candle-glow: rgba(232, 169, 60, 0.32);
+
+  /* ── Supernatural accents ── */
+  --moonlit: #6b9fe0;
+  --violet: #9a7ae0;
+  --seal: #c8382e;
+
+  /* ── Semantic ── */
+  --danger: var(--cinnabar);
+  --warn: var(--candle);
+  --ok: var(--jade);
+  --shield: var(--moonlit);
+  --shield-temp: #7fd0e8;
+
+  /* Health bands — hue plus an always-present glyph/pattern. */
+  --hp-healthy: var(--jade);
+  --hp-wounded: var(--candle);
+  --hp-critical: #f0762e;
+  --hp-down: var(--cinnabar);
+
+  /* ── Phase theming: overridden on [data-phase] ── */
+  --phase: var(--jade);
+  --phase-dim: var(--jade-dim);
+  --phase-glow: var(--jade-glow);
+
+  /* ── Type ── */
+  --font-display: "Cinzel", "Iowan Old Style", Georgia, serif;
+  --font-body: "Noto Serif", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-xs: 0.6875rem;  /* 11px */
+  --fs-sm: 0.75rem;    /* 12px */
+  --fs-md: 0.8125rem;  /* 13px */
+  --fs-base: 0.875rem; /* 14px */
+  --fs-lg: 1rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.625rem;
+
+  /* ── Space: 4px rhythm ── */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+
+  /* ── Form ── */
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 11px;
+  --r-xl: 16px;
+
+  --border: 1px solid var(--metal-700);
+  --border-strong: 1px solid var(--metal-500);
+
+  /* ── Depth: lacquer reflects rather than blurs ── */
+  --lift-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --lift-2: 0 4px 14px rgba(0, 0, 0, 0.55);
+  --lift-3: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --inset-carve: inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --t-fast: 110ms;
+  --t-base: 200ms;
+  --t-slow: 380ms;
+  --t-phase: 620ms;
+
+  /* Layering */
+  --z-atmos: 0;
+  --z-content: 1;
+  --z-sticky: 20;
+  --z-overlay: 60;
+  --z-modal: 100;
+  --z-toast: 140;
+
+  --tap: 44px; /* minimum comfortable touch target */
+}
+
+/* Phase pigment swaps drive every accent in one assignment. */
+[data-phase="0"] {
+  --phase: var(--jade);
+  --phase-dim: var(--jade-dim);
+  --phase-glow: var(--jade-glow);
+}
+[data-phase="1"] {
+  --phase: var(--cinnabar);
+  --phase-dim: var(--cinnabar-dim);
+  --phase-glow: var(--cinnabar-glow);
+}
+[data-phase="2"] {
+  --phase: var(--candle);
+  --phase-dim: var(--candle-dim);
+  --phase-glow: var(--candle-glow);
+}
+
+/* Reduced motion: collapse durations but keep state changes visible. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 1ms;
+    --t-base: 1ms;
+    --t-slow: 1ms;
+    --t-phase: 1ms;
+  }
+}
+
+[data-motion="reduced"] {
+  --t-fast: 1ms;
+  --t-base: 1ms;
+  --t-slow: 1ms;
+  --t-phase: 1ms;
+}

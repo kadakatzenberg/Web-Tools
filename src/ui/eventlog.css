@@ -1,0 +1,82 @@
+.eventlog {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(24rem, 100vw);
+  z-index: var(--z-overlay);
+  background: linear-gradient(180deg, var(--lacquer-800), var(--lacquer-900));
+  border-left: 1px solid var(--metal-600);
+  box-shadow: var(--lift-3);
+  display: flex;
+  flex-direction: column;
+  animation: log-in var(--t-base) var(--ease-out);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@keyframes log-in { from { transform: translateX(100%); } }
+
+.eventlog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s3);
+  border-bottom: 1px solid var(--metal-700);
+}
+
+.eventlog__title { font-size: var(--fs-md); color: var(--ash); }
+
+.eventlog__close { color: var(--faint); width: var(--tap); height: 36px; border-radius: var(--r-sm); }
+.eventlog__close:hover { color: var(--bone); background: var(--lacquer-600); }
+
+.eventlog__filters {
+  display: flex;
+  gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--metal-700);
+}
+
+.eventlog__filter {
+  font-family: var(--font-display);
+  font-size: 0.5625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  border: 1px solid var(--metal-700);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  min-height: 28px;
+}
+
+.eventlog__filter[data-active="1"] { color: var(--phase); border-color: var(--phase-dim); }
+
+.eventlog__list { list-style: none; overflow-y: auto; flex: 1; padding: var(--s2); }
+
+.eventlog__entry {
+  display: flex;
+  gap: var(--s2);
+  padding: var(--s2);
+  border-left: 2px solid var(--metal-600);
+  margin-bottom: 2px;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--ash);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.eventlog__entry[data-kind="damage"] { border-left-color: var(--cinnabar); }
+.eventlog__entry[data-kind="heal"] { border-left-color: var(--jade); }
+.eventlog__entry[data-kind="status"] { border-left-color: var(--violet); }
+.eventlog__entry[data-kind="ability"] { border-left-color: var(--moonlit); }
+.eventlog__entry[data-kind="shield"] { border-left-color: var(--shield-temp); }
+.eventlog__entry[data-kind="flow"] { border-left-color: var(--candle); }
+
+.eventlog__when { font-size: 0.5625rem; color: var(--faint); flex-shrink: 0; padding-top: 2px; }
+
+.eventlog__text { flex: 1; min-width: 0; }
+
+@media (max-width: 640px) {
+  .eventlog { width: 100vw; }
+}

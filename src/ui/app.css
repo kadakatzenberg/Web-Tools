@@ -1,0 +1,186 @@
+.app {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  z-index: var(--z-content);
+}
+
+/* ── Top bar ── */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-sticky) + 5);
+  background: rgba(5, 5, 10, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--metal-700);
+  padding-top: env(safe-area-inset-top);
+}
+
+.topbar__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--s4);
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-height: 52px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-shrink: 0;
+}
+
+/* A carved vermilion seal: the mark of the house. */
+.brand__seal {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, var(--seal), #8f231b);
+  color: #ffe9e4;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 0 14px rgba(200, 56, 46, 0.4), var(--inset-carve);
+}
+
+.brand__name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: var(--bone);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--s1);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  padding: 0 var(--s3);
+  min-height: 44px;
+  white-space: nowrap;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.tab:hover { color: var(--bone); }
+
+.tab[data-active="1"] { color: var(--phase); }
+
+.tab[data-active="1"]::after {
+  content: "";
+  position: absolute;
+  left: var(--s2);
+  right: var(--s2);
+  bottom: 0;
+  height: 2px;
+  background: var(--phase);
+  box-shadow: 0 0 12px var(--phase-glow);
+  animation: tab-ink var(--t-base) var(--ease-out);
+}
+
+@keyframes tab-ink { from { transform: scaleX(0.2); opacity: 0; } }
+
+.topbar__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-shrink: 0;
+}
+
+.tool {
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  color: var(--smoke);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-sm);
+  padding: 0 var(--s2);
+  min-height: 32px;
+  min-width: 36px;
+  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+
+.tool:hover { color: var(--bone); border-color: var(--metal-400); }
+.tool[aria-pressed="true"] { color: var(--phase); border-color: var(--phase-dim); }
+
+/* ── Main ── */
+
+.main__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--s4);
+  padding-bottom: max(var(--s4), env(safe-area-inset-bottom));
+}
+
+/* ── Recovery ── */
+
+.recovery {
+  max-width: 1180px;
+  margin: var(--s3) auto 0;
+  padding: var(--s3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  background: rgba(232, 169, 60, 0.09);
+  border: 1px solid var(--candle-dim);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  color: var(--ash);
+}
+
+.recovery__actions { display: flex; gap: var(--s2); }
+
+/* ── Crash ── */
+
+.crash {
+  max-width: 42rem;
+  margin: 12vh auto;
+  padding: var(--s5);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.crash__title { font-size: var(--fs-2xl); color: var(--cinnabar); }
+.crash__body { color: var(--ash); line-height: 1.8; max-width: 48ch; }
+
+.crash__detail {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--smoke);
+  background: var(--lacquer-850);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-sm);
+  padding: var(--s2);
+  max-width: 100%;
+  overflow-x: auto;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .topbar__inner, .main__inner { padding: 0 var(--s3); }
+  .brand__name { display: none; }
+  .tab { padding: 0 var(--s2); font-size: var(--fs-xs); }
+}
