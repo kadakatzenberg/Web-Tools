@@ -60,12 +60,15 @@ export function deriveStats(stats: Stats, mods?: TempMod[]): DerivedStats {
 /**
  * Resistance applied against an incoming hit.
  *
- * NOTE — deliberate behaviour preservation: v1 clamps resistance at zero via
- * `Math.max(0, effCON)`. A negative CON or WIS therefore grants *no* resistance
- * rather than amplifying incoming damage, even though the written Hei Mao
- * rulebook describes negative values as increasing damage taken. The shipped
- * behaviour is authoritative here and is preserved unchanged. Changing it would
- * silently alter every historical encounter. See docs/MIGRATION.md.
+ * Resistance clamps at zero: a negative CON or WIS grants *no* resistance, and
+ * does **not** amplify incoming damage.
+ *
+ * This is correct and intentional — do not "fix" it. The written rulebook says
+ * negative values increase damage taken, and session logs show that wording
+ * leading to manual arithmetic errors at the table (a 4-damage hit being
+ * applied as 5 against -1 CON). The table has confirmed the clamped behaviour
+ * is the intended rule. Catching exactly this class of mistake is a large part
+ * of why the tracker exists. See docs/MIGRATION.md.
  */
 export function resistanceFor(
   type: DamageType,

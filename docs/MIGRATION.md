@@ -96,14 +96,17 @@ regardless of network state.
 
 *Why:* silent data loss during a live session.
 
-## Preserved divergence: negative CON and WIS
+## Settled rule: negative CON and WIS never add damage
 
-The written Hei Mao rulebook says negative CON or WIS *increases* damage taken.
-The shipped v1 code clamps resistance at zero (`Math.max(0, effCON)`), so a
-negative value grants no resistance but does not amplify damage.
+Resistance clamps at zero. A negative CON or WIS grants **no** resistance and
+does **not** increase damage taken.
 
-**v2 preserves the code behaviour**, not the rulebook text, and pins it with a
-test (`does not amplify damage for negative CON`). Changing it would silently
-alter the arithmetic of every historical encounter and every enemy the generator
-has produced with a negative CON — which is most of them, since a negative stat
-is mandatory. If this should change, it is a rules decision, not a bug fix.
+The written rulebook says negative values increase damage taken. That wording is
+misleading, and session logs show it producing manual arithmetic errors in play —
+a 4-damage hit applied as 5 against -1 CON, and a 9-damage round applied as 11.
+The table has confirmed the clamped behaviour is the intended rule.
+
+**Do not change this.** It is pinned by two tests
+(`never amplifies damage for a negative CON`, and the WIS equivalent). If the
+rulebook text is ever revised, that reference document should be corrected to
+match the code rather than the other way round.

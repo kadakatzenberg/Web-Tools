@@ -52,11 +52,17 @@ describe("damage pipeline", () => {
     expect(applyDamage(c, 10, "true").hp).toBe(10);
   });
 
-  it("does not amplify damage for negative CON (v1 behaviour preserved)", () => {
+  it("never amplifies damage for a negative CON — resistance floors at zero", () => {
     const c = makeCombatant({ hp: 20, stats: stats({ CON: -3 }) });
-    // Resistance clamps at 0, so a negative CON grants no resistance
-    // but also does not increase the hit.
+    // A negative CON grants no resistance and must not add to the hit.
+    // Applying it as bonus damage is a known manual-arithmetic error; the
+    // tracker exists partly to make it impossible.
     expect(applyDamage(c, 10, "physical").hp).toBe(10);
+  });
+
+  it("never amplifies damage for a negative WIS", () => {
+    const c = makeCombatant({ hp: 20, stats: stats({ WIS: -2 }) });
+    expect(applyDamage(c, 10, "magical").hp).toBe(10);
   });
 
   it("routes resistance through temporary CON modifiers", () => {
