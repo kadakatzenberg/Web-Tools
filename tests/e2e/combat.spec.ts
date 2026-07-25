@@ -355,7 +355,7 @@ test("moves a combatant between battlefield positions", async ({ page }) => {
   const table = page.locator(".wartable");
   const expand = table.getByRole("button", { name: "Expand" });
   if (await expand.isVisible()) await expand.click();
-  await expect(table.locator('.lane[data-position="Back"] .token')).toHaveCount(1);
+  await expect(table.locator('.band[data-drop="Player:Back"] .tok')).toHaveCount(1);
 });
 
 test("opens the command palette and advances the phase from it", async ({ page }) => {
@@ -455,4 +455,84 @@ test("logs no console errors during a normal session", async ({ page }) => {
   await page.getByRole("button", { name: "Next phase →" }).click();
 
   expect(errors).toEqual([]);
+});
+
+
+test("drags a combatant between war table bands", async ({ page }) => {
+  await addCombatant(page, "Runner");
+
+  const table = page.locator(".wartable");
+  const expand = table.getByRole("button", { name: "Expand" });
+  if (await expand.isVisible()) await expand.click();
+
+  const front = table.locator('.band[data-drop="Player:Front"]');
+  const back = table.locator('.band[data-drop="Player:Back"]');
+  await expect(front.locator(".tok")).toHaveCount(1);
+
+  const token = front.locator(".tok").first();
+  const from = await token.boundingBox();
+  const to = await back.boundingBox();
+
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  // Two moves: the first engages the drag, the second lands on the target.
+  await page.mouse.move(from!.x + from!.width / 2 + 30, from!.y + from!.height / 2, { steps: 4 });
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 8 });
+  await expect(back).toHaveAttribute("data-over", "1");
+  await page.mouse.up();
+
+  await expect(back.locator(".tok")).toHaveCount(1);
+  await expect(front.locator(".tok")).toHaveCount(0);
+  await expect(card(page, "Runner").getByRole("button", { name: "Back", exact: true }))
+    .toHaveAttribute("aria-pressed", "true");
+});
+
+test("does not allow dropping a combatant onto the opposing side", async ({ page }) => {
+  await addCombatant(page, "Ally");
+  await addCombatant(page, "Foe", { role: "Enemy" });
+
+  const table = page.locator(".wartable");
+  const expand = table.getByRole("button", { name: "Expand" });
+  if (await expand.isVisible()) await expand.click();
+
+  const playerFront = table.locator('.band[data-drop="Player:Front"]');
+  const enemyFront = table.locator('.band[data-drop="Enemy:Front"]');
+
+  const token = playerFront.locator(".tok").first();
+  const from = await token.boundingBox();
+  const to = await enemyFront.boundingBox();
+
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from!.x + from!.width / 2 + 30, from!.y + from!.height / 2, { steps: 4 });
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 8 });
+  // The enemy band never advertises itself as a valid target.
+  await expect(enemyFront).not.toHaveAttribute("data-accept", "1");
+  await page.mouse.up();
+
+  // Ally stayed put; Foe was not displaced.
+  await expect(playerFront.locator(".tok")).toHaveCount(1);
+  await expect(enemyFront.locator(".tok")).toHaveCount(1);
+});
+
+test("cancels a drag on Escape", async ({ page }) => {
+  await addCombatant(page, "Skittish");
+  const table = page.locator(".wartable");
+  const expand = table.getByRole("button", { name: "Expand" });
+  if (await expand.isVisible()) await expand.click();
+
+  const front = table.locator('.band[data-drop="Player:Front"]');
+  const back = table.locator('.band[data-drop="Player:Back"]');
+  const from = await front.locator(".tok").first().boundingBox();
+  const to = await back.boundingBox();
+
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from!.x + from!.width / 2 + 30, from!.y + from!.height / 2, { steps: 4 });
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 6 });
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+
+  await expect(front.locator(".tok")).toHaveCount(1);
+  await expect(back.locator(".tok")).toHaveCount(0);
 });

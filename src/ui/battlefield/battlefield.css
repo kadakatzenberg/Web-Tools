@@ -74,186 +74,254 @@
   color: var(--bone);
 }
 
-.wartable__field {
+.wartable__hint {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-}
-
-.wartable__side {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: var(--s3);
-}
-
-.wartable__sidelabel {
+  margin-top: var(--s2);
   font-size: var(--fs-xs);
-  letter-spacing: 0.16em;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  color: var(--smoke);
-  padding: var(--s2) 0;
+  color: var(--faint);
+  font-style: italic;
 }
 
-.wartable__side[data-side="enemy"] .wartable__sidelabel {
-  color: var(--violet);
-}
-.wartable__side[data-side="player"] .wartable__sidelabel {
-  color: var(--moonlit);
-}
+/* ══ The field ══
+   Two columns: the engagement bands, and the Out sidings.
+   Five rows: enemy back / enemy front / the front line / player front / player back.
+   Mirrored, so the two Front bands meet at the centre. */
 
-.wartable__lanes {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--s2);
-  min-width: 0;
-}
-
-/* The centre line: where the two forces meet. */
-.wartable__divide {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--seal), transparent);
-  opacity: 0.55;
+.wt {
   position: relative;
+  display: grid;
+  grid-template-columns: 1fr clamp(88px, 14%, 132px);
+  grid-template-rows: repeat(2, minmax(66px, auto)) 0 repeat(2, minmax(66px, auto));
+  gap: 2px;
+  padding-left: 18px; /* room for the vertical flank labels */
 }
 
-.wartable__divide span {
+/* Placement is keyed off the drop target itself, so the grid can never drift
+   out of step with what a band actually accepts. */
+.band[data-drop="Enemy:Back"]   { grid-area: 1 / 1; }
+.band[data-drop="Enemy:Front"]  { grid-area: 2 / 1; }
+.band[data-drop="Player:Front"] { grid-area: 4 / 1; }
+.band[data-drop="Player:Back"]  { grid-area: 5 / 1; }
+
+/* Out sidings span each half. */
+.band[data-drop="Enemy:Out"]    { grid-area: 1 / 2 / 3 / 3; }
+.band[data-drop="Player:Out"]   { grid-area: 4 / 2 / 6 / 3; }
+
+/* The front line: where the two forces meet. */
+.wt__line {
+  grid-area: 3 / 1 / 4 / 3;
+  position: relative;
+  height: 0;
+  border-top: 1px solid var(--seal);
+  opacity: 0.75;
+  margin: var(--s2) 0;
+}
+
+.wt__mark {
   position: absolute;
   left: 50%;
-  top: 50%;
-  width: 7px;
-  height: 7px;
+  top: 0;
+  width: 9px;
+  height: 9px;
   transform: translate(-50%, -50%) rotate(45deg);
   background: var(--seal);
+  box-shadow: 0 0 10px rgba(200, 56, 46, 0.55);
+}
+
+.wt__flank {
+  position: absolute;
+  left: 0;
+  font-size: 0.5625rem;
+  letter-spacing: 0.2em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  pointer-events: none;
+}
+
+.wt__flank--enemy {
+  top: 0;
+  height: calc(50% - var(--s2));
+  color: var(--violet);
+  opacity: 0.75;
+}
+
+.wt__flank--player {
+  bottom: 0;
+  height: calc(50% - var(--s2));
+  color: var(--moonlit);
+  opacity: 0.75;
+  transform: rotate(180deg);
+}
+
+/* ── Band ── */
+
+.band {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-sm);
+  background: rgba(5, 5, 10, 0.4);
+  min-width: 0;
+  transition: border-color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+
+/* Depth cue: Front sits closest to the line and reads warmest. */
+.band[data-position="Front"] {
+  background: rgba(12, 10, 14, 0.55);
+}
+.band[data-position="Back"] {
+  background: rgba(5, 5, 10, 0.28);
+}
+.band[data-position="Out"] {
+  border-style: dashed;
   opacity: 0.8;
 }
 
-/* ── Lane ── */
-
-.lane {
-  position: relative;
-  background: rgba(5, 5, 10, 0.45);
-  border: 1px solid var(--metal-700);
-  border-radius: var(--r-md);
-  padding: var(--s2);
-  min-height: 84px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
+.band[data-side="enemy"] {
+  border-left: 2px solid rgba(154, 122, 224, 0.4);
+}
+.band[data-side="player"] {
+  border-left: 2px solid rgba(107, 159, 224, 0.4);
 }
 
-.lane[data-position="Out"] {
-  opacity: 0.72;
+.band--out {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.band__label {
+  flex-shrink: 0;
+  width: 3.4rem;
+  font-family: var(--font-display);
+  font-size: 0.5625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--smoke);
+}
+
+.band--out .band__label {
+  width: auto;
+  text-align: center;
+}
+
+.band__slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  align-content: center;
+}
+
+.band--out .band__slots {
+  justify-content: center;
+}
+
+/* Drop affordance — colour and inner glow only, never size. */
+.band[data-accept="1"] {
+  border-color: var(--phase-dim);
   border-style: dashed;
 }
 
-.lane__label {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2);
+.band[data-accept="1"][data-over="1"] {
+  border-color: var(--phase);
+  border-style: solid;
+  background: color-mix(in srgb, var(--phase) 14%, rgba(5, 5, 10, 0.5));
+  box-shadow: inset 0 0 22px -6px var(--phase);
 }
 
-.lane__count {
-  font-size: var(--fs-xs);
-  color: var(--faint);
-}
-
-.lane__slots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-  flex: 1;
-  align-content: flex-start;
-}
-
-.lane__empty {
-  color: var(--faint);
-  font-size: var(--fs-sm);
-}
-
-/* Overlaid, not appended: selecting a combatant must not change the height of
-   the war table. Growing it here pushes the whole card list down and can steal
-   the click the GM is in the middle of making. */
-.lane__move {
+/* Overlaid so a selection cannot change the table's height. */
+.band__move {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   font-family: var(--font-display);
   font-size: var(--fs-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--phase);
-  background: color-mix(in srgb, var(--lacquer-900) 76%, transparent);
+  background: color-mix(in srgb, var(--lacquer-900) 80%, transparent);
   border: 1px dashed var(--phase-dim);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   opacity: 0;
   transition: opacity var(--t-fast) var(--ease-out);
+  padding: 0 var(--s2);
+  text-align: center;
 }
 
-.lane:hover .lane__move,
-.lane__move:focus-visible {
+.band:hover .band__move,
+.band__move:focus-visible {
   opacity: 1;
 }
 
 @media (pointer: coarse) {
-  /* No hover on touch — keep the target permanently visible but quiet. */
-  .lane__move {
+  .band__move {
     opacity: 1;
-    background: color-mix(in srgb, var(--lacquer-900) 55%, transparent);
+    background: color-mix(in srgb, var(--lacquer-900) 58%, transparent);
   }
 }
 
 /* ── Token ── */
 
-.token {
-  position: relative;
+.tok {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 74px;
-  padding: var(--s2) 0.2rem;
-  border-radius: var(--r-md);
+  gap: var(--s2);
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
   border: 1px solid var(--metal-700);
+  border-radius: 999px;
   background: linear-gradient(180deg, var(--lacquer-600), var(--lacquer-800));
+  max-width: 100%;
+  min-height: 34px;
+  cursor: grab;
   transition: border-color var(--t-fast) var(--ease-out),
     transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out);
 }
 
-.token:hover {
-  transform: translateY(-2px);
+.tok:hover {
   border-color: var(--metal-400);
+  transform: translateY(-1px);
 }
 
-.token[data-side="player"] {
-  border-bottom: 2px solid rgba(107, 159, 224, 0.55);
-}
-.token[data-side="enemy"] {
-  border-bottom: 2px solid rgba(154, 122, 224, 0.55);
+.tok:active {
+  cursor: grabbing;
 }
 
-.token[data-selected="1"] {
+.tok[data-side="player"] {
+  box-shadow: inset 2px 0 0 rgba(107, 159, 224, 0.7);
+}
+.tok[data-side="enemy"] {
+  box-shadow: inset 2px 0 0 rgba(154, 122, 224, 0.7);
+}
+
+.tok[data-selected="1"] {
   border-color: var(--phase);
-  box-shadow: 0 0 0 1px var(--phase), 0 0 18px var(--phase-glow);
+  box-shadow: inset 2px 0 0 var(--phase), 0 0 16px var(--phase-glow);
 }
 
-.token[data-done="1"] {
+.tok[data-done="1"] {
   opacity: 0.5;
 }
 
-.token[data-band="unconscious"] {
-  filter: grayscale(0.65);
+.tok[data-band="unconscious"] {
+  filter: grayscale(0.6);
 }
 
-/* The ring is a vessel that fills from the bottom — health as volume. */
-.token__ring {
+.tok[data-dragging="1"] {
+  opacity: 0.35;
+}
+
+/* Health as volume: a vessel filling from the bottom. */
+.tok__vessel {
   position: relative;
-  width: 30px;
-  height: 30px;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 1px solid var(--metal-500);
   background: var(--lacquer-900);
@@ -262,7 +330,7 @@
   place-items: center;
 }
 
-.token__fill {
+.tok__fill {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -271,83 +339,130 @@
   transition: height var(--t-slow) var(--ease-out);
 }
 
-.token__glyph {
+.tok__glyph {
   position: relative;
-  font-size: var(--fs-sm);
+  font-size: 0.625rem;
   color: var(--bone);
   text-shadow: 0 1px 3px #000;
 }
 
-.token__name {
-  font-size: 0.625rem;
-  line-height: 1.2;
-  max-width: 100%;
+.tok__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.tok__name {
+  font-size: 0.6875rem;
+  color: var(--bone);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ash);
+  max-width: 8.5rem;
 }
 
-.token__meta {
+.tok__meta {
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 0.625rem;
+  gap: 4px;
+  font-size: 0.5625rem;
   font-weight: 700;
 }
 
-.token__shield {
+.tok__shield {
   color: var(--shield);
 }
-
-.token__done {
+.tok__done {
   color: var(--jade);
 }
 
-.token__conditions {
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.token__condition {
-  font-size: 0.5rem;
+.tok__cond {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--candle);
-  background: rgba(232, 169, 60, 0.13);
+  background: rgba(232, 169, 60, 0.14);
   border-radius: 2px;
   padding: 0 2px;
+  font-weight: 600;
 }
 
+/* ── Drag ghost ── */
+
+.dragghost {
+  position: fixed;
+  z-index: var(--z-toast);
+  transform: translate(-50%, -140%);
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  color: var(--bone);
+  background: color-mix(in srgb, var(--phase) 26%, var(--lacquer-700));
+  border: 1px solid var(--phase);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  box-shadow: var(--lift-2), 0 0 18px var(--phase-glow);
+  white-space: nowrap;
+}
+
+/* While dragging, stop text selection dead. */
+.wartable[data-dragging="1"] {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* ── Responsive ── */
+
 @media (max-width: 720px) {
-  /* Stacking the lanes made the table taller than the viewport. Keep the three
-     positions side by side and let each lane scroll its own tokens. */
-  .wartable__lanes {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--s1);
+  .wt {
+    grid-template-columns: 1fr clamp(84px, 26%, 110px);
+    grid-template-rows: repeat(2, minmax(58px, auto)) 0 repeat(2, minmax(58px, auto));
+    padding-left: 14px;
   }
-  .wartable__side {
-    grid-template-columns: 1fr;
-  }
-  .token {
+
+  /* In the narrow Out siding a horizontal token leaves one glyph of room for
+     the name. Stack it instead so the full column width goes to the label. */
+  .band--out .tok {
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.25rem;
+    border-radius: var(--r-md);
     width: 100%;
-    min-width: 0;
   }
-  .wartable__sidelabel {
-    writing-mode: horizontal-tb;
-    padding: 0;
+
+  .band--out .tok__body {
+    align-items: center;
+    width: 100%;
   }
-  .lane {
-    min-height: 0;
+
+  .band--out .tok__name {
+    max-width: 100%;
+    text-align: center;
   }
-  .lane__slots {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: var(--s1);
+
+  .band {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: var(--s1) var(--s2);
   }
-  .token {
-    flex: 0 0 auto;
+
+  .band__label {
+    width: auto;
+  }
+
+  .band__slots {
+    min-height: 30px;
+  }
+
+  .tok__name {
+    max-width: 6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tok:hover {
+    transform: none;
   }
 }
