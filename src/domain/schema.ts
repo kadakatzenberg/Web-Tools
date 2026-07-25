@@ -67,6 +67,7 @@ const abilitySchema = z
     charging: z.coerce.boolean().catch(false).optional(),
     phaseLock: z.coerce.number().nullish().transform((v) => (v ? Number(v) : undefined)),
     phaseLockType: z.enum(["player", "enemy"]).catch("player").optional(),
+    dice: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
   })
   .passthrough();
 
@@ -201,6 +202,7 @@ const sheetSkillSchema = z
     mode: abilityModeSchema.optional(),
     maxVal: z.coerce.number().catch(1).optional(),
     gainPerPhase: z.coerce.number().catch(1).optional(),
+    dice: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
   })
   .passthrough();
 

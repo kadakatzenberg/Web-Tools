@@ -1151,3 +1151,21 @@
   padding-top: var(--s3);
   border-top: var(--border);
 }
+
+/* Dice notation carried by a skill, and the card-level attack roll. */
+.ability__dice {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--candle);
+  background: rgba(232, 169, 60, 0.1);
+  border: 1px solid rgba(232, 169, 60, 0.3);
+  border-radius: var(--r-sm);
+  padding: 1px 5px;
+  min-height: 22px;
+}
+
+.ability__dice:hover {
+  background: rgba(232, 169, 60, 0.2);
+  color: var(--bone);
+}

@@ -82,3 +82,30 @@ The atmosphere layer caps device pixel ratio at 1.5, scales particle count by a
 coarse capability tier, and stops its loop entirely when the tab is hidden or
 reduced motion is requested. The tracker is fully functional with the canvas
 removed — it is decoration behind an `aria-hidden` boundary, not a dependency.
+
+
+## Dice notation
+
+The bot accepts far more than `1d20+n`, and three of its features map onto rules
+the tracker already modelled but never expressed:
+
+**Advantage and Disadvantage were already status conditions** and had no
+mechanical effect whatsoever — every roll the tracker emitted was a flat d20
+regardless. They now produce `2d20kh1` and `2d20kl1`, on both the enemy phase
+block and a combatant's own attack roll. Holding both cancels, per convention.
+
+**Crit highlighting** (`cs`, `cf=1`) costs nothing mathematically and makes a
+natural 20 or 1 obvious in the Discord message. It is opt-in on the enemy phase
+block: it is the only part of the emitted notation the bot could plausibly
+reject, and a broken roll block mid-phase is worse than a plain one.
+
+**Scatter rolls.** Targeting *everyone* emits a die sized to the living party
+plus a numbered legend, matching how indiscriminate attacks already get handled
+at the table.
+
+Skills can also carry their own notation — sessions show them rolling `1d4`,
+`1d6` and similar — which attaches a one-click copy button to the ability.
+
+**The tracker never rolls.** Every one of these functions builds a string and
+nothing more. The bot stays the single source of randomness, so nobody has to
+trust a number the tool produced over one the whole table watched happen.

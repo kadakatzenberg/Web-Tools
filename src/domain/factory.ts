@@ -115,6 +115,7 @@ export function abilityFromSheetSkill(
     cur: mode === "ammo" ? max : 0,
     gainPerPhase,
     effectText: sk.effect ?? "",
+    ...(sk.dice?.trim() ? { dice: sk.dice.trim() } : {}),
   };
   if (phaseLock) {
     ability.phaseLock = phaseLock;

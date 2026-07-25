@@ -11,6 +11,7 @@
 import type { Combatant, EncounterState } from "./types";
 import { PHASES } from "./constants";
 import { deriveStats } from "./rules";
+import { d20Roll, scatterRoll, swingFor, SWING_LABEL } from "./dice";
 
 /**
  * Condition vocabulary used at the table. Deliberately coarse: the party should
@@ -103,6 +104,11 @@ export interface EnemyRoll {
   target: string;
 }
 
+export interface EnemyPhaseOptions {
+  /** Highlight natural 20s and 1s in the bot output. Cosmetic only. */
+  flagCrits?: boolean;
+}
+
 /**
  * The enemy phase block, in the format the rules specify:
  *
@@ -111,22 +117,38 @@ export interface EnemyRoll {
  *
  * The bonus is the enemy's hit bonus (DEX × 2) including temporary modifiers,
  * so the GM never has to look it up mid-phase.
+ *
+ * An enemy holding Advantage or Disadvantage rolls `2d20kh1` or `2d20kl1`
+ * accordingly, and the line is tagged so the reason is visible in Discord.
+ * Holding both cancels out. A target of "everyone" becomes a scatter roll — one
+ * die and a numbered legend — matching how indiscriminate attacks already get
+ * handled at the table.
  */
 export function formatEnemyPhaseBlock(
   state: EncounterState,
   rolls: EnemyRoll[],
+  options: EnemyPhaseOptions = {},
 ): string {
   const byId = new Map(state.combatants.map((c) => [c.id, c]));
+  const flagCrits = options.flagCrits ?? false;
+  const targets = livingPlayers(state).map((p) => p.name);
   const lines: string[] = [];
 
   for (const roll of rolls) {
     const c = byId.get(roll.combatantId);
     if (!c || c.hp <= 0) continue;
+
     const hit = deriveStats(c.stats, c.tempMods).hit;
-    const sign = hit >= 0 ? `+${hit}` : `${hit}`;
-    const target = roll.target.trim() || "—";
-    lines.push(`${c.name.toUpperCase()} — ${target}`);
-    lines.push(`{{1d20${hit === 0 ? "" : sign}}}`);
+    const swing = swingFor(c);
+    const raw = roll.target.trim();
+    const scatter = raw.toLowerCase() === "everyone";
+    const label = SWING_LABEL[swing];
+
+    lines.push(
+      `${c.name.toUpperCase()} — ${raw || "—"}${label ? ` [${label}]` : ""}`,
+    );
+    lines.push(d20Roll({ bonus: hit, swing, flagCrits }));
+    if (scatter && targets.length) lines.push(scatterRoll(targets));
     lines.push("");
   }
 

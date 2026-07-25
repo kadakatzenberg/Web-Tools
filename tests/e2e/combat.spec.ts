@@ -640,3 +640,95 @@ test("negative CON makes a combatant take extra physical damage", async ({ page 
   const log = page.getByRole("complementary", { name: "Combat log" });
   await expect(log.getByText(/\+2 exposed/)).toBeVisible();
 });
+
+
+test("an enemy with Advantage rolls keep-highest in the phase block", async ({ page }) => {
+  await addCombatant(page, "Kada");
+  await addCombatant(page, "Void Horde", { role: "Enemy", stats: { DEX: 1 } });
+
+  // Give the enemy Advantage.
+  const foe = card(page, "Void Horde");
+  await foe.getByLabel("Condition", { exact: true }).selectOption("Advantage");
+  await foe.getByLabel("Condition duration in rounds").fill("2");
+  await foe.getByRole("button", { name: "Apply", exact: true }).click();
+
+  await page.getByRole("button", { name: "Next phase →" }).click();
+  const panel = page.locator(".enemyphase");
+  await expect(panel.locator(".enemyphase__swing")).toHaveText("ADV");
+
+  await panel.getByLabel("Target for Void Horde").selectOption("Kada");
+  await expect(panel.locator(".enemyphase__preview")).toHaveText(
+    "VOID HORDE — Kada [ADV]\n{{2d20kh1+2}}",
+  );
+
+  // Crit flags are opt-in and change only the notation, not the bonus.
+  await panel.getByRole("button", { name: "Crit flags" }).click();
+  await expect(panel.locator(".enemyphase__preview")).toHaveText(
+    "VOID HORDE — Kada [ADV]\n{{2d20kh1cscf=1+2}}",
+  );
+});
+
+test("targeting everyone adds a scatter die with a legend", async ({ page }) => {
+  await addCombatant(page, "Kada");
+  await addCombatant(page, "Dawn");
+  await addCombatant(page, "Bloat", { role: "Enemy" });
+
+  await page.getByRole("button", { name: "Next phase →" }).click();
+  const panel = page.locator(".enemyphase");
+  await panel.getByLabel("Target for Bloat").selectOption("everyone");
+
+  await expect(panel.locator(".enemyphase__preview")).toHaveText(
+    "BLOAT — everyone\n{{1d20}}\n{{1d2}} — 1: Kada. 2: Dawn.",
+  );
+});
+
+test("a combatant's attack roll accounts for Advantage", async ({ page }) => {
+  await addCombatant(page, "Archer", { stats: { DEX: 3 } });
+  const c = card(page, "Archer");
+
+  // Plain: hit bonus of +6.
+  await expect(c.getByRole("button", { name: /Attack roll/ })).toHaveAttribute(
+    "title",
+    /\{\{1d20cscf=1\+6\}\}/,
+  );
+
+  await c.getByLabel("Condition", { exact: true }).selectOption("Advantage");
+  await c.getByLabel("Condition duration in rounds").fill("3");
+  await c.getByRole("button", { name: "Apply", exact: true }).click();
+
+  await expect(c.locator(".badge", { hasText: "Advantage" })).toBeVisible();
+  await expect(c.getByRole("button", { name: /Attack roll/ })).toHaveAttribute(
+    "title",
+    /\{\{2d20kh1cscf=1\+6\}\}/,
+  );
+});
+
+test("an ability can carry its own dice notation", async ({ page }) => {
+  await addCombatant(page, "Mage");
+  const c = card(page, "Mage");
+
+  await c.getByRole("button", { name: "Abilities" }).click();
+  await c.getByRole("button", { name: "+ Ability" }).click();
+  await c.getByLabel("Ability name").fill("Blazing Star");
+  await c.getByLabel("Dice notation").fill("1d4");
+  await c.locator(".add-ability").getByRole("button", { name: "Add", exact: true }).click();
+
+  const ability = c.locator(".ability").filter({ hasText: "Blazing Star" });
+  await expect(ability.locator(".ability__dice")).toHaveText("🎲 {{1d4}}");
+});
+
+test("rejects prose typed into the dice field", async ({ page }) => {
+  await addCombatant(page, "Confused");
+  const c = card(page, "Confused");
+
+  await c.getByRole("button", { name: "Abilities" }).click();
+  await c.getByRole("button", { name: "+ Ability" }).click();
+  await c.getByLabel("Ability name").fill("Vague Skill");
+  await c.getByLabel("Dice notation").fill("roll a d4 please");
+  await c.locator(".add-ability").getByRole("button", { name: "Add", exact: true }).click();
+
+  // The ability is created, but no bogus roll button is attached.
+  const ability = c.locator(".ability").filter({ hasText: "Vague Skill" });
+  await expect(ability).toBeVisible();
+  await expect(ability.locator(".ability__dice")).toHaveCount(0);
+});

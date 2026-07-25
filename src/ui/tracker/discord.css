@@ -59,7 +59,7 @@
 
 .enemyphase__row {
   display: grid;
-  grid-template-columns: 1fr auto minmax(9rem, 14rem);
+  grid-template-columns: 1fr auto auto minmax(9rem, 14rem);
   align-items: center;
   gap: var(--s2);
   padding: var(--s1) var(--s2);
@@ -85,6 +85,32 @@
   text-align: right;
 }
 
+.enemyphase__swing {
+  font-family: var(--font-display);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 1px 5px;
+  border-radius: var(--r-sm);
+  border: 1px solid currentColor;
+}
+
+.enemyphase__swing[data-swing="advantage"] {
+  color: var(--jade);
+  background: rgba(78, 207, 154, 0.12);
+}
+
+.enemyphase__swing[data-swing="disadvantage"] {
+  color: var(--cinnabar);
+  background: rgba(227, 81, 65, 0.12);
+}
+
+.enemyphase__lead code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  color: var(--candle);
+}
+
 .enemyphase__preview {
   margin-top: var(--s3);
   padding: var(--s2);
@@ -102,7 +128,7 @@
 
 @media (max-width: 640px) {
   .enemyphase__row {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
   }
   .enemyphase__row select {
     grid-column: 1 / -1;

@@ -46,6 +46,11 @@ export interface Ability {
   charging?: boolean;
   phaseLock?: number;
   phaseLockType?: PhaseLockType;
+  /**
+   * Tupper notation this skill rolls, without braces — e.g. `1d4` or `2d6!`.
+   * Optional and additive; abilities written before this field parse unchanged.
+   */
+  dice?: string;
 }
 
 export interface TempShield {
@@ -95,6 +100,8 @@ export interface SheetSkill {
   mode?: AbilityMode;
   maxVal?: number;
   gainPerPhase?: number;
+  /** Tupper notation this skill rolls, without braces. */
+  dice?: string;
 }
 
 export interface SheetSkills {

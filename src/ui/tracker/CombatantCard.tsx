@@ -29,9 +29,10 @@ import {
 } from "@/domain/rules";
 import { POSITIONS, SKILL_MODES, SKILL_MODE_LABELS, STAT_KEYS, STATUS_OPTIONS } from "@/domain/constants";
 import { gid } from "@/domain/factory";
+import { d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
 import { useStoreApi } from "@/state/store";
-import { announce, useId } from "../hooks";
-import { Badge, Button, Disclosure, IconButton, Meter, Modal } from "../primitives";
+import { announce, useCopy, useId } from "../hooks";
+import { Badge, Button, Disclosure, IconButton, Meter, Modal, useToast } from "../primitives";
 import { FloatingMarks, useFeedback, useImpact } from "@/fx/feedback";
 import { playCue } from "@/fx/sound";
 import "./tracker.css";
@@ -108,6 +109,9 @@ const AbilityChip = memo(function AbilityChip({
     wasReady.current = ready;
   }, [ready, locked, chargeReady]);
 
+  const copy = useCopy();
+  const toast = useToast();
+
   const patch = useCallback(
     (p: Partial<Ability>, marksDone = false) =>
       dispatch({
@@ -163,6 +167,20 @@ const AbilityChip = memo(function AbilityChip({
       </div>
 
       {ab.effectText && <p className="ability__effect">{ab.effectText}</p>}
+
+      {ab.dice && (
+        <button
+          type="button"
+          className="ability__dice"
+          title={`Copy ${wrapDice(ab.dice)} for Discord`}
+          onClick={async () => {
+            const ok = await copy(wrapDice(ab.dice!));
+            toast.push(ok ? `${wrapDice(ab.dice!)} copied` : "Could not copy", ok ? "ok" : "danger");
+          }}
+        >
+          🎲 {wrapDice(ab.dice)}
+        </button>
+      )}
 
       <div className="ability__status">
         <span className="ability__state tnum">{stateWord}</span>
@@ -289,6 +307,8 @@ function AbilityEditor({
   const [effect, setEffect] = useState(ab.effectText ?? "");
   const [max, setMax] = useState(String(ab.max));
   const [gain, setGain] = useState(String(ab.gainPerPhase ?? 1));
+  const [dice, setDice] = useState(ab.dice ?? "");
+  const diceValid = !dice.trim() || looksLikeDice(dice);
 
   const capacityLabel =
     ab.mode === "ammo" ? "Ammo capacity" : ab.mode === "charge" ? "Charge required" : ab.mode === "stack" ? "Stack ceiling" : "Cooldown length";
@@ -304,6 +324,7 @@ function AbilityEditor({
           <Button onClick={onClose}>Cancel</Button>
           <Button
             tone="heal"
+            disabled={!diceValid}
             onClick={() => {
               dispatch({
                 type: "ABILITY_UPDATED",
@@ -314,6 +335,7 @@ function AbilityEditor({
                   effectText: effect,
                   max: Math.max(0, parseInt(max, 10) || 0),
                   gainPerPhase: Math.max(1, parseInt(gain, 10) || 1),
+                  dice: dice.trim(),
                 },
               });
               onClose();
@@ -341,6 +363,20 @@ function AbilityEditor({
         </>
       )}
 
+      <label className="field__label" htmlFor="ab-dice">Dice</label>
+      <input
+        id="ab-dice"
+        value={dice}
+        placeholder="1d4"
+        aria-invalid={diceValid ? undefined : "true"}
+        onChange={(e) => setDice(e.target.value)}
+      />
+      <p className={diceValid ? "field__hint" : "field__error"}>
+        {diceValid
+          ? "Tupper notation without braces. Adds a copy button to the ability."
+          : "That does not look like dice notation. Leave out the braces."}
+      </p>
+
       <label className="field__label" htmlFor="ab-effect">Effect</label>
       <textarea id="ab-effect" value={effect} onChange={(e) => setEffect(e.target.value)} />
     </Modal>
@@ -357,6 +393,7 @@ function AddAbility({ combatantId }: { combatantId: string }) {
   const [max, setMax] = useState("2");
   const [gain, setGain] = useState("1");
   const [effect, setEffect] = useState("");
+  const [dice, setDice] = useState("");
   const [lock, setLock] = useState("");
   const [lockType, setLockType] = useState<"player" | "enemy">("player");
 
@@ -380,11 +417,13 @@ function AddAbility({ combatantId }: { combatantId: string }) {
       cur: mode === "ammo" ? mx : 0,
       gainPerPhase: Math.max(1, parseInt(gain, 10) || 1),
       effectText: effect,
+      ...(dice.trim() && looksLikeDice(dice) ? { dice: dice.trim() } : {}),
       ...(phaseLock ? { phaseLock, phaseLockType: lockType } : {}),
     };
     dispatch({ type: "ABILITY_ADDED", id: combatantId, ability });
     setName("");
     setEffect("");
+    setDice("");
     setLock("");
     setOpen(false);
   };
@@ -434,6 +473,12 @@ function AddAbility({ combatantId }: { combatantId: string }) {
             placeholder="Gain"
           />
         )}
+        <input
+          value={dice}
+          onChange={(e) => setDice(e.target.value)}
+          aria-label="Dice notation"
+          placeholder="Dice e.g. 1d4"
+        />
         <input
           type="number"
           min={1}
@@ -519,6 +564,10 @@ export const CombatantCard = memo(function CombatantCard({
   const headingId = useId("cbt");
 
   const cardRef = useImpact<HTMLElement>(c.hp);
+  const copy = useCopy();
+  const toast = useToast();
+  const swing = swingFor(c);
+  const attackRoll = d20Roll({ bonus: derived.hit, swing, flagCrits: true });
 
   useEffect(() => {
     if (!focused) return;
@@ -667,6 +716,12 @@ export const CombatantCard = memo(function CombatantCard({
               </Badge>
             )}
             {c.done && <Badge tone="ok" glyph="✓">Acted</Badge>}
+            {swing === "advantage" && (
+              <Badge tone="ok" glyph="▲">Advantage</Badge>
+            )}
+            {swing === "disadvantage" && (
+              <Badge tone="danger" glyph="▼">Disadvantage</Badge>
+            )}
           </div>
         </div>
 
@@ -785,6 +840,19 @@ export const CombatantCard = memo(function CombatantCard({
                 }}
               >
                 Full
+              </Button>
+            </div>
+
+            <div className="action-group">
+              <Button
+                size="sm"
+                title={`Copy ${attackRoll} — hit bonus and any Advantage or Disadvantage already applied`}
+                onClick={async () => {
+                  const ok = await copy(attackRoll);
+                  toast.push(ok ? `${attackRoll} copied` : "Could not copy", ok ? "ok" : "danger");
+                }}
+              >
+                🎲 Attack roll
               </Button>
             </div>
           </div>

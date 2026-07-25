@@ -23,6 +23,7 @@ import {
   type EnemyRoll,
 } from "@/domain/report";
 import { deriveStats } from "@/domain/rules";
+import { SWING_LABEL, swingFor } from "@/domain/dice";
 import { useCopy } from "../hooks";
 import { Button, useToast } from "../primitives";
 import "./discord.css";
@@ -72,6 +73,12 @@ export function EnemyPhasePanel({ state }: { state: EncounterState }) {
   const enemies = useMemo(() => livingEnemies(state), [state]);
   const players = useMemo(() => livingPlayers(state), [state]);
   const [rolls, setRolls] = useState<EnemyRoll[]>([]);
+  /**
+   * Crit highlighting is off by default. It is cosmetic and safe, but it is
+   * also the only part of the emitted notation the bot could conceivably
+   * reject, and a broken roll block mid-phase is worse than a plain one.
+   */
+  const [flagCrits, setFlagCrits] = useState(false);
 
   // Keep one row per living enemy as the roster changes mid-phase.
   useEffect(() => {
@@ -83,7 +90,7 @@ export function EnemyPhasePanel({ state }: { state: EncounterState }) {
 
   if (!enemies.length) return null;
 
-  const block = formatEnemyPhaseBlock(state, rolls);
+  const block = formatEnemyPhaseBlock(state, rolls, { flagCrits });
   const assigned = rolls.filter((r) => r.target.trim()).length;
 
   const setTarget = (id: string, target: string) =>
@@ -109,6 +116,14 @@ export function EnemyPhasePanel({ state }: { state: EncounterState }) {
           </Button>
           <Button
             size="sm"
+            aria-pressed={flagCrits}
+            onClick={() => setFlagCrits((v) => !v)}
+            title="Append cs and cf=1 so the bot highlights natural 20s and 1s"
+          >
+            {flagCrits ? "✓ Crit flags" : "Crit flags"}
+          </Button>
+          <Button
+            size="sm"
             tone="danger"
             disabled={!assigned}
             onClick={async () => {
@@ -123,7 +138,10 @@ export function EnemyPhasePanel({ state }: { state: EncounterState }) {
 
       <p className="enemyphase__lead">
         Pick a target for each enemy, then paste the block straight into Discord. Hit
-        bonuses come from each enemy's DEX, including temporary modifiers.
+        bonuses come from each enemy's DEX, including temporary modifiers. An enemy
+        holding Advantage or Disadvantage rolls <code>2d20kh1</code> or{" "}
+        <code>2d20kl1</code> automatically. Targeting <em>everyone</em> adds a scatter
+        die with a numbered legend.
       </p>
 
       <ul className="enemyphase__list">
@@ -136,6 +154,15 @@ export function EnemyPhasePanel({ state }: { state: EncounterState }) {
               <span className="enemyphase__bonus tnum" title="Hit bonus (DEX × 2)">
                 {hit >= 0 ? `+${hit}` : hit}
               </span>
+              {SWING_LABEL[swingFor(e)] && (
+                <span
+                  className="enemyphase__swing"
+                  data-swing={swingFor(e)}
+                  title={swingFor(e) === "advantage" ? "Rolls 2d20kh1" : "Rolls 2d20kl1"}
+                >
+                  {SWING_LABEL[swingFor(e)]}
+                </span>
+              )}
               <select
                 aria-label={`Target for ${e.name}`}
                 value={row?.target ?? ""}
