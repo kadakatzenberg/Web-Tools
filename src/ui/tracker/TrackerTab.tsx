@@ -7,7 +7,7 @@
  * collapse away once the fight is running.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Combatant, DamageType, Role, Stats } from "@/domain/types";
 import { EMPTY_STATS, ENEMY_TYPE_HP, PHASES, STAT_KEYS } from "@/domain/constants";
 import { healthBand, healthPercent } from "@/domain/rules";
@@ -18,6 +18,8 @@ import type { SessionApi } from "@/persistence/useSession";
 import { announce, useCopy } from "../hooks";
 import { Badge, Button, ConfirmDialog, Disclosure, EmptyState, IconButton, useToast } from "../primitives";
 import { CombatantCard } from "./CombatantCard";
+import { EnemyPhasePanel, PostControls } from "./DiscordTools";
+import { pendingCombatants } from "@/domain/report";
 import { WarTable } from "../battlefield/WarTable";
 import { playCue } from "@/fx/sound";
 import "./tracker.css";
@@ -193,11 +195,9 @@ function InitiativeRoller() {
 /* ── Phase bar ── */
 
 function PhaseBar({
-  onCopyStatus,
   focusMode,
   onToggleFocus,
 }: {
-  onCopyStatus: () => void;
   focusMode: boolean;
   onToggleFocus: () => void;
 }) {
@@ -205,7 +205,9 @@ function PhaseBar({
   const { dispatch, undo, redo } = useStoreApi();
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const pending = present.combatants.filter((c) => !c.done && c.hp > 0).length;
+  // Scoped to the side whose phase it is, so this always agrees with the
+  // Pending button beside it.
+  const pending = pendingCombatants(present).length;
 
   return (
     <div className="phasebar" data-phase={present.phase}>
@@ -233,9 +235,7 @@ function PhaseBar({
           <IconButton label="Redo" disabled={!future.length} onClick={redo}>
             ↷
           </IconButton>
-          <Button size="sm" onClick={onCopyStatus}>
-            Copy status
-          </Button>
+          <PostControls state={present} />
           <Button size="sm" aria-pressed={focusMode} onClick={onToggleFocus}>
             {focusMode ? "Show all" : "Focus phase"}
           </Button>
@@ -566,8 +566,6 @@ function Group({
 export function TrackerTab({ session }: { session: SessionApi }) {
   const { present, trash } = useStore();
   const { dispatch } = useStoreApi();
-  const copy = useCopy();
-  const toast = useToast();
   const [compact, setCompact] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -575,16 +573,6 @@ export function TrackerTab({ session }: { session: SessionApi }) {
 
   const players = useMemo(() => present.combatants.filter((c) => c.role === "Player"), [present.combatants]);
   const enemies = useMemo(() => present.combatants.filter((c) => c.role === "Enemy"), [present.combatants]);
-
-  const copyStatus = useCallback(async () => {
-    const lines = [`Round ${present.round} · ${PHASES[present.phase]}`, ""];
-    for (const c of present.combatants) {
-      const st = c.statuses.length ? c.statuses.map((s) => `${s.name} (${s.duration}r)`).join(", ") : "none";
-      lines.push(`${c.name} · HP ${c.hp}/${c.maxHp} · Shield ${c.shield} · Status: ${st}`);
-    }
-    const ok = await copy(lines.join("\n"));
-    toast.push(ok ? "Encounter status copied" : "Could not copy to clipboard", ok ? "ok" : "danger");
-  }, [present, copy, toast]);
 
   const restoreLast = () => {
     const t = trash[0];
@@ -611,7 +599,7 @@ export function TrackerTab({ session }: { session: SessionApi }) {
 
   return (
     <div className="tracker">
-      <PhaseBar onCopyStatus={copyStatus} focusMode={focusMode} onToggleFocus={() => setFocusMode((v) => !v)} />
+      <PhaseBar focusMode={focusMode} onToggleFocus={() => setFocusMode((v) => !v)} />
 
       <div className="tracker__body">
         {!present.locked && <InitiativeRoller />}
@@ -633,6 +621,10 @@ export function TrackerTab({ session }: { session: SessionApi }) {
             </Button>
           )}
         </div>
+
+        {present.phase === 1 && present.combatants.length > 0 && (
+          <EnemyPhasePanel state={present} />
+        )}
 
         {present.combatants.length > 0 && <MultiAction combatants={present.combatants} />}
 

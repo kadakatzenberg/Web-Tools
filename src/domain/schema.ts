@@ -143,6 +143,7 @@ export const combatantSchema = z
     notes: z.unknown().transform((v) => (typeof v === "string" ? v : "")),
     sheetSkills: z.unknown().transform((v) => (looseJson(v) ?? {}) as object),
     done: z.coerce.boolean().catch(false),
+    player: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
   })
   .transform((c) => {
     // maxHp must be positive or every percentage calculation divides by zero.

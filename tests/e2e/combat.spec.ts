@@ -52,7 +52,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("loads straight into a usable tracker", async ({ page }) => {
-  await expect(page.getByRole("heading", { name: "Player Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Player Phase", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Next phase →" })).toBeVisible();
   await expect(page.getByText("The table is empty")).toBeVisible();
 });
@@ -143,7 +143,7 @@ test("resolves initiative with players first and with enemies first", async ({ p
   // Beat the enemy total → players act first.
   await page.getByLabel("Player initiative total").fill(String(total + 1));
   await page.getByRole("button", { name: "Lock initiative" }).click();
-  await expect(page.getByRole("heading", { name: "Player Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Player Phase", exact: true })).toBeVisible();
   await expect(page.getByText(/P1/)).toBeVisible();
 
   // Reset and tie → enemies act first.
@@ -154,7 +154,7 @@ test("resolves initiative with players first and with enemies first", async ({ p
   const total2 = parseInt((await page.locator(".initiative__total strong").innerText()).trim(), 10);
   await page.getByLabel("Player initiative total").fill(String(total2));
   await page.getByRole("button", { name: "Lock initiative" }).click();
-  await expect(page.getByRole("heading", { name: "Enemy Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Enemy Phase", exact: true })).toBeVisible();
 });
 
 test("advances phases and only ticks durations on the round boundary", async ({ page }) => {
@@ -171,17 +171,17 @@ test("advances phases and only ticks durations on the round boundary", async ({ 
 
   // Player → Enemy: no tick.
   await next.click();
-  await expect(page.getByRole("heading", { name: "Enemy Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Enemy Phase", exact: true })).toBeVisible();
   await expect(c.getByText("2r")).toBeVisible();
 
   // Enemy → Environment: no tick.
   await next.click();
-  await expect(page.getByRole("heading", { name: "Environment Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Environment Phase", exact: true })).toBeVisible();
   await expect(c.getByText("2r")).toBeVisible();
 
   // Environment → Player: round increments and the condition ticks.
   await next.click();
-  await expect(page.getByRole("heading", { name: "Player Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Player Phase", exact: true })).toBeVisible();
   await expect(page.getByText(/Round\s*2/)).toBeVisible();
   await expect(c.getByText("1r")).toBeVisible();
 
@@ -365,7 +365,7 @@ test("opens the command palette and advances the phase from it", async ({ page }
 
   await page.getByLabel("Search commands").fill("advance");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Enemy Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Enemy Phase", exact: true })).toBeVisible();
 });
 
 test("records actions in the combat log", async ({ page }) => {
@@ -383,7 +383,7 @@ test("records actions in the combat log", async ({ page }) => {
 test("advances the phase with the space bar", async ({ page }) => {
   await page.locator("body").click();
   await page.keyboard.press("Space");
-  await expect(page.getByRole("heading", { name: "Enemy Phase" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Enemy Phase", exact: true })).toBeVisible();
 });
 
 test("survives a reload by offering the local backup", async ({ page }) => {
@@ -535,4 +535,79 @@ test("cancels a drag on Escape", async ({ page }) => {
 
   await expect(front.locator(".tok")).toHaveCount(1);
   await expect(back.locator(".tok")).toHaveCount(0);
+});
+
+
+test("casts a stack ability and marks the combatant as acted", async ({ page }) => {
+  await addCombatant(page, "Spearman");
+  const c = card(page, "Spearman");
+
+  await c.getByRole("button", { name: "Abilities" }).click();
+  await c.getByRole("button", { name: "+ Ability" }).click();
+  await c.getByLabel("Ability name").fill("Sangre Lanza");
+  await c.getByLabel("Ability mode").selectOption("stack");
+  await c.getByLabel("Capacity or cooldown").fill("5");
+  await c.locator(".add-ability").getByRole("button", { name: "Add", exact: true }).click();
+
+  const ability = c.locator(".ability").filter({ hasText: "Sangre Lanza" });
+  await expect(ability.locator(".ability__state")).toHaveText("0/5");
+
+  // Build a couple of stacks by hand, as a player would.
+  await ability.getByLabel("Increase Sangre Lanza").click();
+  await ability.getByLabel("Increase Sangre Lanza").click();
+  await expect(ability.locator(".ability__state")).toHaveText("2/5");
+
+  // Cast spends the action without touching the stack count.
+  await ability.getByRole("button", { name: "Cast", exact: true }).click();
+  await expect(ability.locator(".ability__state")).toHaveText("2/5");
+  await expect(c.locator(".badge", { hasText: "Acted" })).toBeVisible();
+
+  // Reset still zeroes the stacks.
+  await ability.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(ability.locator(".ability__state")).toHaveText("0/5");
+});
+
+test("builds an enemy phase roll block in the rules format", async ({ page }) => {
+  await addCombatant(page, "Kada");
+  await addCombatant(page, "Void Horde", { role: "Enemy", stats: { DEX: 2 } });
+
+  // Enter the enemy phase.
+  await page.getByRole("button", { name: "Next phase →" }).click();
+  await expect(page.getByRole("heading", { name: "Enemy Phase", exact: true })).toBeVisible();
+
+  const panel = page.locator(".enemyphase");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("+4")).toBeVisible(); // DEX 2 × 2
+
+  await panel.getByLabel("Target for Void Horde").selectOption("Kada");
+  await expect(panel.locator(".enemyphase__preview")).toHaveText(
+    "VOID HORDE — Kada\n{{1d20+4}}",
+  );
+
+  await expect(panel.getByRole("button", { name: /Copy 1 roll/ })).toBeEnabled();
+});
+
+test("the enemy phase panel only appears during the enemy phase", async ({ page }) => {
+  await addCombatant(page, "Foe", { role: "Enemy" });
+  await expect(page.locator(".enemyphase")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Next phase →" }).click();
+  await expect(page.locator(".enemyphase")).toBeVisible();
+
+  await page.getByRole("button", { name: "Next phase →" }).click();
+  await expect(page.locator(".enemyphase")).toHaveCount(0);
+});
+
+test("pending count agrees between the phase bar and the post button", async ({ page }) => {
+  await addCombatant(page, "Alpha");
+  await addCombatant(page, "Beta");
+  await addCombatant(page, "Enemy One", { role: "Enemy" });
+
+  // Player phase: two players owe an action, the enemy does not count.
+  await expect(page.getByRole("button", { name: "Pending (2)" })).toBeVisible();
+  await expect(page.getByText("2 still to act")).toBeVisible();
+
+  await card(page, "Alpha").getByRole("button", { name: "Mark acted" }).click();
+  await expect(page.getByRole("button", { name: "Pending (1)" })).toBeVisible();
+  await expect(page.getByText("1 still to act")).toBeVisible();
 });

@@ -1,0 +1,114 @@
+/* ── Post cluster ── */
+
+.post {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: 2px var(--s1) 2px var(--s2);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-sm);
+  background: rgba(5, 5, 10, 0.4);
+}
+
+.post__label {
+  color: var(--faint);
+  letter-spacing: 0.16em;
+}
+
+/* ── Enemy phase ── */
+
+.enemyphase {
+  padding: var(--s3);
+  border-color: var(--cinnabar-dim);
+}
+
+.enemyphase__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-bottom: var(--s2);
+}
+
+.enemyphase__title {
+  font-size: var(--fs-md);
+  color: #ffb3a8;
+}
+
+.enemyphase__actions {
+  display: flex;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+
+.enemyphase__lead {
+  font-size: var(--fs-xs);
+  color: var(--smoke);
+  line-height: 1.6;
+  max-width: 62ch;
+  margin-bottom: var(--s3);
+}
+
+.enemyphase__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.enemyphase__row {
+  display: grid;
+  grid-template-columns: 1fr auto minmax(9rem, 14rem);
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s2);
+  background: var(--lacquer-850);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-sm);
+}
+
+.enemyphase__name {
+  font-size: var(--fs-sm);
+  color: var(--bone);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enemyphase__bonus {
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: #f5d98a;
+  min-width: 2rem;
+  text-align: right;
+}
+
+.enemyphase__preview {
+  margin-top: var(--s3);
+  padding: var(--s2);
+  background: var(--lacquer-900);
+  border: 1px solid var(--metal-700);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--ash);
+  white-space: pre-wrap;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .enemyphase__row {
+    grid-template-columns: 1fr auto;
+  }
+  .enemyphase__row select {
+    grid-column: 1 / -1;
+  }
+  .post {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

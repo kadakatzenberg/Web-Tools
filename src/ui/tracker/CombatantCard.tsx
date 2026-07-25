@@ -248,8 +248,23 @@ const AbilityChip = memo(function AbilityChip({
           )}
 
           {ab.mode === "stack" && (
-            <Button size="sm" onClick={() => patch({ cur: 0 })}>
-              Reset
+            <>
+              {/* Stack abilities had no way to be used at all — the +/- controls
+                  only moved the counter. Cast spends the action and marks the
+                  combatant as acted, leaving the stack count under manual
+                  control since only the player knows what their skill consumes. */}
+              <Button size="sm" tone="heal" onClick={() => patch({}, true)}>
+                Cast
+              </Button>
+              <Button size="sm" onClick={() => patch({ cur: 0 })}>
+                Reset
+              </Button>
+            </>
+          )}
+
+          {ab.mode === "passive" && (
+            <Button size="sm" onClick={() => patch({}, true)}>
+              Invoke
             </Button>
           )}
         </div>

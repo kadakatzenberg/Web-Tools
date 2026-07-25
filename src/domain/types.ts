@@ -125,6 +125,12 @@ export interface Combatant {
   notes: string;
   sheetSkills: SheetSkills;
   done: boolean;
+  /**
+   * Discord handle of the person playing this combatant, carried over from
+   * their library sheet. Optional and additive — records written before this
+   * field existed parse unchanged.
+   */
+  player?: string;
 }
 
 /** 0 = Player Phase, 1 = Enemy Phase, 2 = Environment Phase. */

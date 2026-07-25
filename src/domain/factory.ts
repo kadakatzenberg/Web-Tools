@@ -59,6 +59,7 @@ function baseCombatant(partial: Partial<Combatant> & { name: string; role: Role 
     notes: partial.notes ?? "",
     sheetSkills: partial.sheetSkills ?? {},
     done: partial.done ?? false,
+    player: partial.player ?? "",
   };
 }
 
@@ -151,6 +152,7 @@ export function combatantFromSheet(sheet: CombatSheet): Combatant {
     abilities,
     sheetSkills: skills,
     notes: sheet.notes ?? "",
+    player: sheet.player ?? "",
   });
 }
 

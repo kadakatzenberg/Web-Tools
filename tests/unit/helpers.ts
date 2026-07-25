@@ -29,6 +29,7 @@ export function makeCombatant(partial: Partial<Combatant> = {}): Combatant {
     notes: partial.notes ?? "",
     sheetSkills: partial.sheetSkills ?? {},
     done: partial.done ?? false,
+    player: partial.player ?? "",
   };
 }
 
