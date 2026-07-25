@@ -210,6 +210,7 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
         const b = res.breakdown;
         const bits: string[] = [`${b.toHp} to HP`];
         if (b.resisted) bits.unshift(`${b.resisted} resisted`);
+        if (b.amplified) bits.unshift(`+${b.amplified} exposed`);
         if (b.absorbedByTemp) bits.unshift(`${b.absorbedByTemp} on temp shield`);
         if (b.absorbedByShield) bits.unshift(`${b.absorbedByShield} on shield`);
         log.push(

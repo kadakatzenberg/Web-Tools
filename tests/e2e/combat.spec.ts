@@ -611,3 +611,32 @@ test("pending count agrees between the phase bar and the post button", async ({ 
   await expect(page.getByRole("button", { name: "Pending (1)" })).toBeVisible();
   await expect(page.getByText("1 still to act")).toBeVisible();
 });
+
+
+test("negative CON makes a combatant take extra physical damage", async ({ page }) => {
+  await addCombatant(page, "Glasscannon", { hp: 20, stats: { CON: -2, WIS: -1 } });
+  const c = card(page, "Glasscannon");
+
+  // 6 physical against CON -2 lands for 8.
+  await c.getByLabel("Damage to Glasscannon").fill("6");
+  await c.getByLabel("Damage type").selectOption("physical");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Glasscannon")).toBe("12/20");
+
+  // 6 magical against WIS -1 lands for 7.
+  await c.getByLabel("Damage to Glasscannon").fill("6");
+  await c.getByLabel("Damage type").selectOption("magical");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Glasscannon")).toBe("5/20");
+
+  // True damage still bypasses the calculation entirely.
+  await c.getByLabel("Damage to Glasscannon").fill("2");
+  await c.getByLabel("Damage type").selectOption("raw");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Glasscannon")).toBe("3/20");
+
+  // The combat log explains why the hits landed heavier.
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+  const log = page.getByRole("complementary", { name: "Combat log" });
+  await expect(log.getByText(/\+2 exposed/)).toBeVisible();
+});

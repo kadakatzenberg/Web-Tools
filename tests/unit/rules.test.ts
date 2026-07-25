@@ -52,17 +52,49 @@ describe("damage pipeline", () => {
     expect(applyDamage(c, 10, "true").hp).toBe(10);
   });
 
-  it("never amplifies damage for a negative CON — resistance floors at zero", () => {
+  it("amplifies physical damage for a negative CON", () => {
     const c = makeCombatant({ hp: 20, stats: stats({ CON: -3 }) });
-    // A negative CON grants no resistance and must not add to the hit.
-    // Applying it as bonus damage is a known manual-arithmetic error; the
-    // tracker exists partly to make it impossible.
-    expect(applyDamage(c, 10, "physical").hp).toBe(10);
+    const r = applyDamage(c, 10, "physical");
+    expect(r.hp).toBe(7); // 10 incoming + 3 exposed
+    expect(r.breakdown.amplified).toBe(3);
+    expect(r.breakdown.resisted).toBe(0);
   });
 
-  it("never amplifies damage for a negative WIS", () => {
+  it("amplifies magical damage for a negative WIS", () => {
     const c = makeCombatant({ hp: 20, stats: stats({ WIS: -2 }) });
-    expect(applyDamage(c, 10, "magical").hp).toBe(10);
+    const r = applyDamage(c, 10, "magical");
+    expect(r.hp).toBe(8);
+    expect(r.breakdown.amplified).toBe(2);
+  });
+
+  it("does not amplify true or raw damage regardless of CON", () => {
+    const c = makeCombatant({ hp: 20, stats: stats({ CON: -3, WIS: -3 }) });
+    expect(applyDamage(c, 10, "raw").hp).toBe(10);
+    expect(applyDamage(c, 10, "true").hp).toBe(10);
+  });
+
+  it("amplifies through a negative temporary modifier", () => {
+    const c = makeCombatant({
+      hp: 20,
+      stats: stats({ CON: 1 }),
+      tempMods: [{ id: "m", stat: "CON", val: -3, duration: 2, label: "sundered" }],
+    });
+    // Effective CON -2, so a 5 hit lands for 7.
+    expect(applyDamage(c, 5, "physical").hp).toBe(13);
+  });
+
+  it("spends amplified damage against shields before HP", () => {
+    const c = makeCombatant({ hp: 20, shield: 6, stats: stats({ CON: -2 }) });
+    const r = applyDamage(c, 4, "physical");
+    expect(r.shield).toBe(0); // 4 + 2 exposed = 6, fully absorbed
+    expect(r.hp).toBe(20);
+  });
+
+  it("reports resistance and amplification as mutually exclusive", () => {
+    const resistant = makeCombatant({ hp: 20, stats: stats({ CON: 2 }) });
+    const rb = applyDamage(resistant, 10, "physical").breakdown;
+    expect(rb.resisted).toBe(2);
+    expect(rb.amplified).toBe(0);
   });
 
   it("routes resistance through temporary CON modifiers", () => {

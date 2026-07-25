@@ -9,7 +9,7 @@ test; **[E]** by a browser test.
 - Order is resistance → temporary shields (in array order) → normal shield → HP. **[T][E]**
 - Physical damage is reduced by effective CON; magical by effective WIS. **[T][E]**
 - True damage (`raw` from the card selector, `true` from the DoT selector) ignores resistance entirely. **[T][E]**
-- Resistance is clamped at zero, so negative CON/WIS grants no resistance and does **not** amplify damage. **[T]** *(the settled rule — the rulebook wording is misleading; see `docs/MIGRATION.md`)*
+- Resistance is a signed value: positive reduces the hit, **negative increases it**. **[T]** *(deliberate rules change from v1, which clamped at zero — see `docs/MIGRATION.md`)*
 - Temporary modifiers feed into the resistance calculation. **[T]**
 - Temporary shields are consumed in order and dropped at zero. **[T][E]**
 - HP clamps to `[0, maxHp]`; damage never drives it negative. **[T][E]**

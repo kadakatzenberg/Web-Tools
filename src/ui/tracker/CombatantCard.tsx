@@ -545,6 +545,7 @@ export const CombatantCard = memo(function CombatantCard({
       playCue("damage");
     }
     if (b.resisted > 0) mark(c.id, `${b.resisted} resisted`, "resist");
+    if (b.amplified > 0) mark(c.id, `+${b.amplified} exposed`, "true");
     if (b.absorbedByTemp + b.absorbedByShield > 0) {
       mark(c.id, `◈ ${b.absorbedByTemp + b.absorbedByShield}`, "shield");
       playCue(b.brokeShield ? "shieldBreak" : "shieldHit");

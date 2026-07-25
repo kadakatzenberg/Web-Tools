@@ -96,17 +96,40 @@ regardless of network state.
 
 *Why:* silent data loss during a live session.
 
-## Settled rule: negative CON and WIS never add damage
+## Rules change: negative CON and WIS now add damage
 
-Resistance clamps at zero. A negative CON or WIS grants **no** resistance and
-does **not** increase damage taken.
+**v1 behaviour:** resistance was clamped at zero (`Math.max(0, effCON)`), so a
+negative CON or WIS granted no resistance but also did not increase damage taken.
 
-The written rulebook says negative values increase damage taken. That wording is
-misleading, and session logs show it producing manual arithmetic errors in play —
-a 4-damage hit applied as 5 against -1 CON, and a 9-damage round applied as 11.
-The table has confirmed the clamped behaviour is the intended rule.
+**v2 behaviour:** resistance is a signed value. A combatant with CON -2 takes two
+extra physical damage per hit; WIS does the same for magical damage. True and raw
+damage still bypass the calculation entirely.
 
-**Do not change this.** It is pinned by two tests
-(`never amplifies damage for a negative CON`, and the WIS equivalent). If the
-rulebook text is ever revised, that reference document should be corrected to
-match the code rather than the other way round.
+This is a deliberate change made by the table, not a bug fix and not a
+preservation. The reasoning:
+
+- CON and WIS feed **nothing but resistance**. Under clamping, CON -3 and CON 0
+  were mechanically identical, so a negative in either stat cost nothing at all.
+- Every other stat's negative has a real price: -STR is less damage, -DEX is less
+  hit, -AGI is lower AC, -INT is less magical damage.
+- The enemy generator **requires** a negative stat on every roll. Under clamping,
+  spending that mandatory weakness on CON or WIS was strictly free, and the freed
+  points went into offence — so "dump the weakness into CON" was a dominant
+  outcome for generated enemies and for player sheets alike.
+
+The written rulebook already described this behaviour; v1's code did not
+implement it.
+
+### Consequences to be aware of
+
+- Every combatant with a negative CON or WIS is now measurably more fragile.
+  Most generated enemies have one, since a weakness is mandatory.
+- The effect is largest at -3, where a 5-damage hit lands for 8. If that proves
+  too swingy in play, the two cheapest levers are capping generator negatives at
+  -2 for CON and WIS, or halving the amplification rounded down.
+- Historical session records are unaffected — nothing is recalculated on load.
+  Only damage applied from now on uses the new maths.
+
+Pinned by tests: `amplifies physical damage for a negative CON`, `amplifies
+magical damage for a negative WIS`, `does not amplify true or raw damage
+regardless of CON`, and `amplifies through a negative temporary modifier`.

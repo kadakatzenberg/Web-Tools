@@ -58,25 +58,26 @@ export function deriveStats(stats: Stats, mods?: TempMod[]): DerivedStats {
 }
 
 /**
- * Resistance applied against an incoming hit.
+ * Resistance applied against an incoming hit, as a signed value.
  *
- * Resistance clamps at zero: a negative CON or WIS grants *no* resistance, and
- * does **not** amplify incoming damage.
+ * Positive reduces the hit; **negative increases it**. A combatant with CON -2
+ * takes two extra physical damage per hit.
  *
- * This is correct and intentional — do not "fix" it. The written rulebook says
- * negative values increase damage taken, and session logs show that wording
- * leading to manual arithmetic errors at the table (a 4-damage hit being
- * applied as 5 against -1 CON). The table has confirmed the clamped behaviour
- * is the intended rule. Catching exactly this class of mistake is a large part
- * of why the tracker exists. See docs/MIGRATION.md.
+ * This is a deliberate rules change from v1, which clamped the value at zero
+ * and so made a negative CON or WIS completely free. Because those two stats
+ * feed nothing but resistance, clamping meant CON -3 and CON 0 were identical,
+ * which made dumping a mandatory weakness into them a dominant choice for both
+ * player sheets and generated enemies. See docs/MIGRATION.md.
+ *
+ * True and raw damage still bypass the calculation entirely.
  */
 export function resistanceFor(
   type: DamageType,
   effCON: number,
   effWIS: number,
 ): number {
-  if (type === "physical") return Math.max(0, effCON);
-  if (type === "magical") return Math.max(0, effWIS);
+  if (type === "physical") return effCON;
+  if (type === "magical") return effWIS;
   return 0;
 }
 
@@ -87,7 +88,10 @@ export interface DamageResult {
   /** Diagnostics for UI feedback; not persisted. */
   breakdown: {
     incoming: number;
+    /** Damage prevented by positive resistance. Never negative. */
     resisted: number;
+    /** Extra damage added by negative resistance. Never negative. */
+    amplified: number;
     afterResist: number;
     absorbedByTemp: number;
     absorbedByShield: number;
@@ -122,6 +126,7 @@ export function applyDamage(
       breakdown: {
         incoming: 0,
         resisted: 0,
+        amplified: 0,
         afterResist: 0,
         absorbedByTemp: 0,
         absorbedByShield: 0,
@@ -172,7 +177,8 @@ export function applyDamage(
     tempShields: ts,
     breakdown: {
       incoming: amt,
-      resisted: Math.min(tax, amt),
+      resisted: tax > 0 ? Math.min(tax, amt) : 0,
+      amplified: tax < 0 ? -tax : 0,
       afterResist,
       absorbedByTemp,
       absorbedByShield,
