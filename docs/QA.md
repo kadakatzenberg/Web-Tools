@@ -62,7 +62,7 @@ advancements. No errors, no warnings, no React key or hydration complaints.
 
 ## Defects found and fixed during QA
 
-Three were genuine application bugs, found by running the app rather than reading it.
+All of these were found by running the app and probing it, not by reading the code.
 
 ### 1. The first interaction with any combatant card was silently swallowed
 
@@ -103,6 +103,43 @@ consumed the entire first screen; the first combatant card was two screens down.
 **Fix:** lanes stay side by side on narrow viewports with per-lane token
 scrolling, the table starts collapsed below 720 px, and session/add-combatant
 controls moved below the roster so combatants sit directly under the phase bar.
+
+### 4. Buttons that accepted a click and did nothing
+
+**Symptom:** with the condition duration left blank, Apply did nothing at all —
+no chip, no message, no error. The same held for Strike and Mend with an empty
+amount, and for every Add button in the Effects panel.
+
+**Cause:** each handler opened with a `return` on incomplete input. Correct as
+validation, invisible as feedback: a dead click is indistinguishable from a
+frozen app, and mid-fight it reads as the tool having lost the encounter.
+
+**Fix:** every one of those guards now raises a warning toast naming the missing
+field, and the two duration fields default to one round so the common case takes
+a single click.
+
+### 5. A temporary modifier could not be given a negative value
+
+**Symptom:** entering STR −2 produced STR +2 — a debuff silently became a buff.
+
+**Cause:** the same `<input type="number">` flaw already fixed on the stat
+editor. The browser reports an intermediate `-` as an empty string, so the minus
+was dropped and only the digits survived.
+
+**Fix:** the field is a filtered text input with `inputMode="numeric"`, matching
+the stat editor.
+
+### 6. A removed combatant stayed selected in an open multi-target panel
+
+**Symptom:** with both combatants selected for a multi-strike, removing one left
+the button reading "Apply to 2".
+
+**Cause:** the selection is held as a list of ids and was never reconciled
+against the roster, so applying dispatched to an id that no longer existed and
+the count misreported how many combatants were about to be hit.
+
+**Fix:** the selection is intersected with the live roster at render time, so the
+count, the disabled state, and the dispatch all agree with what is on the table.
 
 ## Known limitations
 

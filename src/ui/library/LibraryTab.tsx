@@ -16,7 +16,7 @@ import { createSheet, fetchSheets, updateSheet } from "@/persistence/repositorie
 import { SupabaseError } from "@/persistence/supabase";
 import { useStoreApi } from "@/state/store";
 import { announce, useDebounced } from "../hooks";
-import { Badge, Button, Disclosure, EmptyState, ErrorPanel, Modal, useToast } from "../primitives";
+import { Badge, Button, Disclosure, EmptyState, ErrorPanel, Modal, NumberInput, useToast } from "../primitives";
 import "./library.css";
 
 /** Non-cryptographic checksum, ported from v1 so existing rows still match. */
@@ -265,10 +265,9 @@ function SheetEditor({
         {STAT_KEYS.map((k) => (
           <label key={k} className="editor__stat">
             <span>{k}</span>
-            <input
-              type="number"
+            <NumberInput
               value={stats[k]}
-              onChange={(e) => setStats({ ...stats, [k]: parseInt(e.target.value, 10) || 0 })}
+              onChange={(n) => setStats({ ...stats, [k]: n })}
             />
           </label>
         ))}

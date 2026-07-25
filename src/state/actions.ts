@@ -43,6 +43,8 @@ export type Command =
   | { type: "TEMP_SHIELD_REMOVED"; id: string; shieldId: string }
   /* conditions */
   | { type: "STATUS_ADDED"; id: string; status: StatusEffect }
+  | { type: "STATUS_ADDED_MANY"; ids: string[]; status: Omit<StatusEffect, "id"> }
+  | { type: "DOT_ADDED_MANY"; ids: string[]; dot: Omit<Dot, "id"> }
   | { type: "STATUS_REMOVED"; id: string; statusId: string }
   | { type: "DOT_ADDED"; id: string; dot: Dot }
   | { type: "DOT_REMOVED"; id: string; dotId: string }
@@ -115,6 +117,10 @@ export function commandLabel(cmd: Command): string {
       return "remove temp shield";
     case "STATUS_ADDED":
       return `add ${cmd.status.name}`;
+    case "STATUS_ADDED_MANY":
+      return `${cmd.status.name} on ${cmd.ids.length}`;
+    case "DOT_ADDED_MANY":
+      return `${cmd.dot.name} on ${cmd.ids.length}`;
     case "STATUS_REMOVED":
       return "remove status";
     case "DOT_ADDED":

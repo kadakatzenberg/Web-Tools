@@ -9,14 +9,14 @@
 
 import { useMemo, useState } from "react";
 import type { Combatant, DamageType, Role, Stats } from "@/domain/types";
-import { EMPTY_STATS, ENEMY_TYPE_HP, PHASES, STAT_KEYS } from "@/domain/constants";
+import { EMPTY_STATS, ENEMY_TYPE_HP, PHASES, STATUS_OPTIONS, STAT_KEYS } from "@/domain/constants";
 import { healthBand, healthPercent } from "@/domain/rules";
 import { rollInitiative } from "@/domain/phase";
 import { createManualCombatant } from "@/domain/factory";
 import { useStore, useStoreApi } from "@/state/store";
 import type { SessionApi } from "@/persistence/useSession";
 import { announce, useCopy } from "../hooks";
-import { Badge, Button, ConfirmDialog, Disclosure, EmptyState, IconButton, useToast } from "../primitives";
+import { Badge, Button, ConfirmDialog, Disclosure, EmptyState, IconButton, NumberInput, useToast } from "../primitives";
 import { CombatantCard } from "./CombatantCard";
 import { EnemyPhasePanel, PostControls } from "./DiscordTools";
 import { pendingCombatants } from "@/domain/report";
@@ -282,18 +282,37 @@ function PhaseBar({
 
 function MultiAction({ combatants }: { combatants: Combatant[] }) {
   const { dispatch } = useStoreApi();
-  const [mode, setMode] = useState<"damage" | "heal" | null>(null);
+  const toast = useToast();
+  const [mode, setMode] = useState<"damage" | "heal" | "condition" | null>(null);
   const [targets, setTargets] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<DamageType>("physical");
+  const [condition, setCondition] = useState<string>("Prone");
+  const [customCondition, setCustomCondition] = useState("");
+  const [duration, setDuration] = useState("1");
+  const [asDot, setAsDot] = useState(false);
 
   const toggle = (id: string) =>
     setTargets((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
+
+  /**
+   * Selection is held by id, so a combatant removed while this panel is open
+   * used to stay selected: the button still read "Apply to 2" with one target
+   * left on the table, and the dispatch went to an id that no longer existed.
+   * Intersect with the live roster instead of trusting the stored list.
+   */
+  const live = useMemo(() => {
+    const present = new Set(combatants.map((c) => c.id));
+    return targets.filter((id) => present.has(id));
+  }, [targets, combatants]);
 
   const close = () => {
     setMode(null);
     setTargets([]);
     setAmount("");
+    setDuration("1");
+    setCustomCondition("");
+    setAsDot(false);
   };
 
   if (!mode) {
@@ -305,29 +324,88 @@ function MultiAction({ combatants }: { combatants: Combatant[] }) {
         <Button size="sm" tone="heal" block onClick={() => setMode("heal")}>
           Multi-mend
         </Button>
+        <Button size="sm" block onClick={() => setMode("condition")}>
+          Multi-affect
+        </Button>
       </div>
     );
   }
 
   const apply = () => {
+    // Each of these used to return silently, so a click on Apply with one
+    // field unfilled looked identical to the app being frozen.
+    if (!live.length) {
+      toast.push("Pick at least one target first.", "warn");
+      return;
+    }
+
+    if (mode === "condition") {
+      const name = condition === "Custom" ? customCondition.trim() : condition;
+      const rounds = parseInt(duration, 10);
+      if (!name) {
+        toast.push("Name the condition first.", "warn");
+        return;
+      }
+      if (!rounds || rounds < 1) {
+        toast.push("A condition needs a duration of at least one round.", "warn");
+        return;
+      }
+      if (asDot) {
+        const dmg = parseInt(amount, 10);
+        if (!dmg) {
+          toast.push("Set the damage per round first.", "warn");
+          return;
+        }
+        dispatch({
+          type: "DOT_ADDED_MANY",
+          ids: live,
+          dot: { name, dmg, type, permanent: false, duration: rounds },
+        });
+        announce(`${name} applied to ${live.length} combatants for ${rounds} rounds.`);
+      } else {
+        dispatch({
+          type: "STATUS_ADDED_MANY",
+          ids: live,
+          status: { name, duration: rounds },
+        });
+        announce(`${name} applied to ${live.length} combatants.`);
+      }
+      close();
+      return;
+    }
+
     const amt = parseInt(amount, 10);
-    if (!amt || !targets.length) return;
+    if (!amt) {
+      toast.push(
+        mode === "damage" ? "Enter an untaxed damage amount first." : "Enter an amount to heal first.",
+        "warn",
+      );
+      return;
+    }
     if (mode === "damage") {
-      dispatch({ type: "DAMAGE_APPLIED", ids: targets, amount: amt, damageType: type });
+      dispatch({ type: "DAMAGE_APPLIED", ids: live, amount: amt, damageType: type });
       playCue("damage");
-      announce(`${amt} ${type} damage applied to ${targets.length} combatants.`);
+      announce(`${amt} ${type} damage applied to ${live.length} combatants.`);
     } else {
-      dispatch({ type: "HEAL_APPLIED", ids: targets, amount: amt });
+      dispatch({ type: "HEAL_APPLIED", ids: live, amount: amt });
       playCue("heal");
-      announce(`${amt} healing applied to ${targets.length} combatants.`);
+      announce(`${amt} healing applied to ${live.length} combatants.`);
     }
     close();
   };
 
   return (
-    <section className={`multi panel multi--${mode}`} aria-label={mode === "damage" ? "Multi-target damage" : "Multi-target heal"}>
+    <section className={`multi panel multi--${mode}`} aria-label={
+        mode === "damage"
+          ? "Multi-target damage"
+          : mode === "heal"
+            ? "Multi-target heal"
+            : "Multi-target condition"
+      }>
       <header className="multi__head">
-        <h3 className="display">{mode === "damage" ? "Multi-strike" : "Multi-mend"}</h3>
+        <h3 className="display">
+          {mode === "damage" ? "Multi-strike" : mode === "heal" ? "Multi-mend" : "Multi-affect"}
+        </h3>
         <div className="multi__bulk">
           <Button size="sm" onClick={() => setTargets(combatants.map((c) => c.id))}>All</Button>
           <Button size="sm" onClick={() => setTargets(combatants.filter((c) => c.role === "Player").map((c) => c.id))}>Players</Button>
@@ -353,24 +431,91 @@ function MultiAction({ combatants }: { combatants: Combatant[] }) {
       </div>
 
       <div className="multi__row">
-        <input
-          type="number"
-          value={amount}
-          placeholder="Amount"
-          aria-label="Amount"
-          autoFocus
-          onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && apply()}
-        />
-        {mode === "damage" && (
-          <select value={type} aria-label="Damage type" onChange={(e) => setType(e.target.value as DamageType)}>
-            <option value="physical">Physical</option>
-            <option value="magical">Magical</option>
-            <option value="raw">True</option>
-          </select>
+        {mode === "condition" ? (
+          <>
+            <select
+              value={condition}
+              aria-label="Condition to apply"
+              onChange={(e) => setCondition(e.target.value)}
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+            {condition === "Custom" && (
+              <input
+                value={customCondition}
+                placeholder="Name"
+                aria-label="Custom condition name to apply"
+                onChange={(e) => setCustomCondition(e.target.value)}
+              />
+            )}
+            <input
+              type="number"
+              min={1}
+              value={duration}
+              placeholder="Rounds"
+              aria-label="Duration in rounds to apply"
+              onChange={(e) => setDuration(e.target.value)}
+            />
+            <label className="multi__check">
+              <input
+                type="checkbox"
+                checked={asDot}
+                onChange={(e) => setAsDot(e.target.checked)}
+              />
+              Damage over time
+            </label>
+            {asDot && (
+              <>
+                <input
+                  type="number"
+                  min={1}
+                  value={amount}
+                  placeholder="Per round"
+                  aria-label="Damage per round to apply"
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <select
+                  value={type}
+                  aria-label="Damage type to apply"
+                  onChange={(e) => setType(e.target.value as DamageType)}
+                >
+                  <option value="physical">Physical</option>
+                  <option value="magical">Magical</option>
+                  <option value="true">True</option>
+                </select>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <input
+              type="number"
+              value={amount}
+              placeholder={mode === "damage" ? "Untaxed" : "Amount"}
+              aria-label={
+                mode === "damage" ? "Untaxed damage to apply" : "Healing amount to apply"
+              }
+              autoFocus
+              onChange={(e) => setAmount(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && apply()}
+            />
+            {mode === "damage" && (
+              <select value={type} aria-label="Damage type to apply" onChange={(e) => setType(e.target.value as DamageType)}>
+                <option value="physical">Physical</option>
+                <option value="magical">Magical</option>
+                <option value="raw">True</option>
+              </select>
+            )}
+          </>
         )}
-        <Button tone={mode === "damage" ? "danger" : "heal"} disabled={!targets.length || !amount} onClick={apply}>
-          Apply to {targets.length}
+        <Button
+          tone={mode === "damage" ? "danger" : mode === "heal" ? "heal" : "phase"}
+          disabled={!live.length}
+          onClick={apply}
+        >
+          Apply to {live.length}
         </Button>
         <Button onClick={close}>Cancel</Button>
       </div>
@@ -419,7 +564,10 @@ function AddCombatant() {
           onChange={(e) => {
             const r = e.target.value as Role;
             setRole(r);
-            if (r === "Player") setMaxHp("15");
+            // Switching to Enemy reveals a tier select defaulting to Normal, so
+            // the HP has to follow it. Leaving it at 15 showed "Normal" beside
+            // the Elite hit-point total.
+            setMaxHp(r === "Player" ? "15" : String(ENEMY_TYPE_HP[type] ?? 10));
           }}
         >
           <option>Player</option>
@@ -456,10 +604,9 @@ function AddCombatant() {
           {STAT_KEYS.map((k) => (
             <label key={k} className="addform__stat">
               <span>{k}</span>
-              <input
-                type="number"
+              <NumberInput
                 value={stats[k]}
-                onChange={(e) => setStats({ ...stats, [k]: parseInt(e.target.value, 10) || 0 })}
+                onChange={(n) => setStats({ ...stats, [k]: n })}
               />
             </label>
           ))}

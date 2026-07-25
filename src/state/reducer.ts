@@ -9,7 +9,7 @@
 import type { Combatant, EncounterState } from "@/domain/types";
 import { applyDamage, applyHeal, clamp } from "@/domain/rules";
 import { advancePhase, lockInitiative, resetInitiative } from "@/domain/phase";
-import { duplicateCombatant } from "@/domain/factory";
+import { duplicateCombatant, gid } from "@/domain/factory";
 import type { Command } from "./actions";
 
 export interface LogEntry {
@@ -315,6 +315,33 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
           entry(state, "status", `${nameOf(state, cmd.id)} is ${cmd.status.name}`, [cmd.id]),
         ],
       };
+
+    case "STATUS_ADDED_MANY": {
+      if (!cmd.ids.length) return { state, log: [] };
+      const ids = new Set(cmd.ids);
+      const log: LogEntry[] = [];
+      const combatants = state.combatants.map((c) => {
+        if (!ids.has(c.id)) return c;
+        log.push(entry(state, "status", `${c.name} is ${cmd.status.name}`, [c.id]));
+        return {
+          ...c,
+          statuses: [...c.statuses, { ...cmd.status, id: gid() }],
+        };
+      });
+      return { state: { ...state, combatants }, log };
+    }
+
+    case "DOT_ADDED_MANY": {
+      if (!cmd.ids.length) return { state, log: [] };
+      const ids = new Set(cmd.ids);
+      const log: LogEntry[] = [];
+      const combatants = state.combatants.map((c) => {
+        if (!ids.has(c.id)) return c;
+        log.push(entry(state, "status", `${c.name} afflicted: ${cmd.dot.name}`, [c.id]));
+        return { ...c, dots: [...c.dots, { ...cmd.dot, id: gid() }] };
+      });
+      return { state: { ...state, combatants }, log };
+    }
 
     case "STATUS_REMOVED":
       return {

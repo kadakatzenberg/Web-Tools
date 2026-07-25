@@ -159,7 +159,7 @@ test("stays responsive typing into a card in a large encounter", async ({ page }
   await page.goto("/");
   await page.getByRole("button", { name: "Restore it" }).click();
 
-  const input = page.locator(".card").first().getByLabel(/^Damage to/);
+  const input = page.locator(".card").first().getByLabel(/^Untaxed damage to/);
   const start = Date.now();
   await input.fill("12");
   await expect(input).toHaveValue("12");

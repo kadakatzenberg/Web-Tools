@@ -103,6 +103,63 @@ export function Field({
   );
 }
 
+/* ── Number input ── */
+
+/**
+ * A signed integer field.
+ *
+ * A controlled `<input type="number">` cannot accept a negative number typed by
+ * hand: the browser reports an intermediate "-" as an empty string, the parse
+ * yields NaN, the value snaps back to 0, and the minus is lost. Typing "-3"
+ * produced "03". Every enemy in this game is required to have a negative stat,
+ * so that was not a small problem.
+ *
+ * This keeps the raw text locally and only reports a number, so "-" is a legal
+ * intermediate state. `inputMode="numeric"` still summons a numeric keypad.
+ */
+export function NumberInput({
+  value,
+  onChange,
+  className = "",
+  ...rest
+}: {
+  value: number;
+  onChange: (n: number) => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
+  const [text, setText] = useState(() => String(value));
+
+  // Re-sync when the value changes from outside (a reset, a different combatant)
+  // but never while the local text already represents it.
+  useEffect(() => {
+    const parsed = text === "" || text === "-" ? 0 : Number.parseInt(text, 10);
+    if (parsed !== value) setText(String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <input
+      {...rest}
+      type="text"
+      inputMode="numeric"
+      className={className}
+      value={text}
+      onFocus={(e) => {
+        // These fields nearly always get replaced rather than edited, and a
+        // field already showing "0" otherwise puts the caret after it — so
+        // typing "-3" produced "03".
+        e.target.select();
+        rest.onFocus?.(e);
+      }}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (!/^-?\d*$/.test(raw)) return; // reject anything not a signed integer
+        setText(raw);
+        onChange(raw === "" || raw === "-" ? 0 : Number.parseInt(raw, 10));
+      }}
+    />
+  );
+}
+
 /* ── Badge ── */
 
 export function Badge({

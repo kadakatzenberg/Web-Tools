@@ -88,10 +88,15 @@ export function CommandPalette({
         group: c.role === "Player" ? "Players" : "Enemies",
         run: () => {
           onGo("tracker");
+          // Address the card by id. The previous selector was generic and
+          // always resolved to the first card on the page, so searching for a
+          // combatant scrolled you to somebody else entirely.
           requestAnimationFrame(() => {
-            document
-              .querySelector(`[aria-labelledby][data-side] [id]`)
-              ?.scrollIntoView?.({ block: "center" });
+            const card = document.querySelector<HTMLElement>(
+              `[data-combatant="${CSS.escape(c.id)}"]`,
+            );
+            card?.scrollIntoView({ block: "center", behavior: "smooth" });
+            card?.querySelector<HTMLElement>(".card__name")?.focus?.();
           });
         },
       });

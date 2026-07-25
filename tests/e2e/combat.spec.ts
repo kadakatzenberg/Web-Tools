@@ -35,6 +35,14 @@ function card(page: Page, name: string) {
   return page.locator(".card").filter({ has: page.getByRole("button", { name, exact: true }) });
 }
 
+/**
+ * The condition chips on a card. Scoped deliberately: a bare text match inside
+ * the card also hits the `<option>` of that card's own condition picker.
+ */
+function conditions(page: Page, name: string) {
+  return card(page, name).getByLabel(`${name} conditions`);
+}
+
 async function hpOf(page: Page, name: string): Promise<string> {
   return (await card(page, name).locator(".card__hp").first().innerText()).replace(/\s/g, "");
 }
@@ -302,8 +310,8 @@ test("applies multi-target damage and healing", async ({ page }) => {
 
   await page.getByRole("button", { name: "Multi-strike" }).click();
   await page.getByRole("button", { name: "All", exact: true }).click();
-  await page.getByLabel("Amount").fill("5");
-  await page.getByLabel("Damage type").last().selectOption("raw");
+  await page.getByLabel("Untaxed damage to apply").fill("5");
+  await page.getByLabel("Damage type to apply").selectOption("raw");
   await page.getByRole("button", { name: /Apply to 2/ }).click();
 
   expect(await hpOf(page, "Alpha")).toBe("15/20");
@@ -311,7 +319,7 @@ test("applies multi-target damage and healing", async ({ page }) => {
 
   await page.getByRole("button", { name: "Multi-mend" }).click();
   await page.getByRole("button", { name: "All", exact: true }).click();
-  await page.getByLabel("Amount").fill("3");
+  await page.getByLabel("Healing amount to apply").fill("3");
   await page.getByRole("button", { name: /Apply to 2/ }).click();
 
   expect(await hpOf(page, "Alpha")).toBe("18/20");
@@ -731,4 +739,241 @@ test("rejects prose typed into the dice field", async ({ page }) => {
   const ability = c.locator(".ability").filter({ hasText: "Vague Skill" });
   await expect(ability).toBeVisible();
   await expect(ability.locator(".ability__dice")).toHaveCount(0);
+});
+
+
+test("negative stats can be typed by hand", async ({ page }) => {
+  const add = page.getByRole("button", { name: "Add a combatant" });
+  if ((await add.getAttribute("aria-expanded")) === "false") await add.click();
+  const stats = page.getByRole("button", { name: "Starting stats" });
+  if ((await stats.getAttribute("aria-expanded")) === "false") await stats.click();
+
+  // The field already shows 0, so this only works if focus selects it.
+  const con = page.locator('.addform__stat:has(span:text-is("CON")) input');
+  await con.click();
+  await con.pressSequentially("-3");
+  await expect(con).toHaveValue("-3");
+
+  await page.getByLabel("Combatant name").fill("Fragile");
+  await page.locator(".addform").getByRole("button", { name: "Add", exact: true }).click();
+
+  // The negative actually reached the combatant: 5 physical lands for 8.
+  const c = card(page, "Fragile");
+  await c.getByLabel("Damage to Fragile").fill("5");
+  await c.getByLabel("Damage type").selectOption("physical");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Fragile")).toBe("7/15");
+});
+
+test("negative stats can be typed into a combatant's stat editor", async ({ page }) => {
+  await addCombatant(page, "Editable");
+  const c = card(page, "Editable");
+  await c.getByRole("button", { name: "Stats" }).click();
+  await c.getByRole("button", { name: "Edit stats" }).click();
+
+  const wis = c.locator('.stat-edit__field:has(span:text-is("WIS")) input');
+  await wis.click();
+  await wis.pressSequentially("-2");
+  await expect(wis).toHaveValue("-2");
+  await c.getByRole("button", { name: "Save", exact: true }).click();
+
+  await c.getByLabel("Damage to Editable").fill("4");
+  await c.getByLabel("Damage type").selectOption("magical");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Editable")).toBe("9/15"); // 4 + 2 exposed
+});
+
+test("the command palette focuses the combatant you searched for", async ({ page }) => {
+  await addCombatant(page, "Alpha");
+  await addCombatant(page, "Zulu");
+
+  await page.keyboard.press("Control+k");
+  await page.getByLabel("Search commands").fill("Zulu");
+  await page.keyboard.press("Enter");
+
+  // The searched card ends up centred, not simply the first one on the page.
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const mid = window.innerHeight / 2;
+        let best = "none";
+        let dist = Infinity;
+        for (const el of document.querySelectorAll<HTMLElement>(".card")) {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.top + r.height / 2 - mid);
+          if (d < dist) {
+            dist = d;
+            best = el.querySelector(".card__name")?.textContent ?? "?";
+          }
+        }
+        return best;
+      }),
+    )
+    .toBe("Zulu");
+});
+
+test("the combat log does not trap keyboard focus", async ({ page }) => {
+  await addCombatant(page, "Someone");
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "Combat log" })).toBeVisible();
+
+  // Focus a control in the tracker while the drawer is open. A focus trap
+  // would have bounced it back inside the drawer.
+  await page.getByRole("button", { name: "Next phase →" }).focus();
+  await expect(page.getByRole("button", { name: "Next phase →" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("complementary", { name: "Combat log" })).toHaveCount(0);
+});
+
+test("max HP can be corrected after a combatant is created", async ({ page }) => {
+  await addCombatant(page, "Boss", { role: "Enemy" });
+  const c = card(page, "Boss");
+  // Choosing Enemy defaults to the Normal tier, which is 10 HP.
+  expect(await hpOf(page, "Boss")).toBe("10/10");
+
+  await c.getByRole("button", { name: "Stats" }).click();
+  const maxHp = c.getByLabel("Maximum hit points for Boss");
+  await maxHp.click();
+  await maxHp.pressSequentially("30");
+  await expect(c.locator(".card__hp").first()).toContainText("30");
+});
+
+test("the add form's enemy tier and hit points agree", async ({ page }) => {
+  const add = page.getByRole("button", { name: "Add a combatant" });
+  if ((await add.getAttribute("aria-expanded")) === "false") await add.click();
+
+  await page.getByLabel("Side").selectOption("Enemy");
+  await expect(page.getByLabel("Enemy tier")).toHaveValue("Normal");
+  await expect(page.getByLabel("Maximum hit points")).toHaveValue("10");
+
+  await page.getByLabel("Enemy tier").selectOption("Boss");
+  await expect(page.getByLabel("Maximum hit points")).toHaveValue("30");
+
+  await page.getByLabel("Side").selectOption("Player");
+  await expect(page.getByLabel("Maximum hit points")).toHaveValue("15");
+});
+
+
+test("applies a condition to several combatants at once", async ({ page }) => {
+  await addCombatant(page, "Hound A", { role: "Enemy" });
+  await addCombatant(page, "Hound B", { role: "Enemy" });
+  await addCombatant(page, "Bystander");
+
+  await page.getByRole("button", { name: "Multi-affect" }).click();
+  await page.getByRole("button", { name: "Enemies", exact: true }).click();
+  await page.getByLabel("Condition to apply").selectOption("Bound");
+  await page.getByLabel("Duration in rounds to apply").fill("2");
+  await page.getByRole("button", { name: /Apply to 2/ }).click();
+
+  await expect(conditions(page, "Hound A").getByText("Bound")).toBeVisible();
+  await expect(conditions(page, "Hound B").getByText("Bound")).toBeVisible();
+  await expect(conditions(page, "Bystander").getByText("Bound")).toHaveCount(0);
+});
+
+test("applies a damage-over-time to several combatants at once", async ({ page }) => {
+  await addCombatant(page, "Hound A", { role: "Enemy" });
+  await addCombatant(page, "Hound B", { role: "Enemy" });
+
+  await page.getByRole("button", { name: "Multi-affect" }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page.getByLabel("Condition to apply").selectOption("Custom");
+  await page.getByLabel("Custom condition name to apply").fill("Senka's Trick");
+  await page.getByLabel("Duration in rounds to apply").fill("2");
+  await page.getByLabel("Damage over time").check();
+  await page.getByLabel("Damage per round to apply").fill("2");
+  await page.getByLabel("Damage type to apply").selectOption("true");
+  await page.getByRole("button", { name: /Apply to 2/ }).click();
+
+  await expect(card(page, "Hound A").getByText("Senka's Trick")).toBeVisible();
+
+  // It actually ticks on the round boundary.
+  const next = page.getByRole("button", { name: "Next phase →" });
+  await next.click();
+  await next.click();
+  await next.click();
+  expect(await hpOf(page, "Hound A")).toBe("8/10");
+  expect(await hpOf(page, "Hound B")).toBe("8/10");
+});
+
+/* ── Regressions: clicks that used to do nothing at all ── */
+
+test("an incomplete strike explains itself instead of doing nothing", async ({ page }) => {
+  await addCombatant(page, "Alpha");
+
+  // Strike with an empty amount used to return silently, which is
+  // indistinguishable from the app having frozen.
+  await card(page, "Alpha").getByRole("button", { name: "Strike", exact: true }).click();
+  await expect(page.getByText(/Enter an untaxed damage amount/)).toBeVisible();
+});
+
+test("apply is inert, not misleading, with no targets selected", async ({ page }) => {
+  await addCombatant(page, "Alpha");
+  await page.getByRole("button", { name: "Multi-affect" }).click();
+  await page.getByRole("button", { name: "None", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Apply to 0/ })).toBeDisabled();
+});
+
+test("a condition applies without having to fill the duration in first", async ({ page }) => {
+  await addCombatant(page, "Hound", { role: "Enemy" });
+
+  // The duration defaults to one round; leaving it untouched used to make
+  // Apply a no-op.
+  const c = card(page, "Hound");
+  await c.getByLabel("Condition", { exact: true }).selectOption("Bound");
+  await c.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(conditions(page, "Hound").getByText("Bound")).toBeVisible();
+});
+
+test("removing a combatant drops it from an open multi-target selection", async ({ page }) => {
+  await addCombatant(page, "Alpha", { hp: 20 });
+  await addCombatant(page, "Beta", { hp: 20 });
+
+  await page.getByRole("button", { name: "Multi-strike" }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Apply to 2/ })).toBeVisible();
+
+  // Selection is held by id, so a removed combatant used to stay selected and
+  // the count kept claiming two.
+  await card(page, "Beta").getByRole("button", { name: "Remove Beta" }).click();
+  await expect(page.getByRole("button", { name: /Apply to 1/ })).toBeVisible();
+
+  await page.getByLabel("Untaxed damage to apply").fill("5");
+  await page.getByLabel("Damage type to apply").selectOption("raw");
+  await page.getByRole("button", { name: /Apply to 1/ }).click();
+  expect(await hpOf(page, "Alpha")).toBe("15/20");
+});
+
+test("a temporary modifier accepts a negative value", async ({ page }) => {
+  await addCombatant(page, "Alpha");
+  const c = card(page, "Alpha");
+  await c.getByRole("button", { name: "Effects" }).click();
+
+  // type="number" reports a lone "-" as an empty string, so "-2" became "2"
+  // and a debuff silently became a buff.
+  await c.getByLabel("Modifier value").fill("-2");
+  await expect(c.getByLabel("Modifier value")).toHaveValue("-2");
+  await c.getByLabel("Modifier duration").fill("2");
+  await c.locator(".ongoing__set").last().getByRole("button", { name: "Add" }).click();
+  await expect(c.getByText("STR -2")).toBeVisible();
+});
+
+test("lowering max HP clamps current HP to the new maximum", async ({ page }) => {
+  await addCombatant(page, "Alpha", { hp: 30 });
+  const c = card(page, "Alpha");
+  await c.getByRole("button", { name: "Stats" }).click();
+  await c.getByLabel("Maximum hit points for Alpha").fill("10");
+  expect(await hpOf(page, "Alpha")).toBe("10/10");
+});
+
+test("healing lifts a downed combatant back above zero", async ({ page }) => {
+  await addCombatant(page, "Alpha", { hp: 10 });
+  const c = card(page, "Alpha");
+  await c.getByLabel(/^Untaxed damage to/).fill("50");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Alpha")).toBe("0/10");
+
+  await c.getByLabel("Heal Alpha").fill("4");
+  await c.getByRole("button", { name: "Mend", exact: true }).click();
+  expect(await hpOf(page, "Alpha")).toBe("4/10");
 });

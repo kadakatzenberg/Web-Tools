@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { PHASES } from "@/domain/constants";
 import { useStore } from "@/state/store";
 import type { LogEntry } from "@/state/reducer";
-import { useFocusTrap } from "./hooks";
+import { useEscapeKey } from "./hooks";
 import { EmptyState } from "./primitives";
 import "./eventlog.css";
 
@@ -34,7 +34,10 @@ const FILTERS: (LogEntry["kind"] | "all")[] = [
 export function EventLog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { log } = useStore();
   const [filter, setFilter] = useState<LogEntry["kind"] | "all">("all");
-  const ref = useFocusTrap(open, onClose);
+  // Deliberately not a focus trap. This is a non-modal side drawer that stays
+  // open while the GM works in the tracker, so trapping Tab inside it would
+  // strand keyboard users. Escape still closes it.
+  useEscapeKey(open, onClose);
 
   const entries = useMemo(
     () => (filter === "all" ? log : log.filter((e) => e.kind === filter)),
@@ -44,7 +47,7 @@ export function EventLog({ open, onClose }: { open: boolean; onClose: () => void
   if (!open) return null;
 
   return (
-    <aside className="eventlog" aria-label="Combat log" ref={ref} tabIndex={-1}>
+    <aside className="eventlog" aria-label="Combat log">
       <header className="eventlog__head">
         <h2 className="eventlog__title display">Combat log</h2>
         <button type="button" className="eventlog__close" onClick={onClose} aria-label="Close combat log">

@@ -165,6 +165,18 @@ export function useScrollLock(active: boolean): void {
   }, [active]);
 }
 
+/** Close a non-modal surface on Escape, without trapping focus inside it. */
+export function useEscapeKey(active: boolean, onClose: () => void): void {
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [active, onClose]);
+}
+
 /* ── Keyboard ── */
 
 export interface Hotkey {

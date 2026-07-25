@@ -32,7 +32,7 @@ import { gid } from "@/domain/factory";
 import { d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
 import { useStoreApi } from "@/state/store";
 import { announce, useCopy, useId } from "../hooks";
-import { Badge, Button, Disclosure, IconButton, Meter, Modal, useToast } from "../primitives";
+import { Badge, Button, Disclosure, IconButton, Meter, Modal, NumberInput, useToast } from "../primitives";
 import { FloatingMarks, useFeedback, useImpact } from "@/fx/feedback";
 import { playCue } from "@/fx/sound";
 import "./tracker.css";
@@ -552,7 +552,9 @@ export const CombatantCard = memo(function CombatantCard({
   const [editing, setEditing] = useState<Ability | null>(null);
   const [statusName, setStatusName] = useState<string>("Prone");
   const [statusCustom, setStatusCustom] = useState("");
-  const [statusDur, setStatusDur] = useState("");
+  // Pre-filled: one round is by far the most common, and a blank field made
+  // Apply do nothing at all until you noticed you had to fill it in.
+  const [statusDur, setStatusDur] = useState("1");
   const [draftStats, setDraftStats] = useState(c.stats);
   const [editStats, setEditStats] = useState(false);
 
@@ -584,7 +586,12 @@ export const CombatantCard = memo(function CombatantCard({
 
   const applyDmg = () => {
     const amount = parseInt(dmg, 10);
-    if (!amount) return;
+    // Never swallow a click. Before, an empty or zero field made Strike a
+    // no-op with no explanation, which reads exactly like the app is broken.
+    if (!amount) {
+      toast.push("Enter an untaxed damage amount first.", "warn");
+      return;
+    }
     const preview = applyDamage(c, amount, dmgType);
     const b = preview.breakdown;
 
@@ -613,7 +620,10 @@ export const CombatantCard = memo(function CombatantCard({
 
   const applyHealing = () => {
     const amount = parseInt(heal, 10);
-    if (!amount) return;
+    if (!amount) {
+      toast.push("Enter an amount to heal first.", "warn");
+      return;
+    }
     const next = Math.min(c.maxHp, c.hp + amount);
     if (next !== c.hp) {
       mark(c.id, `+${next - c.hp}`, "heal");
@@ -633,10 +643,17 @@ export const CombatantCard = memo(function CombatantCard({
   const addStatus = () => {
     const name = statusName === "Custom" ? statusCustom.trim() : statusName;
     const duration = parseInt(statusDur, 10);
-    if (!name || !duration) return;
+    if (!name) {
+      toast.push("Name the condition first.", "warn");
+      return;
+    }
+    if (!duration || duration < 1) {
+      toast.push("A condition needs a duration of at least one round.", "warn");
+      return;
+    }
     dispatch({ type: "STATUS_ADDED", id: c.id, status: { id: gid(), name, duration } });
     announce(`${c.name} is now ${name} for ${duration} rounds.`);
-    setStatusDur("");
+    setStatusDur("1");
     setStatusCustom("");
   };
 
@@ -644,6 +661,7 @@ export const CombatantCard = memo(function CombatantCard({
     <article
       ref={cardRef}
       className="card"
+      data-combatant={c.id}
       data-side={isPlayer ? "player" : "enemy"}
       data-band={band}
       data-done={c.done ? "1" : undefined}
@@ -796,8 +814,9 @@ export const CombatantCard = memo(function CombatantCard({
               <input
                 type="number"
                 value={dmg}
-                placeholder="Damage"
-                aria-label={`Damage to ${c.name}`}
+                placeholder="Untaxed"
+                title="Damage before resistance — the tracker applies CON or WIS for you"
+                aria-label={`Untaxed damage to ${c.name}`}
                 onChange={(e) => setDmg(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && applyDmg()}
               />
@@ -984,17 +1003,25 @@ export const CombatantCard = memo(function CombatantCard({
                 <div><dt>M.Res</dt><dd className="tnum">{derived.magicalResist}</dd></div>
               </dl>
 
+              <label className="maxhp">
+                <span>Max HP</span>
+                <NumberInput
+                  value={c.maxHp}
+                  aria-label={`Maximum hit points for ${c.name}`}
+                  onChange={(n) => {
+                    if (n > 0) dispatch({ type: "COMBATANT_MAXHP_SET", id: c.id, maxHp: n });
+                  }}
+                />
+              </label>
+
               {editStats ? (
                 <div className="stat-edit">
                   {STAT_KEYS.map((k) => (
                     <label key={k} className="stat-edit__field">
                       <span>{k}</span>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={draftStats[k]}
-                        onChange={(e) =>
-                          setDraftStats({ ...draftStats, [k as StatKey]: parseInt(e.target.value, 10) || 0 })
-                        }
+                        onChange={(n) => setDraftStats({ ...draftStats, [k as StatKey]: n })}
                       />
                     </label>
                   ))}
@@ -1045,12 +1072,16 @@ export const CombatantCard = memo(function CombatantCard({
 
 function ShieldRow({ c }: { c: Combatant }) {
   const { dispatch } = useStoreApi();
+  const toast = useToast();
   const [val, setVal] = useState("");
   const [label, setLabel] = useState("");
 
   const addTemp = () => {
     const v = parseInt(val, 10);
-    if (!v || v < 1) return;
+    if (!v || v < 1) {
+      toast.push("Enter a temporary shield value of at least 1.", "warn");
+      return;
+    }
     dispatch({
       type: "TEMP_SHIELD_ADDED",
       id: c.id,
@@ -1122,6 +1153,7 @@ function ShieldRow({ c }: { c: Combatant }) {
 
 function OngoingEditor({ c }: { c: Combatant }) {
   const { dispatch } = useStoreApi();
+  const toast = useToast();
   const [dotName, setDotName] = useState("");
   const [dotDmg, setDotDmg] = useState("");
   const [dotType, setDotType] = useState<DamageType>("physical");
@@ -1164,7 +1196,14 @@ function OngoingEditor({ c }: { c: Combatant }) {
             onClick={() => {
               const d = parseInt(dotDmg, 10);
               const dur = parseInt(dotDur, 10);
-              if (!d || (!dotPerm && !dur)) return;
+              if (!d) {
+                toast.push("Set the damage per round first.", "warn");
+                return;
+              }
+              if (!dotPerm && !dur) {
+                toast.push("Give the effect a duration, or mark it permanent.", "warn");
+                return;
+              }
               dispatch({
                 type: "DOT_ADDED",
                 id: c.id,
@@ -1195,7 +1234,14 @@ function OngoingEditor({ c }: { c: Combatant }) {
             onClick={() => {
               const v = parseInt(regVal, 10);
               const dur = parseInt(regDur, 10);
-              if (!v || (!regPerm && !dur)) return;
+              if (!v) {
+                toast.push("Set the hit points regained per round first.", "warn");
+                return;
+              }
+              if (!regPerm && !dur) {
+                toast.push("Give the regeneration a duration, or mark it permanent.", "warn");
+                return;
+              }
               dispatch({ type: "REGEN_ADDED", id: c.id, regen: { id: gid(), val: v, permanent: regPerm, duration: regPerm ? null : dur } });
               setRegVal(""); setRegDur(""); setRegPerm(false);
             }}
@@ -1226,7 +1272,19 @@ function OngoingEditor({ c }: { c: Combatant }) {
               <option key={k}>{k}</option>
             ))}
           </select>
-          <input type="number" value={modVal} placeholder="Value" aria-label="Modifier value" onChange={(e) => setModVal(e.target.value)} />
+          {/* Signed, so deliberately not type="number": the browser reports a
+              lone "-" as an empty string and the minus is lost. A debuff like
+              STR −2 is the whole point of this control. */}
+          <input
+            type="text"
+            inputMode="numeric"
+            value={modVal}
+            placeholder="Value"
+            aria-label="Modifier value"
+            onChange={(e) => {
+              if (/^-?\d*$/.test(e.target.value)) setModVal(e.target.value);
+            }}
+          />
           <input type="number" min={1} value={modDur} placeholder="Rounds" aria-label="Modifier duration" onChange={(e) => setModDur(e.target.value)} />
           <input value={modLabel} placeholder="Label" aria-label="Modifier label" onChange={(e) => setModLabel(e.target.value)} />
           <Button
@@ -1234,7 +1292,14 @@ function OngoingEditor({ c }: { c: Combatant }) {
             onClick={() => {
               const v = parseInt(modVal, 10);
               const dur = parseInt(modDur, 10);
-              if (!v || !dur) return;
+              if (!v) {
+                toast.push("A modifier needs a non-zero value.", "warn");
+                return;
+              }
+              if (!dur) {
+                toast.push("A modifier needs a duration in rounds.", "warn");
+                return;
+              }
               dispatch({
                 type: "TEMP_MOD_ADDED",
                 id: c.id,
