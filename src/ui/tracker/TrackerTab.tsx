@@ -7,7 +7,7 @@
  * collapse away once the fight is running.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Combatant, DamageType, Role, Stats } from "@/domain/types";
 import { EMPTY_STATS, ENEMY_TYPE_HP, PHASES, STATUS_OPTIONS, STAT_KEYS } from "@/domain/constants";
 import { healthBand, healthPercent } from "@/domain/rules";
@@ -15,9 +15,13 @@ import { rollInitiative } from "@/domain/phase";
 import { createManualCombatant } from "@/domain/factory";
 import { useStore, useStoreApi } from "@/state/store";
 import type { SessionApi } from "@/persistence/useSession";
-import { announce, useCopy } from "../hooks";
+import { announce, useCopy, useMediaQuery } from "../hooks";
 import { Badge, Button, ConfirmDialog, Disclosure, EmptyState, IconButton, NumberInput, useToast } from "../primitives";
 import { CombatantCard } from "./CombatantCard";
+import { OrderRail } from "./OrderRail";
+import { RoundHerald } from "./RoundHerald";
+import { EventLogPanel } from "../EventLog";
+import { IconAdvance, IconRedo, IconUndo } from "../icons";
 import { EnemyPhasePanel, PostControls } from "./DiscordTools";
 import { pendingCombatants } from "@/domain/report";
 import { WarTable } from "../battlefield/WarTable";
@@ -213,27 +217,36 @@ function PhaseBar({
     <div className="phasebar" data-phase={present.phase}>
       <div className="phasebar__main">
         <div className="phasebar__meta">
-          <span className="eyebrow">
-            Round <span className="tnum">{present.round}</span>
-            <span className="phasebar__sep">·</span>
-            P<span className="tnum">{present.playerPhaseCount}</span>
-            <span className="phasebar__sep">·</span>
-            E<span className="tnum">{present.enemyPhaseCount}</span>
-          </span>
-          <h2 className="phasebar__phase display" aria-live="polite">
-            {PHASES[present.phase]}
-          </h2>
-          <p className="phasebar__pending">
-            {pending === 0 ? "All combatants have acted" : `${pending} still to act`}
-          </p>
+          {/* The round as a struck coin. It is the largest figure on the screen
+              because it is the one piece of state that orients everything else. */}
+          <div className="phasebar__round" aria-hidden="true">
+            <span className="phasebar__round-label">Round</span>
+            <span className="phasebar__round-value">{present.round}</span>
+          </div>
+
+          <div className="phasebar__names">
+            <h2 className="phasebar__phase" aria-live="polite">
+              {PHASES[present.phase]}
+            </h2>
+            <p className="phasebar__pending">
+              {pending === 0 ? "All combatants have acted" : `${pending} still to act`}
+              <span className="phasebar__sep">·</span>
+              <span className="phasebar__counts">
+                P{present.playerPhaseCount} E{present.enemyPhaseCount}
+              </span>
+            </p>
+            <span className="sr-only">
+              Round {present.round}, {PHASES[present.phase]}.
+            </span>
+          </div>
         </div>
 
         <div className="phasebar__actions">
           <IconButton label="Undo last action" disabled={!past.length} onClick={undo}>
-            ↶
+            <IconUndo size={15} />
           </IconButton>
           <IconButton label="Redo" disabled={!future.length} onClick={redo}>
-            ↷
+            <IconRedo size={15} />
           </IconButton>
           <PostControls state={present} />
           <Button size="sm" aria-pressed={focusMode} onClick={onToggleFocus}>
@@ -252,7 +265,8 @@ function PhaseBar({
               playCue("phase");
             }}
           >
-            Next phase →
+            Next phase
+            <IconAdvance size={15} />
           </Button>
         </div>
       </div>
@@ -627,7 +641,7 @@ function CombatantChip({ c, onFocus }: { c: Combatant; onFocus: () => void }) {
         {c.hp}/{c.maxHp}
       </span>
       <span className="rosterchip__bar" aria-hidden="true">
-        <span style={{ width: `${healthPercent(c.hp, c.maxHp)}%`, background: BAND_TONE[band] }} />
+        <span style={{ width: `${healthPercent(c.hp, c.maxHp)}%`, backgroundColor: BAND_TONE[band] }} />
       </span>
       {c.done && <span aria-hidden="true">✓</span>}
     </button>
@@ -686,11 +700,12 @@ function Group({
           ))}
         </div>
       ) : (
-        members.map((c) => {
-          const side = all.filter((x) => x.role === c.role);
-          const idx = side.indexOf(c);
-          return (
-            <CombatantCard
+        <div className="roster">
+          {members.map((c) => {
+            const side = all.filter((x) => x.role === c.role);
+            const idx = side.indexOf(c);
+            return (
+              <CombatantCard
               key={c.id}
               c={c}
               compact={compact}
@@ -699,10 +714,11 @@ function Group({
               isFirst={idx === 0}
               isLast={idx === side.length - 1}
               focused={focusedId === c.id}
-              onFocus={onFocus}
-            />
-          );
-        })
+                onFocus={onFocus}
+              />
+            );
+          })}
+        </div>
       )}
     </section>
   );
@@ -710,7 +726,7 @@ function Group({
 
 /* ── Tab ── */
 
-export function TrackerTab({ session }: { session: SessionApi }) {
+export function TrackerTab({ session }: { session: SessionApi; logOpen?: boolean }) {
   const { present, trash } = useStore();
   const { dispatch } = useStoreApi();
   const [compact, setCompact] = useState(false);
@@ -744,68 +760,119 @@ export function TrackerTab({ session }: { session: SessionApi }) {
     ? groups.filter((g) => (present.phase === 1 ? g.title === "Enemies" : present.phase === 0 ? g.title === "Players" : true))
     : groups;
 
+  /** Selecting in the rail focuses the card and brings it into view. */
+  const selectFromRail = useCallback((id: string) => {
+    setFocusedId(id);
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-combatant="${CSS.escape(id)}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, []);
+
+  const populated = present.combatants.length > 0;
+
+  /**
+   * The activity rail only exists on a wide screen. Below that the enemy roll
+   * block moves back into the main column rather than disappearing — hiding the
+   * rail with CSS alone silently removed the feature on every tablet and phone.
+   * Rendered in exactly one place either way, so there is no duplicate DOM for
+   * a screen reader to walk twice.
+   */
+  const hasContextRail = useMediaQuery("(min-width: 1181px)");
+  const showRolls = present.phase === 1 && populated;
+
   return (
     <div className="tracker">
-      <PhaseBar focusMode={focusMode} onToggleFocus={() => setFocusMode((v) => !v)} />
+      <RoundHerald round={present.round} />
 
-      <div className="tracker__body">
-        {!present.locked && <InitiativeRoller />}
+      <div className="workspace">
+        {/* ── The Order ──
+            Read-only standing of every combatant, pinned so the state of the
+            fight is legible no matter how far down the roster you have
+            scrolled. */}
+        <aside className="workspace__rail">
+          <OrderRail state={present} focusedId={focusedId} onSelect={selectFromRail} />
+        </aside>
 
-        {present.combatants.length > 0 && showTable && (
-          <WarTable focusedId={focusedId} onSelect={setFocusedId} />
-        )}
+        <div className="workspace__main">
+          <PhaseBar focusMode={focusMode} onToggleFocus={() => setFocusMode((v) => !v)} />
 
-        <div className="tracker__toolbar">
-          <Button size="sm" aria-pressed={compact} onClick={() => setCompact((v) => !v)}>
-            {compact ? "Expanded cards" : "Compact cards"}
-          </Button>
-          <Button size="sm" aria-pressed={showTable} onClick={() => setShowTable((v) => !v)}>
-            {showTable ? "Hide war table" : "Show war table"}
-          </Button>
-          {trash.length > 0 && (
-            <Button size="sm" onClick={restoreLast}>
-              Restore {trash[0]!.combatant.name}
-            </Button>
+          <div className="tracker__body">
+            {!present.locked && <InitiativeRoller />}
+
+            {populated && showTable && (
+              <WarTable focusedId={focusedId} onSelect={setFocusedId} />
+            )}
+
+            <div className="tracker__toolbar">
+              <Button size="sm" aria-pressed={compact} onClick={() => setCompact((v) => !v)}>
+                {compact ? "Expanded cards" : "Compact cards"}
+              </Button>
+              <Button size="sm" aria-pressed={showTable} onClick={() => setShowTable((v) => !v)}>
+                {showTable ? "Hide war table" : "Show war table"}
+              </Button>
+              {trash.length > 0 && (
+                <Button size="sm" onClick={restoreLast}>
+                  Restore {trash[0]!.combatant.name}
+                </Button>
+              )}
+            </div>
+
+            {showRolls && !hasContextRail && <EnemyPhasePanel state={present} />}
+
+            {populated && <MultiAction combatants={present.combatants} />}
+
+            {!populated ? (
+              <EmptyState
+                seal="戰"
+                title="The table is empty"
+                body="Add combatants by hand, pull approved sheets from the library, or roll a fresh pack of enemies from the generator."
+              />
+            ) : (
+              visibleGroups.map((g) => (
+                <Group
+                  key={g.title}
+                  title={g.title}
+                  members={g.members}
+                  all={present.combatants}
+                  compact={compact}
+                  focusedId={focusedId}
+                  onFocus={setFocusedId}
+                  playerPhaseCount={present.playerPhaseCount}
+                  enemyPhaseCount={present.enemyPhaseCount}
+                  tone={g.tone}
+                />
+              ))
+            )}
+
+            {/* Setup lives beneath the roster: it is touched once per encounter,
+                the roster is touched every round. */}
+            <div className="tracker__setup">
+              <Disclosure label="Add a combatant" defaultOpen={!populated}>
+                <AddCombatant />
+              </Disclosure>
+              <SessionBar session={session} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Activity ──
+            The enemy roll block when it is the enemies' phase, the combat log
+            otherwise. Both used to be buried: the rolls pushed the roster down
+            the page, and the log was hidden behind a toggle most GMs never
+            found. */}
+        {hasContextRail && (
+        <aside className="workspace__context" aria-label="Activity">
+          {showRolls ? (
+            <div className="context__scroll">
+              <EnemyPhasePanel state={present} />
+            </div>
+          ) : (
+            <EventLogPanel />
           )}
-        </div>
-
-        {present.phase === 1 && present.combatants.length > 0 && (
-          <EnemyPhasePanel state={present} />
+        </aside>
         )}
-
-        {present.combatants.length > 0 && <MultiAction combatants={present.combatants} />}
-
-        {/* The roster is the instrument. Setup affordances live below it so the
-            combatants the GM is reading stay closest to the phase controls. */}
-        {present.combatants.length === 0 ? (
-          <EmptyState
-            seal="戰"
-            title="The table is empty"
-            body="Add combatants by hand, pull approved sheets from the library, or roll a fresh pack of enemies from the generator."
-          />
-        ) : (
-          visibleGroups.map((g) => (
-            <Group
-              key={g.title}
-              title={g.title}
-              members={g.members}
-              all={present.combatants}
-              compact={compact}
-              focusedId={focusedId}
-              onFocus={setFocusedId}
-              playerPhaseCount={present.playerPhaseCount}
-              enemyPhaseCount={present.enemyPhaseCount}
-              tone={g.tone}
-            />
-          ))
-        )}
-
-        <div className="tracker__setup">
-          <Disclosure label="Add a combatant" defaultOpen={present.combatants.length === 0}>
-            <AddCombatant />
-          </Disclosure>
-          <SessionBar session={session} />
-        </div>
       </div>
     </div>
   );

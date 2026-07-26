@@ -1,31 +1,64 @@
+/**
+ * The shell.
+ *
+ * The application is framed as one instrument rather than a page of panels: a
+ * command bar across the top, and beneath it a workspace divided into three
+ * zones by hairline inlay — the Order rail, the table, and the activity rail.
+ * The zones are separated by rules cut into the ground, not by gaps between
+ * floating boxes, so the whole thing reads as a single carved surface.
+ */
+
 .app {
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   z-index: var(--z-content);
 }
 
-/* ── Top bar ── */
+/* ══ Command bar ══ */
 
 .topbar {
   position: sticky;
   top: 0;
   z-index: calc(var(--z-sticky) + 5);
-  background: rgba(5, 5, 10, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--metal-700);
+  background:
+    linear-gradient(180deg, rgba(9, 9, 17, 0.97), rgba(5, 5, 12, 0.94));
+  border-bottom: 1px solid var(--metal-800);
   padding-top: env(safe-area-inset-top);
 }
 
+/* A hairline of phase pigment along the underside: the one place the whole
+   application announces whose turn it is, visible from any scroll position. */
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--phase-dim) 18%,
+    var(--phase) 50%,
+    var(--phase-dim) 82%,
+    transparent
+  );
+  opacity: 0.75;
+  transition: opacity var(--t-phase) var(--ease-out);
+}
+
 .topbar__inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 var(--s4);
   display: flex;
   align-items: center;
   gap: var(--s4);
-  min-height: 52px;
+  padding: 0 var(--s4);
+  min-height: var(--bar-h);
 }
+
+/* ── Brand ── */
 
 .brand {
   display: flex;
@@ -34,123 +67,235 @@
   flex-shrink: 0;
 }
 
-/* A carved vermilion seal: the mark of the house. */
+/* A stamped vermilion chop. Cut corners rather than a rounded box — the mark
+   is pressed into the surface, not printed on it. */
 .brand__seal {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  background: linear-gradient(180deg, var(--seal), #8f231b);
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+  background: linear-gradient(158deg, var(--seal), var(--seal-deep));
   color: #ffe9e4;
   font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  box-shadow: 0 0 14px rgba(200, 56, 46, 0.4), var(--inset-carve);
+  line-height: 1;
+  box-shadow:
+    0 0 0 1px rgba(207, 59, 48, 0.35),
+    0 2px 10px rgba(160, 40, 32, 0.3),
+    var(--carve);
+}
+
+/* The chop's worn edge: a faint inner keyline, as on a real pressed seal. */
+.brand__seal::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(255, 220, 214, 0.28);
+  border-radius: 1px;
 }
 
 .brand__name {
+  font-family: var(--font-display);
   font-size: var(--fs-md);
   font-weight: 700;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.26em;
   color: var(--bone);
+  white-space: nowrap;
 }
+
+/* ── Navigation ── */
 
 .tabs {
   display: flex;
-  gap: var(--s1);
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  gap: 2px;
+  flex-shrink: 0;
 }
-.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   position: relative;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-weight: 550;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--smoke);
   padding: 0 var(--s3);
-  min-height: 44px;
+  min-height: 40px;
+  border-radius: var(--r-sm);
   white-space: nowrap;
-  transition: color var(--t-fast) var(--ease-out);
+  transition:
+    color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
 }
 
-.tab:hover { color: var(--bone); }
+.tab:hover {
+  color: var(--bone);
+  background: var(--panel);
+}
 
-.tab[data-active="1"] { color: var(--phase); }
+.tab[data-active="1"] {
+  color: var(--bone);
+  background: var(--panel-high);
+  box-shadow: var(--carve);
+}
 
 .tab[data-active="1"]::after {
   content: "";
   position: absolute;
-  left: var(--s2);
-  right: var(--s2);
-  bottom: 0;
-  height: 2px;
+  left: var(--s3);
+  right: var(--s3);
+  bottom: 5px;
+  height: 1.5px;
+  border-radius: 1px;
   background: var(--phase);
-  box-shadow: 0 0 12px var(--phase-glow);
-  animation: tab-ink var(--t-base) var(--ease-out);
+  box-shadow: 0 0 8px var(--phase-glow);
+  animation: tab-ink var(--t-base) var(--ease-ink);
 }
 
-@keyframes tab-ink { from { transform: scaleX(0.2); opacity: 0; } }
+@keyframes tab-ink {
+  from { transform: scaleX(0.15); opacity: 0; }
+}
+
+/* ── Encounter readout ══
+   The centre of the bar carries the state of the fight, so round and phase are
+   legible from across a desk without scrolling back to the top of the table. */
+
+.topbar__state {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+  min-width: 0;
+}
+
+.statechip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  padding: var(--s1) var(--s3);
+  border-radius: var(--r-sm);
+  background: var(--inlay);
+  box-shadow: inset 0 0 0 1px var(--metal-800);
+  white-space: nowrap;
+}
+
+.statechip__label {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.statechip__value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--bone);
+}
+
+.statechip--phase .statechip__value {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--phase);
+}
+
+/* ── Tools ── */
 
 .topbar__tools {
   display: flex;
   align-items: center;
-  gap: var(--s1);
+  gap: 2px;
   flex-shrink: 0;
 }
 
 .tool {
-  font-family: var(--font-display);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.08em;
-  color: var(--smoke);
-  border: 1px solid var(--metal-700);
-  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  min-width: 34px;
   padding: 0 var(--s2);
-  min-height: 32px;
-  min-width: 36px;
-  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+  color: var(--smoke);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+  transition:
+    color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
 }
 
-.tool:hover { color: var(--bone); border-color: var(--metal-400); }
-.tool[aria-pressed="true"] { color: var(--phase); border-color: var(--phase-dim); }
+.tool:hover {
+  color: var(--bone);
+  background: var(--panel);
+  border-color: var(--metal-800);
+}
 
-/* ── Main ── */
+.tool[aria-pressed="true"] {
+  color: var(--phase);
+  background: var(--panel-high);
+  border-color: var(--phase-dim);
+}
+
+.tool__kbd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+}
+
+/* ══ Main ══ */
+
+.main {
+  flex: 1;
+  min-height: 0;
+}
 
 .main__inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 var(--s4);
   padding-bottom: max(var(--s4), env(safe-area-inset-bottom));
 }
 
-/* ── Recovery ── */
+/* The library and generator are reading surfaces rather than instruments, so
+   they keep a measured column instead of the full-bleed workspace. */
+.main__inner[data-tab="library"],
+.main__inner[data-tab="generator"] {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-inline: var(--s4);
+}
+
+/* ══ Recovery notice ══ */
 
 .recovery {
-  max-width: 1180px;
-  margin: var(--s3) auto 0;
-  padding: var(--s3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--s3);
   flex-wrap: wrap;
-  background: rgba(232, 169, 60, 0.09);
+  margin: var(--s3) var(--s4) 0;
+  padding: var(--s3);
+  background: linear-gradient(180deg, rgba(238, 176, 67, 0.08), rgba(238, 176, 67, 0.03));
   border: 1px solid var(--candle-dim);
+  border-left: 3px solid var(--candle);
   border-radius: var(--r-md);
   font-size: var(--fs-sm);
   color: var(--ash);
 }
 
-.recovery__actions { display: flex; gap: var(--s2); }
+.recovery__actions {
+  display: flex;
+  gap: var(--s2);
+}
 
-/* ── Crash ── */
+/* ══ Crash ══ */
 
 .crash {
   max-width: 42rem;
@@ -163,15 +308,25 @@
   gap: var(--s3);
 }
 
-.crash__title { font-size: var(--fs-2xl); color: var(--cinnabar); }
-.crash__body { color: var(--ash); line-height: 1.8; max-width: 48ch; }
+.crash__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  color: var(--cinnabar);
+}
+
+.crash__body {
+  font-family: var(--font-prose);
+  color: var(--ash);
+  line-height: 1.8;
+  max-width: 48ch;
+}
 
 .crash__detail {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--smoke);
-  background: var(--lacquer-850);
-  border: 1px solid var(--metal-700);
+  background: var(--inlay);
+  border: 1px solid var(--metal-800);
   border-radius: var(--r-sm);
   padding: var(--s2);
   max-width: 100%;
@@ -179,8 +334,33 @@
   text-align: left;
 }
 
-@media (max-width: 640px) {
-  .topbar__inner, .main__inner { padding: 0 var(--s3); }
+/* ══ Responsive ══ */
+
+/* Below the three-zone threshold the readout loses its round chip — the phase
+   strip in the workspace carries the same figures at full size. */
+@media (max-width: 1100px) {
+  .statechip--round { display: none; }
+}
+
+@media (max-width: 860px) {
+  .topbar__inner {
+    padding: 0 var(--s3);
+    gap: var(--s3);
+  }
   .brand__name { display: none; }
-  .tab { padding: 0 var(--s2); font-size: var(--fs-xs); }
+  .tab {
+    padding: 0 var(--s2);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.06em;
+  }
+  .statechip { padding: var(--s1) var(--s2); }
+  .recovery { margin-inline: var(--s3); }
+}
+
+@media (max-width: 560px) {
+  /* At phone width the bar keeps only identity, navigation and the two tools
+     that matter mid-fight; the state readout is redundant with the phase strip
+     pinned directly beneath it. */
+  .topbar__state { display: none; }
+  .tool--optional { display: none; }
 }

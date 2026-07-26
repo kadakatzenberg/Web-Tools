@@ -1,82 +1,196 @@
+/**
+ * The combat log, in both its presentations.
+ *
+ * Entries are keyed by a coloured spine rather than a coloured background: at
+ * this density a tinted background turns the panel into a stripe of noise,
+ * whereas a 2px spine reads as a category at a glance and leaves every line of
+ * text sitting on one ground.
+ */
+
 .eventlog {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: min(24rem, 100vw);
-  z-index: var(--z-overlay);
-  background: linear-gradient(180deg, var(--lacquer-800), var(--lacquer-900));
-  border-left: 1px solid var(--metal-600);
-  box-shadow: var(--lift-3);
   display: flex;
   flex-direction: column;
-  animation: log-in var(--t-base) var(--ease-out);
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  min-height: 0;
+  background: var(--rail);
 }
 
-@keyframes log-in { from { transform: translateX(100%); } }
+/* ── Inline: the activity rail ── */
+
+.eventlog--inline {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Drawer: narrow screens, and the L shortcut ── */
+
+.eventlog--drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 100vw);
+  z-index: var(--z-overlay);
+  background: linear-gradient(180deg, var(--panel), var(--table));
+  border-left: 1px solid var(--metal-700);
+  box-shadow: var(--lift-3);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: log-in var(--t-base) var(--ease-out);
+}
+
+@keyframes log-in {
+  from { transform: translateX(16px); opacity: 0; }
+}
+
+/* ── Head ── */
 
 .eventlog__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--s3);
-  border-bottom: 1px solid var(--metal-700);
+  gap: var(--s2);
+  padding: var(--s3) var(--s3) var(--s2);
+  border-bottom: 1px solid var(--metal-800);
+  flex-shrink: 0;
 }
 
-.eventlog__title { font-size: var(--fs-md); color: var(--ash); }
+.eventlog__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  margin: 0;
+}
 
-.eventlog__close { color: var(--faint); width: var(--tap); height: 36px; border-radius: var(--r-sm); }
-.eventlog__close:hover { color: var(--bone); background: var(--lacquer-600); }
+.eventlog__close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  color: var(--smoke);
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+
+.eventlog__close:hover {
+  color: var(--bone);
+  background: var(--panel-high);
+}
+
+/* ── Filters ── */
 
 .eventlog__filters {
   display: flex;
-  gap: var(--s1);
-  padding: var(--s2) var(--s3);
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--metal-700);
+  gap: 2px;
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--metal-800);
+  flex-shrink: 0;
 }
 
 .eventlog__filter {
-  font-family: var(--font-display);
-  font-size: 0.5625rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--smoke);
-  border: 1px solid var(--metal-700);
-  border-radius: 999px;
-  padding: 0.2rem 0.55rem;
-  min-height: 28px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  padding: 3px var(--s2);
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  transition:
+    color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
 }
 
-.eventlog__filter[data-active="1"] { color: var(--phase); border-color: var(--phase-dim); }
+.eventlog__filter:hover {
+  color: var(--ash);
+  background: var(--panel);
+}
 
-.eventlog__list { list-style: none; overflow-y: auto; flex: 1; padding: var(--s2); }
+.eventlog__filter[data-active="1"] {
+  color: var(--bone);
+  background: var(--panel-high);
+  border-color: var(--metal-700);
+}
+
+/* ── Entries ── */
+
+.eventlog__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--s2) var(--s3) var(--s5);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--metal-700) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 
 .eventlog__entry {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
   gap: var(--s2);
-  padding: var(--s2);
-  border-left: 2px solid var(--metal-600);
-  margin-bottom: 2px;
+  align-items: baseline;
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--ash);
-  background: rgba(255, 255, 255, 0.012);
+  transition: background var(--t-fast) var(--ease-out);
 }
 
-.eventlog__entry[data-kind="damage"] { border-left-color: var(--cinnabar); }
-.eventlog__entry[data-kind="heal"] { border-left-color: var(--jade); }
-.eventlog__entry[data-kind="status"] { border-left-color: var(--violet); }
-.eventlog__entry[data-kind="ability"] { border-left-color: var(--moonlit); }
-.eventlog__entry[data-kind="shield"] { border-left-color: var(--shield-temp); }
-.eventlog__entry[data-kind="flow"] { border-left-color: var(--candle); }
+.eventlog__entry:hover { background: var(--panel); }
 
-.eventlog__when { font-size: 0.5625rem; color: var(--faint); flex-shrink: 0; padding-top: 2px; }
+/* The category spine. */
+.eventlog__entry::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--metal-600);
+}
 
-.eventlog__text { flex: 1; min-width: 0; }
+.eventlog__entry[data-kind="damage"]::before  { background: var(--cinnabar); }
+.eventlog__entry[data-kind="heal"]::before    { background: var(--jade); }
+.eventlog__entry[data-kind="status"]::before  { background: var(--violet); }
+.eventlog__entry[data-kind="ability"]::before { background: var(--candle); }
+.eventlog__entry[data-kind="shield"]::before  { background: var(--moonlit); }
+.eventlog__entry[data-kind="flow"]::before    { background: var(--metal-400); }
+.eventlog__entry[data-kind="roster"]::before  { background: var(--metal-500); }
 
-@media (max-width: 640px) {
-  .eventlog { width: 100vw; }
+.eventlog__when {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.eventlog__text {
+  font-family: var(--font-ui);
+  color: var(--ash);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Context rail scroller ── */
+
+.context__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--s3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--metal-700) transparent;
 }

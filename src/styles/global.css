@@ -17,10 +17,11 @@ html {
 body {
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--lacquer-900);
+  background: var(--void);
   color: var(--bone);
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: var(--fs-base);
+  font-variant-numeric: tabular-nums;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -36,17 +37,17 @@ body::before {
   z-index: var(--z-atmos);
   pointer-events: none;
   background:
-    radial-gradient(120% 80% at 50% -10%, rgba(70, 60, 110, 0.16), transparent 60%),
-    radial-gradient(90% 60% at 50% 110%, rgba(120, 40, 30, 0.1), transparent 65%),
+    radial-gradient(110% 70% at 50% -8%, rgba(74, 62, 118, 0.14), transparent 62%),
+    radial-gradient(85% 55% at 50% 108%, rgba(124, 42, 32, 0.09), transparent 66%),
     repeating-linear-gradient(
       0deg,
-      transparent 0 63px,
-      rgba(140, 150, 190, 0.028) 63px 64px
+      transparent 0 79px,
+      rgba(140, 150, 190, 0.022) 79px 80px
     ),
     repeating-linear-gradient(
       90deg,
-      transparent 0 63px,
-      rgba(140, 150, 190, 0.028) 63px 64px
+      transparent 0 79px,
+      rgba(140, 150, 190, 0.022) 79px 80px
     );
 }
 
@@ -81,11 +82,19 @@ h4 {
 }
 
 .eyebrow {
-  font-family: var(--font-display);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.18em;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--smoke);
+}
+
+/* Prose — help text, empty states, anything read as a sentence rather than
+   scanned as data. The serif is reserved for this and nothing else. */
+.prose {
+  font-family: var(--font-prose);
+  line-height: 1.75;
 }
 
 /* ── Focus: always visible, never colour-only ── */
@@ -99,6 +108,12 @@ h4 {
   border-radius: var(--r-sm);
 }
 
+/* On a dark ground a single ring can disappear against a light surface, so
+   focus also carries a dark halo underneath it. */
+:focus-visible {
+  box-shadow: 0 0 0 4px rgba(3, 3, 8, 0.85);
+}
+
 /* ── Controls ── */
 button,
 input,
@@ -106,7 +121,7 @@ select,
 textarea {
   font: inherit;
   color: inherit;
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
 }
 
 button {

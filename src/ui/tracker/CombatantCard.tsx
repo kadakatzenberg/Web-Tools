@@ -32,7 +32,8 @@ import { gid } from "@/domain/factory";
 import { d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
 import { useStoreApi } from "@/state/store";
 import { announce, useCopy, useId } from "../hooks";
-import { Badge, Button, Disclosure, IconButton, Meter, Modal, NumberInput, useToast } from "../primitives";
+import { Badge, Button, DetailTabs, IconButton, Meter, Modal, NumberInput, useToast } from "../primitives";
+import { IconCheck, IconClose, IconDuplicate, rankMark, statusMark } from "../icons";
 import { FloatingMarks, useFeedback, useImpact } from "@/fx/feedback";
 import { playCue } from "@/fx/sound";
 import "./tracker.css";
@@ -657,10 +658,22 @@ export const CombatantCard = memo(function CombatantCard({
     setStatusCustom("");
   };
 
+  const rank = c.hp <= 0
+    ? "down"
+    : isPlayer
+      ? "player"
+      : c.type === "Boss"
+        ? "boss"
+        : c.type === "Elite"
+          ? "elite"
+          : "normal";
+  const RankMark = rankMark(c.role, c.type, c.hp <= 0);
+
   return (
     <article
       ref={cardRef}
       className="card"
+      data-rank={rank}
       data-combatant={c.id}
       data-side={isPlayer ? "player" : "enemy"}
       data-band={band}
@@ -689,6 +702,13 @@ export const CombatantCard = memo(function CombatantCard({
             ▼
           </IconButton>
         </div>
+
+        {/* The rank emblem. Standing is carried by shape and frame weight as
+            well as pigment, so a boss stays distinguishable from a mook in
+            greyscale and at a glance. */}
+        <span className="card__emblem" data-rank={rank} aria-hidden="true">
+          <RankMark size={17} />
+        </span>
 
         <div className="card__identity">
           {renaming ? (
@@ -724,10 +744,11 @@ export const CombatantCard = memo(function CombatantCard({
           )}
 
           <div className="card__tags">
-            <Badge tone={isPlayer ? "player" : "enemy"}>{isPlayer ? "Player" : c.type || "Enemy"}</Badge>
-            <Badge tone="neutral" glyph={c.position === "Out" ? "⤫" : c.position === "Back" ? "◂" : "▸"}>
-              {c.position}
-            </Badge>
+            <span className="card__rank" data-rank={rank}>
+              {isPlayer ? "Player" : c.type || "Enemy"}
+            </span>
+            <span className="card__dot" aria-hidden="true" />
+            <span className="card__pos">{c.position}</span>
             {BAND_LABEL[band] && (
               <Badge tone={band === "unconscious" ? "danger" : band === "critical" ? "danger" : "warn"} glyph={BAND_GLYPH[band]}>
                 {BAND_LABEL[band]}
@@ -744,19 +765,22 @@ export const CombatantCard = memo(function CombatantCard({
         </div>
 
         <div className="card__head-actions">
-          <Button
-            size="sm"
-            tone={c.done ? "phase" : "neutral"}
+          {/* Acted is a toggle, not a sentence. The text form ate a third of the
+              header and pushed every name into an ellipsis. */}
+          <IconButton
+            label={c.done ? `Mark ${c.name} as still to act` : `Mark ${c.name} as acted`}
+            className="card__acted"
+            tone={c.done ? "phase" : "ghost"}
             aria-pressed={c.done}
             onClick={() => dispatch({ type: "COMBATANT_DONE_TOGGLED", id: c.id })}
           >
-            {c.done ? "✓ Acted" : "Mark acted"}
-          </Button>
+            <IconCheck size={14} />
+          </IconButton>
           <IconButton
             label={`Duplicate ${c.name}`}
             onClick={() => dispatch({ type: "COMBATANT_DUPLICATED", id: c.id })}
           >
-            ⧉
+            <IconDuplicate size={14} />
           </IconButton>
           <IconButton
             label={`Remove ${c.name}`}
@@ -766,7 +790,7 @@ export const CombatantCard = memo(function CombatantCard({
               announce(`${c.name} removed. Undo is available.`);
             }}
           >
-            ✕
+            <IconClose size={14} />
           </IconButton>
         </div>
       </header>
@@ -774,11 +798,13 @@ export const CombatantCard = memo(function CombatantCard({
       {/* ── Health ── */}
       <div className="card__health">
         <div className="card__hp-row">
-          <span className="eyebrow">Health</span>
           <span className="card__hp tnum" style={{ color: BAND_TONE[band] }}>
             {c.hp}
             <span className="card__hp-sep">/</span>
-            {c.maxHp}
+            <span className="card__hp-max">{c.maxHp}</span>
+          </span>
+          <span className="card__hp-pct tnum" aria-hidden="true">
+            {Math.round(pct)}%
           </span>
         </div>
         <Meter
@@ -898,18 +924,29 @@ export const CombatantCard = memo(function CombatantCard({
           {/* ── Statuses ── */}
           {c.statuses.length > 0 && (
             <ul className="chips" aria-label={`${c.name} conditions`}>
-              {c.statuses.map((s) => (
-                <li key={s.id} className="chip chip--status">
+              {c.statuses.map((s) => {
+                const { Icon, polarity } = statusMark(s.name);
+                return (
+                <li key={s.id} className="chip chip--status" data-polarity={polarity}>
+                  <span className="chip__icon" aria-hidden="true">
+                    <Icon size={12} />
+                  </span>
                   <span>{s.name}</span>
-                  <span className="chip__meta tnum">{s.duration}r</span>
+                  {/* Duration doubles as severity: the closer to expiry, the
+                      quieter it gets, so what is about to lapse is visible
+                      without reading every number. */}
+                  <span className="chip__meta tnum" data-soon={s.duration <= 1 ? "1" : undefined}>
+                    {s.duration}r
+                  </span>
                   <IconButton
                     label={`Remove ${s.name}`}
                     onClick={() => dispatch({ type: "STATUS_REMOVED", id: c.id, statusId: s.id })}
                   >
-                    ✕
+                    <IconClose size={11} />
                   </IconButton>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
 
@@ -972,91 +1009,101 @@ export const CombatantCard = memo(function CombatantCard({
 
           {/* ── Progressive disclosure ── */}
           <div className="card__more">
-            <Disclosure label="Stats" count={undefined}>
-              <div className="stat-grid" role="list">
-                {STAT_KEYS.map((k) => {
-                  const base = c.stats[k] ?? 0;
-                  const total = eff[k];
-                  const delta = total - base;
-                  return (
-                    <div key={k} className="stat" role="listitem">
-                      <span className="stat__key">{k}</span>
-                      <span className="stat__val tnum" data-sign={total > 0 ? "pos" : total < 0 ? "neg" : "zero"}>
-                        {total > 0 ? `+${total}` : total}
-                      </span>
-                      {delta !== 0 && (
-                        <span className="stat__delta tnum">
-                          {delta > 0 ? `+${delta}` : delta} tmp
-                        </span>
-                      )}
+            <DetailTabs
+              label={`${c.name} details`}
+              tabs={[
+                {
+                  id: "stats",
+                  label: "Stats",
+                  content: () => (
+                    <>
+                    <div className="stat-grid" role="list">
+                      {STAT_KEYS.map((k) => {
+                        const base = c.stats[k] ?? 0;
+                        const total = eff[k];
+                        const delta = total - base;
+                        return (
+                          <div key={k} className="stat" role="listitem">
+                            <span className="stat__key">{k}</span>
+                            <span className="stat__val tnum" data-sign={total > 0 ? "pos" : total < 0 ? "neg" : "zero"}>
+                              {total > 0 ? `+${total}` : total}
+                            </span>
+                            {delta !== 0 && (
+                              <span className="stat__delta tnum">
+                                {delta > 0 ? `+${delta}` : delta} tmp
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
 
-              <dl className="derived">
-                <div><dt>AC</dt><dd className="tnum">{derived.ac}</dd></div>
-                <div><dt>Hit</dt><dd className="tnum">{derived.hit >= 0 ? `+${derived.hit}` : derived.hit}</dd></div>
-                <div><dt>Phys</dt><dd className="tnum">{derived.physicalDamage >= 0 ? `+${derived.physicalDamage}` : derived.physicalDamage}</dd></div>
-                <div><dt>Mag</dt><dd className="tnum">{derived.magicalDamage >= 0 ? `+${derived.magicalDamage}` : derived.magicalDamage}</dd></div>
-                <div><dt>P.Res</dt><dd className="tnum">{derived.physicalResist}</dd></div>
-                <div><dt>M.Res</dt><dd className="tnum">{derived.magicalResist}</dd></div>
-              </dl>
+                    <dl className="derived">
+                      <div><dt>AC</dt><dd className="tnum">{derived.ac}</dd></div>
+                      <div><dt>Hit</dt><dd className="tnum">{derived.hit >= 0 ? `+${derived.hit}` : derived.hit}</dd></div>
+                      <div><dt>Phys</dt><dd className="tnum">{derived.physicalDamage >= 0 ? `+${derived.physicalDamage}` : derived.physicalDamage}</dd></div>
+                      <div><dt>Mag</dt><dd className="tnum">{derived.magicalDamage >= 0 ? `+${derived.magicalDamage}` : derived.magicalDamage}</dd></div>
+                      <div><dt>P.Res</dt><dd className="tnum">{derived.physicalResist}</dd></div>
+                      <div><dt>M.Res</dt><dd className="tnum">{derived.magicalResist}</dd></div>
+                    </dl>
 
-              <label className="maxhp">
-                <span>Max HP</span>
-                <NumberInput
-                  value={c.maxHp}
-                  aria-label={`Maximum hit points for ${c.name}`}
-                  onChange={(n) => {
-                    if (n > 0) dispatch({ type: "COMBATANT_MAXHP_SET", id: c.id, maxHp: n });
-                  }}
-                />
-              </label>
-
-              {editStats ? (
-                <div className="stat-edit">
-                  {STAT_KEYS.map((k) => (
-                    <label key={k} className="stat-edit__field">
-                      <span>{k}</span>
+                    <label className="maxhp">
+                      <span>Max HP</span>
                       <NumberInput
-                        value={draftStats[k]}
-                        onChange={(n) => setDraftStats({ ...draftStats, [k as StatKey]: n })}
+                        value={c.maxHp}
+                        aria-label={`Maximum hit points for ${c.name}`}
+                        onChange={(n) => {
+                          if (n > 0) dispatch({ type: "COMBATANT_MAXHP_SET", id: c.id, maxHp: n });
+                        }}
                       />
                     </label>
-                  ))}
-                  <div className="stat-edit__actions">
-                    <Button size="sm" tone="heal" onClick={() => { dispatch({ type: "COMBATANT_STATS_SET", id: c.id, stats: draftStats }); setEditStats(false); }}>
-                      Save
-                    </Button>
-                    <Button size="sm" onClick={() => { setDraftStats(c.stats); setEditStats(false); }}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button size="sm" onClick={() => { setDraftStats(c.stats); setEditStats(true); }}>
-                  Edit stats
-                </Button>
-              )}
-            </Disclosure>
 
-            <Disclosure label="Effects">
-              <OngoingEditor c={c} />
-            </Disclosure>
-
-            <Disclosure label="Abilities">
-              <AddAbility combatantId={c.id} />
-            </Disclosure>
-
-            <Disclosure label="Notes">
-              <textarea
-                value={c.notes}
-                aria-label={`${c.name} notes`}
-                placeholder={"Notes…\n* bullet points"}
-                onChange={(e) => dispatch({ type: "COMBATANT_NOTES_SET", id: c.id, notes: e.target.value })}
-              />
-            </Disclosure>
+                    {editStats ? (
+                      <div className="stat-edit">
+                        {STAT_KEYS.map((k) => (
+                          <label key={k} className="stat-edit__field">
+                            <span>{k}</span>
+                            <NumberInput
+                              value={draftStats[k]}
+                              onChange={(n) => setDraftStats({ ...draftStats, [k as StatKey]: n })}
+                            />
+                          </label>
+                        ))}
+                        <div className="stat-edit__actions">
+                          <Button size="sm" tone="heal" onClick={() => { dispatch({ type: "COMBATANT_STATS_SET", id: c.id, stats: draftStats }); setEditStats(false); }}>
+                            Save
+                          </Button>
+                          <Button size="sm" onClick={() => { setDraftStats(c.stats); setEditStats(false); }}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button size="sm" onClick={() => { setDraftStats(c.stats); setEditStats(true); }}>
+                        Edit stats
+                      </Button>
+                    )}
+                    </>
+                  ),
+                },
+                { id: "effects", label: "Effects", content: () => <OngoingEditor c={c} /> },
+                { id: "skills", label: "Skills", content: () => <AddAbility combatantId={c.id} /> },
+                {
+                  id: "notes",
+                  label: "Notes",
+                  content: () => (
+                    <textarea
+                      value={c.notes}
+                      aria-label={`${c.name} notes`}
+                      placeholder={"Notes…\n* bullet points"}
+                      onChange={(e) =>
+                        dispatch({ type: "COMBATANT_NOTES_SET", id: c.id, notes: e.target.value })
+                      }
+                    />
+                  ),
+                },
+              ]}
+            />
           </div>
         </>
       )}

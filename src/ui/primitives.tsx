@@ -209,7 +209,10 @@ export function Meter({
       aria-valuemax={max}
       aria-label={label}
     >
-      <div className="meter__fill" style={{ width: `${pct}%`, background: tone }} />
+      {/* backgroundColor, not the `background` shorthand: the shorthand resets
+          background-image, which silently killed the health-band hatch that
+          makes the band readable without colour. */}
+      <div className="meter__fill" style={{ width: `${pct}%`, backgroundColor: tone }} />
     </div>
   );
 }
@@ -426,6 +429,68 @@ export function Disclosure({
       {open && (
         <div className="disclosure__panel" id={id}>
           {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Detail tabs ── */
+
+/**
+ * A single strip of toggles opening one panel, used where a stack of separate
+ * disclosures would otherwise repeat down a card.
+ *
+ * Four collapsed disclosures cost four rows of chrome each and, multiplied
+ * across a roster, turn into a wall of near-identical grey bars. One strip
+ * costs a single row and makes the available detail legible at a glance.
+ *
+ * Deliberately buttons with `aria-expanded`, not an ARIA tablist. A tablist
+ * must always have exactly one selected tab, and this strip can be closed
+ * entirely so a card reduces to nothing but its operational surface. Claiming
+ * the tab role without honouring that contract — or its arrow-key
+ * navigation — would describe the control to a screen reader as something it
+ * is not.
+ */
+export function DetailTabs({
+  tabs,
+  label,
+}: {
+  tabs: { id: string; label: string; content: () => ReactNode }[];
+  label: string;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const base = useId("dt");
+  const active = tabs.find((t) => t.id === open);
+
+  return (
+    <div className="dtabs">
+      <div className="dtabs__strip" role="group" aria-label={label}>
+        {tabs.map((t) => {
+          const selected = open === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              id={`${base}-${t.id}`}
+              className="dtabs__tab"
+              aria-expanded={selected}
+              aria-controls={selected ? `${base}-${t.id}-panel` : undefined}
+              data-active={selected ? "1" : undefined}
+              onClick={() => setOpen(selected ? null : t.id)}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      {active && (
+        <div
+          className="dtabs__panel"
+          id={`${base}-${active.id}-panel`}
+          aria-labelledby={`${base}-${active.id}`}
+        >
+          {active.content()}
         </div>
       )}
     </div>

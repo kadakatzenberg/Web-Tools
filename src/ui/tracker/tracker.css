@@ -1,12 +1,72 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   The workspace
+   ══════════════════════════════════════════════════════════════════════════
+   Three zones cut into one surface: the Order rail on the left, the table in
+   the middle, the activity rail on the right. The zones are divided by hairline
+   inlay rather than by gaps, so the workspace reads as a single carved plane
+   instead of three floating panels.
+
+   The rails are independently scrollable and pinned below the command bar, so
+   the roster can be as long as it likes without ever pushing the order or the
+   log out of reach. This is the whole point of the layout: at 1440px the old
+   single column put every combatant card below the fold.
+   ═════════════════════════════════════════════════════════════════════════ */
+
 .tracker {
   position: relative;
 }
 
+.workspace {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--context-w);
+  align-items: start;
+  min-height: calc(100dvh - var(--bar-h));
+}
+
+.workspace__rail {
+  position: sticky;
+  top: var(--bar-h);
+  /* Fills the column rather than stopping under the last unit — a rail that
+     ends mid-page reads as a truncated panel instead of a frame. */
+  height: calc(100dvh - var(--bar-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* A frame, not a panel: the rail darkens away from the table so the eye
+     settles on the workspace rather than the edges. */
+  background: linear-gradient(90deg, var(--void), var(--rail) 70%);
+  border-right: 1px solid var(--metal-800);
+  scrollbar-width: thin;
+  scrollbar-color: var(--metal-700) transparent;
+}
+
+.workspace__context {
+  position: sticky;
+  top: var(--bar-h);
+  height: calc(100dvh - var(--bar-h));
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(270deg, var(--void), var(--rail) 70%);
+  border-left: 1px solid var(--metal-800);
+}
+
+.workspace__main {
+  /* The roster grid resolves against this column, not the viewport, so the
+     card count per row responds to the space actually available once both
+     rails are accounted for. */
+  container-type: inline-size;
+  container-name: workspace;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4) var(--s7);
+}
+
+/* Legacy alias — the tracker body is now the centre column. */
 .tracker__body {
   display: flex;
   flex-direction: column;
   gap: var(--s3);
-  padding: var(--s3) 0 var(--s7);
 }
 
 .tracker__toolbar {
@@ -15,74 +75,128 @@
   gap: var(--s2);
 }
 
-/* ── Phase bar ── */
+/* ══ Phase strip ══
+   The deliberate, always-reachable turn control. Pinned to the top of the
+   centre column so Next Phase is never scrolled away mid-fight. */
 
 .phasebar {
   position: sticky;
-  top: 0;
+  top: var(--bar-h);
   z-index: var(--z-sticky);
-  background: linear-gradient(180deg, rgba(8, 8, 15, 0.97), rgba(8, 8, 15, 0.9));
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--phase-dim);
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
   margin: 0 calc(var(--s4) * -1);
   padding: var(--s3) var(--s4);
+  background: linear-gradient(180deg, rgba(7, 7, 14, 0.98), rgba(7, 7, 14, 0.92));
+  border-bottom: 1px solid var(--metal-800);
   transition: border-color var(--t-phase) var(--ease-out);
 }
 
-/* A pigment wash bleeds down from the phase edge — the room changes colour. */
+/* The pigment edge. It sweeps in on a phase change — the one moment the
+   interface is allowed to announce itself. */
 .phasebar::after {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
+  inset: auto 0 -1px 0;
+  height: 1px;
   background: linear-gradient(90deg, transparent, var(--phase), transparent);
-  opacity: 0.85;
-  animation: phase-sweep var(--t-phase) var(--ease-out);
+  opacity: 0.9;
+  animation: phase-sweep var(--t-phase) var(--ease-ink);
 }
 
 @keyframes phase-sweep {
-  from {
-    opacity: 0;
-    transform: scaleX(0.3);
-  }
+  from { opacity: 0; transform: scaleX(0.2); }
 }
 
 .phasebar__main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--s3);
+  gap: var(--s4);
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .phasebar__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
   min-width: 0;
 }
 
+/* The round counter as a struck coin: the largest number on the screen, and
+   the anchor the eye returns to. */
+.phasebar__round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, var(--panel-high), var(--inlay));
+  box-shadow:
+    inset 0 0 0 1px var(--metal-700),
+    inset 0 0 0 4px var(--table),
+    inset 0 0 0 5px var(--phase-dim),
+    0 0 18px -6px var(--phase-glow);
+  transition: box-shadow var(--t-phase) var(--ease-out);
+}
+
+.phasebar__round-label {
+  font-family: var(--font-ui);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1;
+}
+
+.phasebar__round-value {
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--bone);
+}
+
+.phasebar__names { min-width: 0; }
+
 .phasebar__sep {
   margin: 0 0.35rem;
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .phasebar__phase {
+  font-family: var(--font-display);
   font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: 0.06em;
   color: var(--phase);
-  text-shadow: 0 0 24px var(--phase-glow);
-  animation: phase-name var(--t-phase) var(--ease-out);
+  text-shadow: 0 0 26px var(--phase-glow);
+  animation: phase-name var(--t-phase) var(--ease-ink);
+  white-space: nowrap;
 }
 
 @keyframes phase-name {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-    letter-spacing: 0.3em;
-  }
+  from { opacity: 0; transform: translateY(-3px); letter-spacing: 0.28em; }
 }
 
 .phasebar__pending {
+  font-family: var(--font-ui);
   font-size: var(--fs-xs);
   color: var(--smoke);
-  font-style: italic;
+}
+
+.phasebar__counts {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.06em;
+  color: var(--faint);
 }
 
 .phasebar__actions {
@@ -92,9 +206,17 @@
   flex-wrap: wrap;
 }
 
+/* The single most consequential control in the application, sized and weighted
+   to say so — and far enough from the destructive controls that it cannot be
+   hit by accident. */
 .phasebar__next {
+  font-family: var(--font-display);
   font-size: var(--fs-md);
-  padding: 0.55rem 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.6rem 1.2rem;
+  gap: var(--s2);
 }
 
 /* ── Session ── */
@@ -323,46 +445,99 @@
   height: 100%;
 }
 
-/* ── Card ── */
+/* ══ Card ══
+   The operational unit. Three tiers, top to bottom: identity and health, which
+   are always legible; the action bar, which is always reachable; and the detail
+   strip, which opens only when asked for.
+
+   Rank is expressed four ways at once — the emblem glyph, the spine weight, the
+   pigment, and the frame treatment on a boss — so standing survives greyscale,
+   small sizes, and a colour-blind reader. */
+
+.roster {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s3);
+  align-items: start;
+}
+
+/* Two up once the centre column can give each card a workable measure. Below
+   that the cards would be too narrow for the action bar to stay on one line. */
+@container workspace (min-width: 700px) {
+  .roster { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Three up only on a genuinely wide table, where a card still gets ~400px. */
+@container workspace (min-width: 1240px) {
+  .roster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 .card {
   position: relative;
-  background: linear-gradient(180deg, var(--lacquer-700), var(--lacquer-850));
-  border: 1px solid var(--metal-700);
-  border-left: 3px solid var(--metal-500);
-  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(178deg, var(--panel-high), var(--panel) 62%, var(--table));
+  border: 1px solid var(--metal-800);
+  border-radius: var(--r-md);
   padding: var(--s3);
-  margin-bottom: var(--s3);
-  box-shadow: var(--lift-1), var(--inset-carve);
-  transition: border-color var(--t-base) var(--ease-out), opacity var(--t-base) var(--ease-out);
+  box-shadow: var(--lift-1), var(--carve);
+  transition:
+    border-color var(--t-base) var(--ease-out),
+    box-shadow var(--t-base) var(--ease-out),
+    opacity var(--t-base) var(--ease-out);
 }
 
-.card[data-side="player"] {
-  border-left-color: var(--moonlit);
-}
-.card[data-side="enemy"] {
-  border-left-color: var(--violet);
+/* The rank spine, cut into the left edge of the card. */
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  background: var(--rank-normal);
+  transition: background var(--t-base) var(--ease-out);
 }
 
-.card[data-band="wounded"] {
-  border-left-color: var(--hp-wounded);
+.card[data-rank="player"]::before { background: var(--rank-player); }
+.card[data-rank="normal"]::before { background: var(--rank-normal); opacity: 0.7; }
+.card[data-rank="elite"]::before  { background: var(--rank-elite); width: 3px; }
+.card[data-rank="boss"]::before {
+  width: 3px;
+  background: linear-gradient(180deg, var(--rank-boss), var(--cinnabar));
+  box-shadow: 0 0 12px rgba(164, 135, 234, 0.45);
 }
-.card[data-band="critical"] {
-  border-left-color: var(--hp-critical);
+.card[data-rank="down"]::before { background: var(--rank-down); opacity: 0.6; }
+
+/* A boss gets a second frame — the only card allowed extra chrome, because it
+   is the only one whose arrival changes how the table is read. */
+.card[data-rank="boss"] {
+  border-color: var(--violet-dim);
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgba(164, 135, 234, 0.09), transparent 60%),
+    linear-gradient(178deg, var(--panel-high), var(--panel) 62%, var(--table));
 }
+
+.card[data-rank="elite"] { border-color: var(--metal-700); }
+
 .card[data-band="unconscious"] {
-  border-left-color: var(--hp-down);
-  background: linear-gradient(180deg, rgba(40, 8, 8, 0.7), var(--lacquer-850));
+  background: linear-gradient(178deg, rgba(60, 14, 12, 0.5), var(--table));
+  border-color: var(--cinnabar-deep);
 }
 
-.card[data-done="1"] {
-  opacity: 0.62;
-}
+/* Acted, and still on the field. Recedes without disappearing — the GM still
+   needs to be able to read and undo it. */
+.card[data-done="1"] { opacity: 0.58; }
+.card[data-done="1"]:hover,
+.card[data-done="1"]:focus-within { opacity: 1; }
 
 .card[data-focused="1"] {
-  border-color: var(--phase);
+  border-color: var(--phase-dim);
   box-shadow: 0 0 0 1px var(--phase-dim), var(--lift-2);
 }
+
+/* ── Head ── */
 
 .card__head {
   display: flex;
@@ -379,9 +554,66 @@
 }
 
 .card__order .icon-btn {
-  width: 24px;
-  height: 20px;
-  font-size: 0.6rem;
+  width: 20px;
+  height: 18px;
+}
+
+/* The compact reorder arrows are a fine-pointer affordance. On touch they
+   return to a full target — the generic coarse-pointer rule in primitives.css
+   loses to the selector above, so it has to be restated here. */
+@media (pointer: coarse) {
+  .card__order { opacity: 1; }
+  .card__order .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Reordering is an occasional act, so it stays quiet until the card is
+   engaged with — it does not need to compete with the name for attention. */
+.card__order { opacity: 0.35; transition: opacity var(--t-fast) var(--ease-out); }
+.card:hover .card__order,
+.card:focus-within .card__order { opacity: 1; }
+
+.card__acted[aria-pressed="true"] {
+  color: var(--jade);
+  background: var(--jade-deep);
+}
+
+/* ── Rank emblem ── */
+
+.card__emblem {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  background: var(--inlay);
+  box-shadow: inset 0 0 0 1px var(--metal-800);
+  color: var(--rank-normal);
+}
+
+.card__emblem[data-rank="player"] {
+  color: var(--rank-player);
+  box-shadow: inset 0 0 0 1px var(--jade-deep);
+}
+.card__emblem[data-rank="normal"] {
+  color: var(--rank-normal);
+  box-shadow: inset 0 0 0 1px var(--cinnabar-deep);
+}
+.card__emblem[data-rank="elite"] {
+  color: var(--rank-elite);
+  box-shadow: inset 0 0 0 1px var(--candle-deep);
+}
+.card__emblem[data-rank="boss"] {
+  color: var(--rank-boss);
+  background: radial-gradient(circle at 50% 40%, rgba(164, 135, 234, 0.16), var(--inlay));
+  box-shadow: inset 0 0 0 1px var(--violet-dim), 0 0 14px -4px rgba(164, 135, 234, 0.55);
+}
+.card__emblem[data-rank="down"] {
+  color: var(--rank-down);
+  opacity: 0.7;
 }
 
 .card__identity {
@@ -389,28 +621,44 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
+  gap: 3px;
 }
 
 .card__name {
   font-family: var(--font-display);
   font-size: var(--fs-lg);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: var(--bone);
   text-align: left;
-  border-bottom: 1px dashed var(--metal-600);
-  padding-bottom: 1px;
   align-self: flex-start;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border-bottom: 1px solid transparent;
+  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
 }
 
 .card__name:hover {
-  border-bottom-color: var(--phase);
   color: #fff;
+  border-bottom-color: var(--metal-500);
+}
+
+/* The name doubles as the rename control, so on touch it has to be a real
+   target rather than a 26px line of text. */
+@media (pointer: coarse) {
+  .card__name {
+    min-height: var(--tap);
+    display: flex;
+    align-items: center;
+  }
+}
+
+.card[data-band="unconscious"] .card__name {
+  color: var(--smoke);
+  text-decoration: line-through;
+  text-decoration-color: var(--cinnabar-dim);
 }
 
 .card__rename input {
@@ -422,8 +670,39 @@
 
 .card__tags {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--s1);
+}
+
+.card__rank {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--rank-normal);
+}
+
+.card__rank[data-rank="player"] { color: var(--rank-player); }
+.card__rank[data-rank="elite"]  { color: var(--rank-elite); }
+.card__rank[data-rank="boss"]   { color: var(--rank-boss); }
+.card__rank[data-rank="down"]   { color: var(--rank-down); }
+
+.card__dot {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.card__pos {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--smoke);
 }
 
 .card__head-actions {
@@ -433,7 +712,9 @@
   flex-shrink: 0;
 }
 
-/* ── Health ── */
+/* ══ Health ══
+   The ratio is the biggest thing on the card. Everything else on this row is
+   deliberately quieter than it. */
 
 .card__health {
   position: relative;
@@ -443,21 +724,35 @@
 .card__hp-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  gap: var(--s2);
   margin-bottom: var(--s1);
 }
 
 .card__hp {
-  font-family: var(--font-display);
-  font-size: var(--fs-xl);
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .card__hp-sep {
   color: var(--faint);
-  margin: 0 0.15rem;
-  font-size: 0.8em;
+  margin: 0 0.1rem;
+  font-size: 0.62em;
+}
+
+.card__hp-max {
+  color: var(--smoke);
+  font-size: 0.62em;
+}
+
+.card__hp-pct {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--faint);
 }
 
 /* Critical health reads as a slow breath, never a strobe. */
@@ -472,18 +767,71 @@
 }
 
 @keyframes crit-breath {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.45; }
+}
+
+/* ══ Detail tabs ══ */
+
+.dtabs {
+  margin-top: var(--s2);
+  border-top: 1px solid var(--metal-800);
+}
+
+.dtabs__strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding-top: var(--s2);
+}
+
+.dtabs__tab {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 550;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: var(--s1) var(--s2);
+  min-height: 26px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  transition:
+    color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.dtabs__tab:hover {
+  color: var(--ash);
+  background: var(--panel-high);
+}
+
+.dtabs__tab[data-active="1"] {
+  color: var(--bone);
+  background: var(--panel-high);
+  border-color: var(--metal-700);
+}
+
+.dtabs__panel {
+  padding-top: var(--s3);
+  animation: dtab-open var(--t-base) var(--ease-out);
+}
+
+@keyframes dtab-open {
+  from { opacity: 0; transform: translateY(-3px); }
+}
+
+.dtabs__panel > textarea {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
 }
 
 /* ── Positions ── */
 
 .card__positions {
+  align-self: flex-start;
   display: inline-flex;
   gap: 1px;
   padding: 2px;
@@ -502,6 +850,14 @@
   border-radius: 3px;
   min-height: 30px;
   transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+}
+
+/* Stated after the base rule so it wins on source order. */
+@media (pointer: coarse) {
+  .pos-btn {
+    min-height: var(--tap);
+    padding-inline: var(--s3);
+  }
 }
 
 .pos-btn:hover {
@@ -567,18 +923,27 @@
   color: var(--shield);
 }
 
+/* The ward controls fill the remaining row rather than floating to its right
+   edge, which left a wide dead gap in the middle of every card. `flex-wrap` is
+   what keeps that honest on a phone: without it the Ward button pushed a
+   hundred pixels past the viewport. */
 .shields__add {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s1);
   align-items: center;
-  margin-left: auto;
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--s3);
 }
 
 .shields__add input[type="number"] {
-  width: 4.5rem;
+  width: 4rem;
+  flex-shrink: 0;
 }
 .shields__add input:not([type="number"]) {
-  width: 6rem;
+  flex: 1;
+  min-width: 3.5rem;
 }
 
 .shields__hint {
@@ -766,6 +1131,41 @@
 }
 .chip--mod {
   border-color: rgba(154, 122, 224, 0.4);
+}
+
+/* ── Condition chips ── */
+
+.chip--status {
+  gap: var(--s1);
+  border-color: var(--metal-700);
+}
+
+.chip__icon {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--smoke);
+}
+
+/* Polarity is carried by the pigment of the mark and a tinted edge, never by
+   the chip's fill — a wall of tinted fills at this size becomes unreadable. */
+.chip--status[data-polarity="harmful"] {
+  border-color: var(--cinnabar-deep);
+}
+.chip--status[data-polarity="harmful"] .chip__icon { color: var(--cinnabar); }
+
+.chip--status[data-polarity="helpful"] {
+  border-color: var(--jade-deep);
+}
+.chip--status[data-polarity="helpful"] .chip__icon { color: var(--jade); }
+
+/* About to lapse. Amber plus a hairline underscore, so it reads without
+   depending on the hue. */
+.chip__meta[data-soon="1"] {
+  color: var(--candle);
+  border-bottom: 1px solid var(--candle-dim);
 }
 
 .card__status-add {
@@ -1064,7 +1464,59 @@
   color: var(--smoke);
 }
 
-/* ── Responsive ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   Responsive
+   ══════════════════════════════════════════════════════════════════════════
+   The layout is reorganised at each step rather than scaled down. Three zones
+   become two, then one, and the Order changes form each time — a vertical rail
+   on a desk, a horizontal strip on a tablet, a swipeable strip under the
+   command bar on a phone. What never changes is that the Order and the Next
+   Phase control both stay on screen.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* On a laptop the rails give ground to the table — the roster is what the GM
+   is operating, and 702px of centre column forced the phase strip to wrap. */
+@media (max-width: 1440px) {
+  .workspace { --rail-w: 236px; --context-w: 284px; }
+}
+
+/* ── Two zones: the activity rail folds back into its drawer ── */
+@media (max-width: 1180px) {
+  /* The activity rail is not rendered at this width — see TrackerTab, which
+     moves the enemy roll block back into the main column rather than hiding a
+     feature with CSS. */
+  .workspace {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  }
+}
+
+/* ── One zone: the Order becomes a horizontal strip above the table ── */
+@media (max-width: 900px) {
+  .workspace {
+    display: block;
+  }
+
+  .workspace__rail {
+    position: sticky;
+    top: var(--bar-h);
+    z-index: var(--z-rail);
+    max-height: none;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--metal-800);
+    background: linear-gradient(180deg, var(--rail), rgba(9, 9, 17, 0.96));
+  }
+
+  .workspace__main {
+    padding: var(--s3) var(--s3) var(--s7);
+  }
+
+  .phasebar {
+    top: 0; /* the rail above it is what sticks; two sticky bars would stack */
+    margin: 0 calc(var(--s3) * -1);
+    padding: var(--s3);
+  }
+}
 
 @media (max-width: 860px) {
   .stat-grid,
@@ -1085,6 +1537,15 @@
     gap: var(--s2);
   }
 
+  .phasebar__meta { gap: var(--s3); }
+
+  .phasebar__round {
+    width: 42px;
+    height: 42px;
+  }
+
+  .phasebar__round-value { font-size: 1.1rem; }
+
   .phasebar__actions {
     justify-content: space-between;
   }
@@ -1094,6 +1555,14 @@
     flex: 1;
     min-height: var(--tap);
   }
+
+  /* Every tab in a card's detail strip has to be a real touch target. */
+  .dtabs__tab {
+    flex: 1;
+    min-height: 38px;
+  }
+
+  .unit { width: 156px; }
 
   .card__head {
     flex-wrap: wrap;
@@ -1124,6 +1593,7 @@
   .shields__add {
     margin-left: 0;
     width: 100%;
+    flex-basis: 100%;
   }
 
   .stat-edit {

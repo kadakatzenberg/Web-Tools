@@ -13,9 +13,87 @@ Materials do the work that chrome usually does:
 - **Seal** — vermilion (`#c8382e`) marks authored surfaces: the brand mark, the
   top edge of every dialog, the centre line of the battlefield.
 
-Cinzel is retained as the display face because it is the app's existing visual
-signature, but self-hosted through `@fontsource` (latin subsets only) instead of
-hotlinked from Google Fonts.
+## Three faces, three jobs
+
+- **Cinzel** — carved Roman capital. Ceremony only: the round, the phase name,
+  seals, section headings.
+- **IBM Plex Sans** — a systems typeface, and the face of every piece of
+  operational data. This is most of the interface.
+- **IBM Plex Mono** — tabular figures wherever numbers align in a column:
+  health, counters, dice, log timestamps.
+- **Noto Serif** — prose only. Help text, empty states, the initiative
+  explanation.
+
+The serif used to carry the whole interface. It is a poor face for dense
+numeric data, which is what a combat tracker mostly is, so it has been pushed
+back to the sentences it reads well. All four are self-hosted through
+`@fontsource`, Latin subsets, under the SIL Open Font License — see
+`ATTRIBUTIONS.md`.
+
+## The three-zone workspace
+
+The single most consequential change in the redesign. The tracker used to be one
+narrow column: on a 1440×900 desktop, six combatants produced 4,600px of scroll
+and *not one card was above the fold*. The primary instrument was invisible on
+the primary screen.
+
+The workspace is now three zones cut into one surface:
+
+- **The Order** (left, 236–258px) — a read-only standing of every combatant:
+  rank, health, conditions, turn state. This is the "understand the fight in
+  three seconds" surface. It is deliberately read-only; nothing on it can change
+  a combatant, which is what lets it be this dense without being dangerous to
+  skim with a cursor. Selecting a unit focuses its card.
+- **The table** (centre) — the phase strip, the war table, and the roster, which
+  becomes a two- or three-column grid as the column widens.
+- **Activity** (right, 284–320px) — the combat log, permanently visible instead
+  of hidden behind a toggle most people never found, replaced by the enemy roll
+  block during the enemy phase.
+
+Zones are divided by hairline inlay rather than gaps, so the workspace reads as
+one carved plane rather than three floating panels. Both rails are pinned and
+scroll independently, so the roster can be any length without pushing the Order
+or the log out of reach.
+
+## Rank as a visual system
+
+A combatant's standing is carried four ways at once, so it survives greyscale,
+small sizes, and a colour-blind reader:
+
+| Rank | Mark | Spine | Pigment | Frame |
+| --- | --- | --- | --- | --- |
+| Player | upward chevrons | 2px | jade | — |
+| Enemy | filled node | 2px, dimmed | cinnabar | — |
+| Elite | faceted lozenge | 3px | candle | raised border |
+| Boss | sealed lozenge in a ring | 3px, lit | violet | second frame, inner glow |
+| Down | broken ring | 2px, faded | grey | struck-through name |
+
+The boss is the only card allowed extra chrome, because it is the only one whose
+arrival changes how the whole table is read.
+
+## Health, without relying on colour
+
+Four bands on one warming ramp — jade, candle, orange, dried cinnabar — so the
+*direction* of travel reads even where the hues do not separate. Below half, the
+bar fill also gains a diagonal hatch, and the track carries fixed quarter marks
+so a ratio can be estimated without reading the number. The fill eases toward
+its new value over 520ms so a hit reads as movement rather than a jump cut.
+
+(The hatch was authored twice before it actually rendered: the meter set its
+colour with the `background` shorthand inline, which resets `background-image`
+and silently discarded it. It is now set with `backgroundColor`.)
+
+## Marks are original
+
+No icon library. Every mark is drawn in `src/ui/icons.tsx` as inline SVG on a
+16×16 grid, cut from the same motifs as the rest of the system — brush strokes,
+blade edges, seal geometry, moon phases, cat-eye curves — with butt caps and
+mitre joins, because these are cut rather than rounded. A general-purpose icon
+set would have brought a house style belonging to no particular product.
+
+Conditions map to marks through a registry with a polarity (harmful, helpful,
+neutral); anything unregistered falls back to a neutral mark, so a custom
+condition is never left without one.
 
 ## Phase as material, not decoration
 
@@ -68,6 +146,21 @@ way that twenty numbers are not.
 
 It complements the cards rather than replacing them: the table answers "who is
 where and how hurt", the cards answer "what can this combatant actually do".
+
+## Motion budget
+
+The strongest motion in the application is spent on exactly one event: the round
+herald, a struck plate with two ink rules drawing apart, shown when the round
+number advances. A new round is the only moment where the whole table's state
+moves at once — durations tick, damage-over-time resolves, every acted flag
+clears — so it is the only moment that earns a full-screen gesture. It never
+blocks a pointer, never covers the rails, is hidden from assistive technology
+(the phase strip is already live), and does not render at all under reduced
+motion. It is also suppressed when the counter moves *backwards*, since
+celebrating an undo would be a lie about what just happened.
+
+Everything else is under 200ms and attached to a state change: the phase edge
+sweep, the meter ease, the detail panel open, hover and focus responses.
 
 ## Sound
 

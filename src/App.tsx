@@ -18,6 +18,8 @@ import { CommandPalette } from "@/ui/CommandPalette";
 import { EventLog } from "@/ui/EventLog";
 import { Button, ConfirmDialog, ToastProvider, useToast } from "@/ui/primitives";
 import { announce, useHotkeys, usePrefersReducedMotion } from "@/ui/hooks";
+import { IconLog, IconMuted, IconSearch, IconSound } from "@/ui/icons";
+import { PHASES } from "@/domain/constants";
 import "@/ui/app.css";
 
 type Tab = "tracker" | "library" | "generator";
@@ -156,7 +158,7 @@ function Shell() {
             <span className="brand__seal" aria-hidden="true">
               黑
             </span>
-            <span className="brand__name display">Hei Mao</span>
+            <span className="brand__name">Hei Mao</span>
           </div>
 
           <nav className="tabs" aria-label="Sections">
@@ -174,33 +176,51 @@ function Shell() {
             ))}
           </nav>
 
+          {/* The state of the fight, readable from any scroll position. It is
+              hidden on the other tabs, where it would describe something the
+              user is not currently looking at. */}
+          {tab === "tracker" && (
+            <div className="topbar__state">
+              <div className="statechip statechip--round">
+                <span className="statechip__label">Round</span>
+                <span className="statechip__value">{present.round}</span>
+              </div>
+              <div className="statechip statechip--phase">
+                <span className="statechip__label">Phase</span>
+                <span className="statechip__value">{PHASES[present.phase]}</span>
+              </div>
+            </div>
+          )}
+
           <div className="topbar__tools">
             <button
               type="button"
-              className="tool"
+              className="tool tool--optional"
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
               title="Command palette (Ctrl/Cmd + K)"
             >
-              ⌘K
+              <IconSearch size={15} />
             </button>
             <button
               type="button"
               className="tool"
               aria-pressed={logOpen}
               onClick={() => setLogOpen((v) => !v)}
+              aria-label="Combat log"
               title="Combat log (L)"
             >
-              Log
+              <IconLog size={15} />
             </button>
             <button
               type="button"
-              className="tool"
+              className="tool tool--optional"
               aria-pressed={sound}
               onClick={() => setSound(setSoundEnabled(!isSoundEnabled()))}
+              aria-label={sound ? "Mute sound" : "Enable sound"}
               title={sound ? "Mute sound" : "Enable sound"}
             >
-              {sound ? "🔊" : "🔇"}
+              {sound ? <IconSound size={15} /> : <IconMuted size={15} />}
             </button>
           </div>
         </div>
@@ -238,8 +258,8 @@ function Shell() {
       )}
 
       <main className="main" id="main">
-        <div className="main__inner">
-          {tab === "tracker" && <TrackerTab session={session} />}
+        <div className="main__inner" data-tab={tab}>
+          {tab === "tracker" && <TrackerTab session={session} logOpen={logOpen} />}
           {tab === "library" && <LibraryTab onAdded={() => setTab("tracker")} />}
           {tab === "generator" && <GeneratorTab onAdded={() => setTab("tracker")} />}
         </div>

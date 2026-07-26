@@ -76,7 +76,7 @@ for (const vp of VIEWPORTS) {
     expect(overflow, `page scrolls horizontally at ${vp.name}`).toBeLessThanOrEqual(1);
 
     // The primary control must remain reachable at every size.
-    await expect(page.getByRole("button", { name: "Next phase →" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next phase" })).toBeVisible();
   });
 }
 
@@ -86,7 +86,7 @@ test("keeps touch targets large enough on a phone", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Restore it" }).click();
 
-  const box = await page.getByRole("button", { name: "Next phase →" }).boundingBox();
+  const box = await page.getByRole("button", { name: "Next phase" }).boundingBox();
   expect(box!.height).toBeGreaterThanOrEqual(40);
 });
 
@@ -139,13 +139,13 @@ test("handles a 40-combatant encounter with responsive phase advancement", async
   await page.getByRole("button", { name: "Restore it" }).click();
   await expect(page.locator(".card")).toHaveCount(40);
 
-  const next = page.getByRole("button", { name: "Next phase →" });
+  const next = page.getByRole("button", { name: "Next phase" });
 
   // Three phases = one full round tick across 40 combatants with DoTs,
   // regeneration, shields, statuses, modifiers, and three abilities each.
   const start = Date.now();
   for (let i = 0; i < 3; i++) await next.click();
-  await expect(page.getByText(/Round\s*2/)).toBeVisible();
+  await expect(page.locator(".phasebar__round-value")).toHaveText("2");
   const elapsed = Date.now() - start;
 
   expect(elapsed, "a full round across 40 combatants should stay responsive").toBeLessThan(6000);
@@ -165,3 +165,118 @@ test("stays responsive typing into a card in a large encounter", async ({ page }
   await expect(input).toHaveValue("12");
   expect(Date.now() - start).toBeLessThan(2000);
 });
+
+/* ── The redesigned shell ── */
+
+test("puts a combatant card above the fold on a laptop", async ({ page }) => {
+  await seed(page, 6);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  // The whole point of the three-zone workspace: the old single column pushed
+  // every card off a 900px-tall screen.
+  await expect(page.locator(".card").first()).toBeInViewport();
+});
+
+test("the Order rail summarises every combatant without duplicating controls", async ({ page }) => {
+  await seed(page, 6);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  const rail = page.getByRole("navigation", { name: "Combat order" });
+  await expect(rail.locator(".unit")).toHaveCount(6);
+
+  // Read-only by contract — the rail must not offer a way to mutate health.
+  await expect(rail.getByRole("textbox")).toHaveCount(0);
+  await expect(rail.getByRole("spinbutton")).toHaveCount(0);
+
+  // Selecting a unit focuses that combatant's card.
+  await rail.locator(".unit").nth(2).click();
+  await expect(page.locator('.card[data-focused="1"]')).toHaveCount(1);
+});
+
+test("the activity rail becomes the main column below the three-zone width", async ({ page }) => {
+  await seed(page, 4);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+  await expect(page.getByRole("complementary", { name: "Activity" })).toBeVisible();
+
+  await page.setViewportSize({ width: 900, height: 900 });
+  await expect(page.getByRole("complementary", { name: "Activity" })).toHaveCount(0);
+
+  // The log is still reachable — it returns to its drawer, it is not removed.
+  await page.getByRole("button", { name: "Combat log", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "Combat log" })).toBeVisible();
+});
+
+test("the Order becomes a horizontal strip rather than a screenful on a phone", async ({ page }) => {
+  await seed(page, 8);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  const rail = page.locator(".workspace__rail");
+  const box = (await rail.boundingBox())!;
+  expect(box.height, "the Order must not consume the phone viewport").toBeLessThan(200);
+
+  // The phase control still shares the first screen with it.
+  await expect(page.getByRole("button", { name: "Next phase" })).toBeInViewport();
+});
+
+test("health bands carry a pattern, not only a hue", async ({ page }) => {
+  await addCombatantQuick(page, "Hurt", 20);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  const fill = page.locator(".card").first().locator(".meter__fill");
+  const image = await fill.evaluate((el) => getComputedStyle(el).backgroundImage);
+  expect(image, "a wounded bar needs a hatch so the band survives greyscale").toContain(
+    "repeating-linear-gradient",
+  );
+});
+
+async function addCombatantQuick(page: Page, name: string, maxHp: number) {
+  await page.addInitScript(
+    ([n, hp]) => {
+      window.localStorage.setItem(
+        "heimao.encounter.backup.v2",
+        JSON.stringify({
+          state: {
+            combatants: [
+              {
+                id: "one",
+                name: n,
+                role: "Player",
+                type: "",
+                hp: Math.floor((hp as number) * 0.3),
+                maxHp: hp,
+                shield: 0,
+                tempShields: [],
+                stats: { STR: 1, DEX: 1, INT: 0, WIS: 1, AGI: 1, CON: 1 },
+                statuses: [],
+                dots: [],
+                hpRegens: [],
+                tempMods: [],
+                abilities: [],
+                position: "Front",
+                notes: "",
+                done: false,
+              },
+            ],
+            phase: 0,
+            round: 1,
+            locked: true,
+            playerPhaseCount: 0,
+            enemyPhaseCount: 0,
+          },
+          savedAt: Date.now(),
+          sessionCode: null,
+        }),
+      );
+    },
+    [name, maxHp],
+  );
+}

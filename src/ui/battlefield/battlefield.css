@@ -90,8 +90,11 @@
 .wt {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr clamp(88px, 14%, 132px);
-  grid-template-rows: repeat(2, minmax(66px, auto)) 0 repeat(2, minmax(66px, auto));
+  /* Bands size to their contents. An empty rank is a thin strip rather than a
+     reserved 66px block — six of those turned the table into 200px of nothing
+     and pushed the roster below the fold on a laptop. */
+  grid-template-columns: 1fr clamp(76px, 11%, 108px);
+  grid-template-rows: repeat(2, minmax(46px, auto)) 0 repeat(2, minmax(46px, auto));
   gap: 2px;
   padding-left: 18px; /* room for the vertical flank labels */
 }
@@ -416,8 +419,8 @@
 
 @media (max-width: 720px) {
   .wt {
-    grid-template-columns: 1fr clamp(84px, 26%, 110px);
-    grid-template-rows: repeat(2, minmax(58px, auto)) 0 repeat(2, minmax(58px, auto));
+    grid-template-columns: 1fr clamp(76px, 24%, 104px);
+    grid-template-rows: repeat(2, minmax(42px, auto)) 0 repeat(2, minmax(42px, auto));
     padding-left: 14px;
   }
 
@@ -465,4 +468,14 @@
   .tok:hover {
     transform: none;
   }
+}
+
+
+/* ══ Touch ══
+   The table is the surface most likely to be operated with a thumb, so every
+   token and control on it takes a full target on a coarse pointer. */
+@media (pointer: coarse) {
+  .tok { min-height: var(--tap); }
+  .wartable__clear,
+  .wartable__collapse { min-height: var(--tap); min-width: var(--tap); }
 }

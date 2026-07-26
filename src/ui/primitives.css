@@ -220,25 +220,73 @@
 
 /* ── Meter ── */
 
+/* ══ Meter ══
+   A health track cut into the surface. The fill eases toward its new value so a
+   hit reads as a movement rather than a jump cut, and below half it gains a
+   diagonal hatch — the band has to survive a greyscale render and a reader who
+   cannot separate amber from green. */
+
 .meter {
   position: relative;
-  height: 10px;
-  background: var(--lacquer-850);
-  border: 1px solid var(--metal-700);
-  border-radius: 999px;
+  height: 8px;
+  background: var(--inlay);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px var(--metal-800),
+    inset 0 1px 3px rgba(0, 0, 0, 0.7);
   overflow: hidden;
+}
+
+/* Quarter marks: a fixed scale behind the fill, so a ratio can be estimated
+   without reading the number. */
+.meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(25% - 1px),
+    rgba(255, 255, 255, 0.09) calc(25% - 1px) 25%
+  );
 }
 
 .meter--compact {
   height: 4px;
-  border-radius: 3px;
 }
+
+.meter--compact::after { display: none; }
 
 .meter__fill {
   height: 100%;
-  border-radius: inherit;
-  transition: width var(--t-slow) var(--ease-out), background var(--t-base) var(--ease-out);
+  border-radius: 2px 1px 1px 2px;
+  transition:
+    width var(--t-meter) var(--ease-out),
+    background-color var(--t-base) var(--ease-out);
   will-change: width;
+}
+
+/* The hatch is applied by band, driven from the card. */
+.card[data-band="wounded"] .meter__fill,
+.card[data-band="critical"] .meter__fill,
+.card[data-band="unconscious"] .meter__fill {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.36) 0 3px,
+    transparent 3px 6px
+  );
+}
+
+/* A lit leading edge, so the current value is findable at a glance on a long
+   bar without hunting for where the fill stops. */
+.card .meter__fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* ── Modal ── */
