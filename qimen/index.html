@@ -64,19 +64,19 @@ a{color:inherit;text-decoration:none}
 }
 
 html[data-theme="dark"]{
-  --void:#04050a;
-  --ink:#080a12;
+  --void:#080a12;
+  --ink:#0c0f18;
   --paper:#eae2d3;
   --fg:#e6e2da;
-  --fg-dim:#9aa0b2;
-  --fg-faint:#767d93;
-  --line:rgba(232,192,122,.15);
-  --line-soft:rgba(255,255,255,.07);
-  --panel:rgba(140,160,220,.035);
-  --panel-2:rgba(7,9,16,.76);
+  --fg-dim:#b2b8c8;
+  --fg-faint:#8b92a8;
+  --line:rgba(232,192,122,.24);
+  --line-soft:rgba(255,255,255,.11);
+  --panel:rgba(140,160,220,.055);
+  --panel-2:rgba(11,14,23,.74);
   --glow:0 0 60px -12px rgba(232,192,122,.35);
   --accent:var(--gold);
-  --scrim:radial-gradient(62% 50% at 50% 45%,rgba(4,5,10,.86) 0%,rgba(4,5,10,.52) 58%,rgba(4,5,10,0) 82%),
+  --scrim:radial-gradient(62% 50% at 50% 45%,rgba(4,5,10,.42) 0%,rgba(4,5,10,.24) 58%,rgba(4,5,10,0) 82%),
           radial-gradient(125% 100% at 50% 50%,rgba(4,5,10,0) 34%,rgba(4,5,10,.62) 78%,rgba(4,5,10,.9) 100%);
 }
 html[data-theme="light"]{
@@ -163,58 +163,31 @@ body{
 body.ready #gl{opacity:1}
 
 /* Fallback when WebGL is unavailable or the device cannot sustain the scene.
-   Not a blank page — a static approximation of the same composition. */
+   Deliberately restrained: faint concentric rings, no glow and no hotspot,
+   so it never reads as a lamp pointed at the reader. */
 body.no-gl::before{
   content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-    radial-gradient(38vmin 38vmin at 50% 46%,rgba(232,192,122,.22),transparent 70%),
-    radial-gradient(74vmin 74vmin at 50% 46%,rgba(224,120,60,.09),transparent 72%),
-    conic-gradient(from 0deg at 50% 46%,
-      rgba(232,192,122,.07) 0deg,transparent 12deg,rgba(232,192,122,.07) 24deg,
-      transparent 36deg,rgba(232,192,122,.07) 48deg,transparent 60deg);
+    radial-gradient(120% 92% at 50% 42%,rgba(96,116,190,.11),transparent 64%),
+    radial-gradient(58% 44% at 50% 44%,rgba(232,192,122,.05),transparent 72%);
   background-color:var(--void);
 }
 body.no-gl::after{
-  content:"";position:fixed;left:50%;top:46%;width:74vmin;height:74vmin;z-index:0;
-  transform:translate(-50%,-50%);pointer-events:none;border-radius:50%;
-  border:1px solid var(--line);
-  box-shadow:0 0 0 12vmin rgba(0,0,0,0) inset, 0 0 90px -20px rgba(232,192,122,.4);
+  content:"";position:fixed;left:50%;top:44%;z-index:0;pointer-events:none;
+  width:150vmax;height:150vmax;transform:translate(-50%,-50%);border-radius:50%;
+  background:repeating-radial-gradient(circle,
+    transparent 0 5.4vmin, rgba(232,192,122,.10) 5.4vmin 5.52vmin);
+  -webkit-mask-image:radial-gradient(circle,#000 0%,#000 20%,transparent 58%);
+  mask-image:radial-gradient(circle,#000 0%,#000 20%,transparent 58%);
 }
 html[data-theme="light"] body.no-gl::before{
   background:
-    radial-gradient(38vmin 38vmin at 50% 46%,rgba(138,98,33,.16),transparent 70%),
-    conic-gradient(from 0deg at 50% 46%,
-      rgba(60,42,20,.05) 0deg,transparent 12deg,rgba(60,42,20,.05) 24deg,transparent 36deg);
+    radial-gradient(120% 92% at 50% 42%,rgba(60,42,20,.06),transparent 64%);
   background-color:var(--void);
 }
-
-#veil{
-  position:fixed;inset:0;z-index:1;pointer-events:none;
-  background:var(--scrim);opacity:.92;
-  transition:opacity .7s var(--ease);
-}
-
-#grain{
-  position:fixed;inset:-50%;z-index:60;pointer-events:none;
-  width:200%;height:200%;opacity:.055;
-  background-image:var(--grain-src);
-  background-size:180px 180px;
-  mix-blend-mode:overlay;
-  animation:grainShift 1.1s steps(6) infinite;
-}
-html[data-theme="light"] #grain{opacity:.06;mix-blend-mode:multiply}
-@keyframes grainShift{
-  0%{transform:translate(0,0)}   16%{transform:translate(-3%,-4%)}
-  33%{transform:translate(-6%,2%)} 50%{transform:translate(3%,-5%)}
-  66%{transform:translate(-2%,5%)} 83%{transform:translate(5%,1%)}
-  100%{transform:translate(0,0)}
-}
-
-#scan{
-  position:fixed;inset:0;z-index:59;pointer-events:none;opacity:.2;
-  background:repeating-linear-gradient(to bottom,
-    rgba(255,255,255,.028) 0 1px, transparent 1px 3px);
-  mix-blend-mode:soft-light;
+html[data-theme="light"] body.no-gl::after{
+  background:repeating-radial-gradient(circle,
+    transparent 0 5.4vmin, rgba(60,42,20,.09) 5.4vmin 5.52vmin);
 }
 
 /* ---------- 5. CURSOR ---------- */
@@ -709,7 +682,7 @@ html[data-theme="light"] .orc__ctl input[type="datetime-local"]{color-scheme:lig
   gap:clamp(1.5rem,3vw,2.6rem);align-items:start}
 .chart{position:relative;isolation:isolate}
 .chart canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;
-  pointer-events:none;opacity:.62;mix-blend-mode:screen}
+  pointer-events:none;opacity:.44;mix-blend-mode:screen}
 html[data-theme="light"] .chart canvas{opacity:.42;mix-blend-mode:multiply}
 .chart__grid{
   position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);
@@ -796,6 +769,52 @@ html[data-theme="light"] .chart canvas{opacity:.42;mix-blend-mode:multiply}
   letter-spacing:.1em;margin-right:.35rem;font-size:.7rem}
 .hint{color:var(--fg-faint);font-family:var(--mono);font-size:.62rem;
   line-height:1.8;letter-spacing:.04em}
+
+
+/* palace markers — several can apply to one palace at once */
+.cell__marks{position:absolute;top:0;right:0;display:flex;z-index:3}
+.cell__mk{font-family:var(--han);font-style:normal;font-size:.6rem;line-height:1;
+  padding:.26rem .28rem;background:var(--mc);color:var(--void);letter-spacing:0}
+.cell__mk--o{background:transparent;color:var(--fg-faint);
+  box-shadow:inset 0 0 0 1px var(--line-soft)}
+.cell__fly{font-family:var(--display);font-variation-settings:"opsz" 16;
+  font-weight:600;font-size:1.05rem;line-height:1;color:var(--fg-faint);
+  opacity:.8;margin-left:auto;font-feature-settings:"lnum" 1}
+.cell__foot{gap:.45rem}
+
+/* asker / matter — the axis of an hour chart, read across */
+.orc__main{display:flex;flex-direction:column;gap:1px}
+.axis{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.5fr) minmax(0,.85fr);
+  gap:1px;background:var(--line-soft);border:1px solid var(--line-soft);border-top:0}
+.axis__end{background:var(--panel-2);backdrop-filter:blur(9px);
+  -webkit-backdrop-filter:blur(9px);padding:clamp(.8rem,1.3vw,1.1rem);
+  display:flex;flex-direction:column;gap:.4rem;justify-content:center}
+.axis__end--r{text-align:right;align-items:flex-end}
+.axis__end em{font-style:normal;font-family:var(--mono);font-size:.55rem;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--fg-faint);
+  display:flex;gap:.5rem;align-items:baseline}
+.axis__end--r em{flex-direction:row-reverse}
+.axis__end em i{font-style:normal;letter-spacing:.14em;font-size:.68rem;
+  text-transform:none;color:var(--el)}
+.axis__end b{font-family:var(--han);font-size:clamp(1.7rem,3vw,2.5rem);
+  font-weight:400;line-height:1;color:var(--fg)}
+.axis__end>span{font-family:var(--mono);font-size:.58rem;line-height:1.6;
+  letter-spacing:.08em;color:var(--fg-dim)}
+.axis__rel{background:color-mix(in srgb,var(--rc) 11%,var(--panel-2));
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  padding:clamp(.8rem,1.3vw,1.1rem);box-shadow:inset 0 0 0 1px var(--rc);
+  display:flex;flex-direction:column;justify-content:center}
+.axis__rel b{font-family:var(--han);font-size:1.15rem;letter-spacing:.2em;color:var(--rc)}
+.axis__rel em{font-style:normal;font-family:var(--mono);font-size:.56rem;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--fg-dim);
+  display:block;margin-top:.3rem}
+.axis__rel p{margin-top:.55rem;font-family:var(--mono);font-weight:300;
+  font-size:.64rem;line-height:1.7;color:var(--fg-dim)}
+@media(max-width:820px){
+  .axis{grid-template-columns:1fr}
+  .axis__end--r{text-align:left;align-items:flex-start}
+  .axis__end--r em{flex-direction:row}
+}
 
 /* ---------- 17. COLOPHON ---------- */
 .sc--colo{padding:clamp(4rem,8vw,7rem) 0 clamp(3rem,5vw,4rem);
@@ -1136,9 +1155,12 @@ html[data-theme="light"] .chart canvas{opacity:.42;mix-blend-mode:multiply}
     </div>
 
     <div class="orc">
-      <div class="chart">
-        <canvas id="qiCanvas" aria-hidden="true"></canvas>
-        <div class="chart__grid" id="chartGrid"></div>
+      <div class="orc__main">
+        <div class="chart">
+          <canvas id="qiCanvas" aria-hidden="true"></canvas>
+          <div class="chart__grid" id="chartGrid"></div>
+        </div>
+        <div class="axis" id="sdAxis"></div>
       </div>
       <aside class="orc__side">
         <div class="sd">
@@ -1572,7 +1594,7 @@ function makeScene(){
   "  float c = plate(p-vec3(0.0,0.0, 0.86+s*1.55), 1.22, 0.012,  t*0.126,  9.0, 0.15, 0.028);",
   "  d = min(min(a,b),c);",
   /* the axis — a hairline through the centre of every plate */
-  "  float ax = sdBox(p, vec3(0.0045,0.0045,3.4));",
+  "  float ax = sdBox(p-vec3(0.0,0.0,0.55), vec3(0.0045,0.0045,2.15));",
   "  d = min(d,ax);",
   "  float core = length(p)-0.075;",
   "  if(core<d) return vec2(core,2.0);",
@@ -1597,7 +1619,7 @@ function makeScene(){
   "  vec3 rd = normalize(q.x*rt + q.y*up + 1.5*fw);",
 
   /* ---- surface march ---- */
-  "  float tt=0.0, mat=0.0; bool hit=false;",
+  "  float tt=0.06, mat=0.0; bool hit=false;",
   "  for(int i=0;i<80;i++){",
   "    vec3 p = ro+rd*tt;",
   "    vec2 m = map(p);",
@@ -1613,8 +1635,8 @@ function makeScene(){
   "    float fres = pow(1.0-max(dot(n,-rd),0.0), 2.4);",
   "    float diff = max(dot(n,ld),0.0);",
   "    float atten = 1.0/(1.0+dot(p,p)*0.28);",
-  "    geo = (diff*1.15*atten + fres*0.85) * smoothstep(13.0,3.0,tt);",
-  "    if(mat>1.5){ emit = 1.05; geo = 0.7; }",
+  "    geo = (diff*1.15*atten + fres*0.85) * (1.0-smoothstep(3.0,13.0,tt));",
+  "    if(mat>1.5){ emit = 0.10; geo = 0.50; }",
   "  }",
 
   /* ---- single-scatter volumetric fog with rotating radial shafts ---- */
@@ -1631,11 +1653,11 @@ function makeScene(){
   /* shafts cast by the 24-notch outer plate, and by the 8-spoke middle plate */
   "    float s1 = 0.52+0.48*cos(ang*24.0 - uTime*0.052*24.0);",
   "    float s2 = 0.55+0.45*cos(ang*8.0  + uTime*0.081*8.0);",
-  "    float shaft = pow(s1,1.8)*0.34 + pow(s2,2.2)*0.38 + 0.20;",
-  "    float falloff = 1.0/(1.0+r*r*1.9);",
+  "    float shaft = s1*0.17 + s2*0.19 + 0.28;",
+  "    float falloff = 1.0/(1.0+r*r*1.25);",
   "    vol += dens*shaft*falloff;",
   "  }",
-  "  vol *= tmax/NS*0.50;",
+  "  vol *= tmax/NS*0.46;",
 
   /* ---- dust motes ---- */
   "  float mot=0.0;",
@@ -1646,7 +1668,7 @@ function makeScene(){
   "    vec3 cell = floor(g*7.0), f = fract(g*7.0)-0.5;",
   "    float h = hash13(cell+fi*23.0);",
   "    float on = step(0.972,h);",
-  "    mot += on*smoothstep(0.16,0.0,length(f))*(0.45+0.55*sin(uTime*1.6+h*120.0));",
+  "    mot += on*(1.0-smoothstep(0.0,0.16,length(f)))*(0.45+0.55*sin(uTime*1.6+h*120.0));",
   "  }",
 
   /* ---- palettes: art-directed per theme, not a filter ---- */
@@ -1654,11 +1676,11 @@ function makeScene(){
   "  vec3 amber = vec3(1.00,0.58,0.26);",
   "  vec3 indigo= vec3(0.30,0.42,0.95);",
 
-  "  vec3 bgD = vec3(0.005,0.006,0.014) + indigo*0.010*(1.0-length(q)*0.5);",
+  "  vec3 bgD = vec3(0.017,0.020,0.038) + indigo*0.026*(1.0-length(q)*0.5);",
   "  vec3 dark = bgD",
-  "    + geo*mix(gold,amber,0.35)*0.92",
-  "    + emit*gold*0.85",
-  "    + vol*mix(indigo*0.74+gold*0.26, gold, 0.18)*0.30",
+  "    + geo*mix(gold,amber,0.35)*1.55",
+  "    + emit*gold*0.60",
+  "    + vol*mix(indigo*0.88+gold*0.12, gold, 0.08)*0.34",
   "  + mot*vec3(0.85,0.80,0.70)*0.62;",
 
   "  vec3 bgL = vec3(0.905,0.876,0.812);",
@@ -1707,7 +1729,7 @@ function makeScene(){
   "void main(){",
   "  vec2 uv=gl_FragCoord.xy/uRes;",
   "  vec2 d=uv-0.5; float r2=dot(d,d);",
-  "  float ca=(0.0008+r2*0.0042)*uAber;",
+  "  float ca=(0.0005+r2*0.0028)*uAber;",
   "  vec3 col;",
   "  col.r=texture(uScene,uv+d*ca).r;",
   "  col.g=texture(uScene,uv).g;",
@@ -1715,7 +1737,7 @@ function makeScene(){
   "  vec3 bl=texture(uBloom,uv).rgb;",
   "  col = mix(col+bl*uBloomStr, col-bl*uBloomStr*0.55, uTheme);",
   "  col = mix(aces(col), col, uTheme);",
-  "  float vig = 1.0 - r2*mix(1.30,0.40,uTheme);",
+  "  float vig = 1.0 - r2*mix(0.78,0.34,uTheme);",
   "  col *= vig;",
   "  col += (hash12(gl_FragCoord.xy+fract(uTime)*311.0)-0.5)*0.0035;",
   "  O=vec4(col,1.0);",
@@ -1803,13 +1825,17 @@ function makeScene(){
       else { retire(); return }
     }
 
-    S.time += dt;
-    S.theme  = lerp(S.theme, S.themeT, clamp(dt*3.2,0,1));
-    S.reveal = lerp(S.reveal,S.revealT,clamp(dt*1.6,0,1));
-    S.dolly  = lerp(S.dolly, S.dollyT, clamp(dt*2.4,0,1));
-    S.mx = lerp(S.mx,S.mxT,clamp(dt*2.2,0,1));
-    S.my = lerp(S.my,S.myT,clamp(dt*2.2,0,1));
-    S.flash *= Math.pow(0.02,dt);
+    /* All of these are wall-clock behaviours. The shared dt is clamped for
+       physics stability, so using it here would make the entry flash and the
+       camera easing decay per *frame* — they would stall on a slow renderer. */
+    var ft=Math.min(frame,0.25);
+    S.time += ft;
+    S.theme  = S.theme  + (S.themeT -S.theme )*(1-Math.exp(-3.2*ft));
+    S.reveal = S.reveal + (S.revealT-S.reveal)*(1-Math.exp(-1.6*ft));
+    S.dolly  = S.dolly  + (S.dollyT -S.dolly )*(1-Math.exp(-2.4*ft));
+    S.mx = S.mx + (S.mxT-S.mx)*(1-Math.exp(-2.2*ft));
+    S.my = S.my + (S.myT-S.my)*(1-Math.exp(-2.2*ft));
+    S.flash *= Math.exp(-5.5*ft);
 
     var p=P_SCENE; gl.useProgram(p);
     gl.uniform1f(p.u("uTime"),S.time);
@@ -1822,12 +1848,12 @@ function makeScene(){
     draw(F.scene,p,F.sw,F.sh);
 
     p=P_BRIGHT; gl.useProgram(p);
-    gl.uniform1f(p.u("uThresh"), lerp(0.56,0.92,S.theme));
+    gl.uniform1f(p.u("uThresh"), lerp(0.74,0.92,S.theme));
     bind(0,F.scene.tex,p,"uTex");
     draw(F.a,p,BW,BH);
 
     for(var i=0;i<3;i++){
-      var rad=1.0+i*1.9;
+      var rad=1.0+i*1.0;
       p=P_BLUR; gl.useProgram(p);
       bind(0,F.a.tex,p,"uTex"); gl.uniform2f(p.u("uDir"),rad,0);
       draw(F.b,p,BW,BH);
@@ -1839,7 +1865,7 @@ function makeScene(){
     p=P_COMP; gl.useProgram(p);
     bind(0,F.scene.tex,p,"uScene");
     bind(1,F.a.tex,p,"uBloom");
-    gl.uniform1f(p.u("uBloomStr"), lerp(0.44,0.30,S.theme));
+    gl.uniform1f(p.u("uBloomStr"), lerp(0.19,0.20,S.theme));
     gl.uniform1f(p.u("uTime"),S.time);
     gl.uniform1f(p.u("uTheme"),S.theme);
     gl.uniform1f(p.u("uAber"),S.aber);
@@ -1968,6 +1994,25 @@ var QM=(function(){
     return 0;
   }
 
+  /* ---------- five-element relations ---------- */
+  var PRODUCE={wood:"fire",fire:"earth",earth:"metal",metal:"water",water:"wood"};
+  var COUNTER={wood:"earth",earth:"water",water:"fire",fire:"metal",metal:"wood"};
+  /* a = the asker (day stem), b = the matter (hour stem) */
+  function relate(a,b,samePalace){
+    if(samePalace) return {key:"same-palace",han:"同宮",en:"Same Palace",tone:"gold",
+      txt:"The asker and the matter stand in one palace. They are already joined — there is no distance to close and no intermediary to work through, so whatever that palace carries lands on both at once."};
+    if(a===b) return {key:"same",han:"比和",en:"Same Element",tone:"jade",
+      txt:"Equal footing. Neither side has leverage over the other, which reads as cooperation when the palaces are favourable and as deadlock or rivalry when they are not."};
+    if(PRODUCE[a]===b) return {key:"day-produces",han:"日生時",en:"Asker Produces Matter",tone:"earth",
+      txt:"You are the one giving. Effort, money and attention flow out of the asker into the matter. It can succeed, but it is funded by you and it will cost more than it returns in the short run."};
+    if(PRODUCE[b]===a) return {key:"hour-produces",han:"時生日",en:"Matter Produces Asker",tone:"jade",
+      txt:"It comes to you. The matter feeds the asker rather than draining them — the most comfortable of the productive relations, and the one that rewards patience over pressure."};
+    if(COUNTER[a]===b) return {key:"day-counters",han:"日剋時",en:"Asker Controls Matter",tone:"gold",
+      txt:"You have the upper hand. The matter yields to the asker, so pressing works — though controlling something is exertion, and the cost lands on you rather than on it."};
+    return {key:"hour-counters",han:"時剋日",en:"Matter Controls Asker",tone:"cinnabar",
+      txt:"It has the upper hand. The matter overcomes the asker, so forcing a direct approach is expensive. Indirection, delay, or borrowing someone else's authority does better than confrontation."};
+  }
+
   /* ---------- the chart ---------- */
   function build(date){
     var jd=toJD(date);
@@ -2048,12 +2093,24 @@ var QM=(function(){
       gods[RING[gi]]=GOD[i];
     }
 
+    /* --- the asker (day stem), the matter (hour stem), and where Jia hides --- */
+    function stemPalace(st){
+      var want = st===0 ? leader : st;      /* 甲 never appears; read its escort */
+      for(var q=1;q<=9;q++) if(earth[q]===want) return q;
+      return 5;
+    }
+    var dayPal=stemPalace(dayIdx%10), hourPal=stemPalace(hs), jiaPal=zfRaw;
+    var rel=relate(PAL[dayPal].el, PAL[hourPal].el, dayPal===hourPal);
+
     var palaces={};
     for(p=1;p<=9;p++){
       palaces[p]={
         no:p, earth:earth[p], heaven:(p===5?null:hStem[p]),
         star:(p===5?null:hStar[p]), door:(p===5?null:doors[p]), god:(p===5?null:gods[p]),
         qin:(p===qinPal), isZhiFu:(p===tgtPal), isZhiShi:(p===zsPal),
+        isDay:(p===dayPal), isHour:(p===hourPal), isJia:(p===jiaPal),
+        /* the structure number flown forward from the centre, as Joey Yap prints it */
+        fly:(((ju-1)+(p-5))%9+9)%9+1,
         isVoid:PAL[p].branches.some(function(b){return voidB.indexOf(b)>=0})
       };
     }
@@ -2069,6 +2126,10 @@ var QM=(function(){
            voids:voidB.map(function(b){return BRANCH[b]}).join("")},
       zhiFu:{palace:tgtPal,star:hStar[tgtPal],origin:zfPal},
       zhiShi:{palace:zsPal,door:zsDoor},
+      asker:{palace:dayPal,stem:dayIdx%10,hidden:(dayIdx%10)===0,el:PAL[dayPal].el},
+      matter:{palace:hourPal,stem:hs,hidden:hs===0,el:PAL[hourPal].el},
+      jia:jiaPal, leaderStem:leader,
+      relation:rel,
       palaces:palaces
     };
   }
@@ -2115,42 +2176,42 @@ var QM=(function(){
   };
 
   var STARS={
-    "天蓬":{py:"Tiān Péng",en:"Rogue",el:"water",pal:1,
+    "天蓬":{py:"Tiān Péng",en:"Heavenly Grass",short:"Grass",el:"water",pal:1,
       txt:"The bandit star: bold, opportunistic and wholly unsentimental. It governs risk-taking, gambling, seizure and theft, and moves faster than judgement. Placed well it is nerve; placed badly it is the loss of everything on a single throw."},
-    "天芮":{py:"Tiān Ruì",en:"Illness",el:"earth",pal:2,
+    "天芮":{py:"Tiān Ruì",en:"Heavenly Grain",short:"Grain",el:"earth",pal:2,
       txt:"The sickness star, and — with perfect classical irony — also the star of the student. Both share a posture: receiving something from outside yourself and being changed by it. Slow, absorbent, unwell when it stagnates, formidable when it studies."},
-    "天沖":{py:"Tiān Chōng",en:"Assault",el:"wood",pal:3,
+    "天沖":{py:"Tiān Chōng",en:"Heavenly Destructor",short:"Destructor",el:"wood",pal:3,
       txt:"The vanguard. Pure forward motion — speed, initiative, the counter-attack, the settling of a score. It does not deliberate. Excellent when the correct action is already known and merely needs doing; dangerous when it is not."},
-    "天輔":{py:"Tiān Fǔ",en:"Assistant",el:"wood",pal:4,
+    "天輔":{py:"Tiān Fǔ",en:"Heavenly Assistant",short:"Assistant",el:"wood",pal:4,
       txt:"The scholar and the counsellor. Education, culture, mentorship, refinement and good advice. Among the gentlest and most reliably favourable stars in the set — the one you want overhead when the task is to learn something or to teach it."},
-    "天禽":{py:"Tiān Qín",en:"Bird",el:"earth",pal:5,
-      txt:"The star of the centre, and the only one without a palace of its own — it lodges with Illness in the southwest. Fairness, arbitration, the settled authority that everything else turns around. It is the axis, and axes do not move."},
-    "天心":{py:"Tiān Xīn",en:"Heart",el:"metal",pal:6,
+    "天禽":{py:"Tiān Qín",en:"Heavenly Bird",short:"Bird",el:"earth",pal:5,
+      txt:"The star of the centre, and the only one without a palace of its own — it lodges with Heavenly Grain in the southwest. Fairness, arbitration, the settled authority that everything else turns around. It is the axis, and axes do not move."},
+    "天心":{py:"Tiān Xīn",en:"Heavenly Heart",short:"Heart",el:"metal",pal:6,
       txt:"The physician and the strategist. Medicine, high-level planning, command, and the clean incision. Sharpest of the stars in the sense of a blade rather than a temper: it removes what does not belong, and it does so from above."},
-    "天柱":{py:"Tiān Zhù",en:"Pillar",el:"metal",pal:7,
+    "天柱":{py:"Tiān Zhù",en:"Heavenly Pillar",short:"Pillar",el:"metal",pal:7,
       txt:"The defensive column. Obstruction, argument, refusal and dismantling. It stops things — an enemy's advance, a plan, a conversation. Read as a wall it protects; read as a bar across your own road it is the reason nothing is moving."},
-    "天任":{py:"Tiān Rèn",en:"Duty",el:"earth",pal:8,
+    "天任":{py:"Tiān Rèn",en:"Heavenly Ambassador",short:"Ambassador",el:"earth",pal:8,
       txt:"The star of endurance. Land, agriculture, property, patient labour and the person who simply keeps showing up. Slow to gain and slow to lose. Nothing about it is exciting, and it is one of the most dependable placements in the chart."},
-    "天英":{py:"Tiān Yīng",en:"Hero",el:"fire",pal:9,
+    "天英":{py:"Tiān Yīng",en:"Heavenly Hero",short:"Hero",el:"fire",pal:9,
       txt:"Brilliance and volatility. Fame, beauty, examinations, performance — everything that burns bright. It attracts attention effortlessly and exhausts its fuel just as fast, which makes it a magnificent beginning and a poor foundation."}
   };
 
   var GODS={
-    "值符":{py:"Zhí Fú",en:"Chief",el:"earth",
+    "值符":{py:"Zhí Fú",en:"Chief",short:"Chief",el:"earth",
       txt:"The commander of the chart and its most noble position. Wherever the Chief sits, that palace carries rank, protection and the backing of someone more powerful than you. It is the ally at the top of the building."},
-    "螣蛇":{py:"Téng Shé",en:"Serpent",el:"fire",
-      txt:"The uncanny. Anxiety, entanglement, strange coincidence, dreams, deception and the spiritual. It twists — nothing under the Serpent proceeds in a straight line, and what is stated is rarely the whole of what is meant."},
-    "太陰":{py:"Tài Yīn",en:"Moon",el:"metal",
+    "螣蛇":{py:"Téng Shé",en:"Surging Snake",short:"Snake",el:"fire",
+      txt:"Twisting and the uncanny. Anxiety, entanglement, strange coincidence, dreams, deception and the spiritual. It twists — nothing under the Serpent proceeds in a straight line, and what is stated is rarely the whole of what is meant."},
+    "太陰":{py:"Tài Yīn",en:"Moon",short:"Moon",el:"metal",
       txt:"The counsellor in shadow. Planning, discretion, quiet assistance and support you were not told about. Where the Chief is help in public, the Moon is help nobody witnessed. Excellent for strategy, secrets and anything delicate."},
-    "六合":{py:"Liù Hé",en:"Harmony",el:"wood",
-      txt:"The joiner. Partnership, marriage, contracts, intermediaries and negotiation. It brings parties together and blurs their boundaries — a blessing for alliances and a hazard when you needed a clean separation."},
-    "白虎":{py:"Bái Hǔ",en:"White Tiger",el:"metal",
+    "六合":{py:"Liù Hé",en:"Harmony",short:"Harmony",el:"wood",
+      txt:"The joiner. Partnership, marriage, contracts, intermediaries and negotiation. Six Harmony brings parties together and blurs their boundaries — a blessing for alliances and a hazard when you needed a clean separation."},
+    "白虎":{py:"Bái Hǔ",en:"White Tiger",short:"Tiger",el:"metal",
       txt:"Force. Weapons, injury, roads, the military and the decisive violent act. The Tiger is not evil so much as unsubtle: it settles matters by strength. Ruinous for the vulnerable, and occasionally the only thing that works."},
-    "玄武":{py:"Xuán Wǔ",en:"Black Tortoise",el:"water",
+    "玄武":{py:"Xuán Wǔ",en:"Black Tortoise",short:"Tortoise",el:"water",
       txt:"Concealment turned dishonest. Theft, deceit, loss, leakage and things that happen at night. Wherever it sits, something is not being disclosed — often by a party who believes they are the one being clever."},
-    "九地":{py:"Jiǔ Dì",en:"Nine Earth",el:"earth",
+    "九地":{py:"Jiǔ Dì",en:"Nine Earth",short:"Nine Earth",el:"earth",
       txt:"Deep stillness. Defence, patience, storage, land and the deliberate refusal to act. The lowest and most stable of the deities: it keeps, buries and waits. The correct spirit for holding ground you have already taken."},
-    "九天":{py:"Jiǔ Tiān",en:"Nine Heaven",el:"metal",
+    "九天":{py:"Jiǔ Tiān",en:"Nine Heaven",short:"Nine Heaven",el:"metal",
       txt:"Altitude. Expansion, publicity, long journeys, aviation and ambition without a ceiling. It lifts everything it touches into view and into motion — the exact opposite of Nine Earth, and the deity of the grand gesture."}
   };
 
@@ -2171,7 +2232,7 @@ var QM=(function(){
     "癸":["Yin Water","The net — hidden trouble, tears, what seeps in"]
   };
 
-  return {build:build,PAL:PAL,DOORS:DOORS,STARS:STARS,GODS:GODS,
+  return {build:build,relate:relate,PRODUCE:PRODUCE,COUNTER:COUNTER,PAL:PAL,DOORS:DOORS,STARS:STARS,GODS:GODS,
           WONDER:WONDER,YI:YI,STEM:STEM,BRANCH:BRANCH,STEM_PY:STEM_PY,
           BRANCH_PY:BRANCH_PY,BRANCH_AN:BRANCH_AN,STEM_EL:STEM_EL,
           TERM:TERM,YUAN:YUAN,RING:RING,STAR0:STAR0,DOOR0:DOOR0,GOD:GOD,
@@ -2609,7 +2670,7 @@ var STACK=(function(){
       var tx=el("text",{x:t1[0],y:(+t1[1]-6).toFixed(2)},key);
       tx.setAttribute("font-size","13.5");
       tx.setAttribute("letter-spacing","0.02em"); g.appendChild(tx);
-      var t0=el("text",{x:t1[0],y:(+t1[1]+9).toFixed(2),class:"lat"},d.en.toUpperCase());
+      var t0=el("text",{x:t1[0],y:(+t1[1]+9).toFixed(2),class:"lat"},(d.short||d.en).toUpperCase());
       g.appendChild(t0);
       svg.appendChild(g);
     });
@@ -2660,9 +2721,17 @@ var ORACLE=(function(){
     var tri = A.lines
       ? A.lines.slice().reverse().map(function(l){return '<i class="'+(l?"":"brk")+'"></i>'}).join("")
       : "";
-    var badge = P.isZhiFu?'<span class="cell__badge">值符</span>'
-              : P.isZhiShi?'<span class="cell__badge" style="background:var(--cinnabar);color:#fff">值使</span>'
-              : P.isVoid?'<span class="cell__badge" style="background:transparent;color:var(--fg-faint);border-left:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)">空</span>':"";
+    var mk=[];
+    if(P.isZhiFu)  mk.push(['符','var(--gold)','Chief 值符']);
+    if(P.isZhiShi) mk.push(['使','var(--cinnabar)','Envoy 值使']);
+    if(P.isDay)    mk.push(['日','var(--jade)','Day stem — the asker']);
+    if(P.isHour)   mk.push(['時','var(--fg)','Hour stem — the matter']);
+    if(P.isJia)    mk.push(['甲','',           'Jia hides in this palace']);
+    if(P.isVoid)   mk.push(['空','',           'Void branch 空亡']);
+    var badge = mk.length ? '<span class="cell__marks">'+mk.map(function(m){
+      return '<i class="cell__mk'+(m[1]?'':' cell__mk--o')+'"'+
+             (m[1]?' style="--mc:'+m[1]+'"':'')+' title="'+m[2]+'">'+m[0]+'</i>';
+    }).join('')+'</span>' : "";
     var stems = n===5
       ? '<span class="cell__hs" style="color:var(--fg-faint)">·</span>'+
         '<span class="cell__es">'+QM.STEM[P.earth]+'</span>'
@@ -2680,7 +2749,9 @@ var ORACLE=(function(){
       '<div class="cell__body"><div class="cell__stems t-han">'+stems+'</div>'+
         '<div class="cell__col t-han">'+col+'</div></div>'+
       '<div class="cell__foot"><span class="tri">'+tri+'</span>'+
-        '<span>'+A.el.toUpperCase()+'</span></div></button>';
+        '<span>'+A.el.toUpperCase()+'</span>'+
+        '<span class="cell__fly" title="Structure number flown from the centre">'+P.fly+'</span>'+
+        '</div></button>';
   }
 
   function readHTML(n){
@@ -2699,16 +2770,19 @@ var ORACLE=(function(){
       '<div class="fade-swap" style="--el:'+ELC(A.el)+'">'+
       '<div class="rk"><b>'+A.tri+'</b><div><h5>Palace '+n+' · '+D.en+' Door</h5>'+
       '<em>'+A.triPy+' · '+A.el+' · '+A.hours+'</em></div></div>'+
-      '<p><strong style="color:var(--fg)">'+D.en+'</strong> stands over <strong style="color:var(--fg)">'+
+      '<p><strong style="color:var(--fg)">'+D.en+' Door</strong> stands over <strong style="color:var(--fg)">'+
       S.en+'</strong>, attended by <strong style="color:var(--fg)">'+G.en+'</strong>. '+first+'</p>'+
       '<div class="row">'+
         '<span><b>'+P.door+'</b>'+D.rank+'</span>'+
-        '<span><b>'+P.star+'</b>'+S.en+'</span>'+
-        '<span><b>'+P.god+'</b>'+G.en+'</span>'+
+        '<span><b>'+P.star+'</b>'+(S.short||S.en)+'</span>'+
+        '<span><b>'+P.god+'</b>'+(G.short||G.en)+'</span>'+
         '<span><b>'+QM.STEM[P.heaven]+'</b>heaven</span>'+
         '<span><b>'+QM.STEM[P.earth]+'</b>earth</span>'+
-        (P.isZhiFu?'<span style="border-color:var(--gold);color:var(--gold)">duty chief</span>':"")+
-        (P.isZhiShi?'<span style="border-color:var(--cinnabar);color:var(--cinnabar)">duty door</span>':"")+
+        (P.isZhiFu?'<span style="border-color:var(--gold);color:var(--gold)">chief 值符</span>':"")+
+        (P.isZhiShi?'<span style="border-color:var(--cinnabar);color:var(--cinnabar)">envoy 值使</span>':"")+
+        (P.isDay?'<span style="border-color:var(--jade);color:var(--jade)">the asker 日干</span>':"")+
+        (P.isHour?'<span style="border-color:var(--fg-dim);color:var(--fg)">the matter 時干</span>':"")+
+        (P.isJia?'<span>甲 hides here</span>':"")+
         (P.isVoid?'<span>void branch</span>':"")+
       '</div></div>';
   }
@@ -2731,7 +2805,7 @@ var ORACLE=(function(){
     });
 
     var pl=chart.pillars;
-    pillars.innerHTML=[["Year",pl.year],["Month",pl.month],["Day",pl.day],["Hour",pl.hour]]
+    pillars.innerHTML=[["Hour",pl.hour],["Day",pl.day],["Month",pl.month],["Year",pl.year]]
       .map(function(r){
         return '<div class="pil"><em>'+r[0]+'</em><b><i class="s">'+QM.STEM[r[1].s]+
           '</i><i class="b2">'+QM.BRANCH[r[1].b]+'</i></b></div>';
@@ -2746,13 +2820,29 @@ var ORACLE=(function(){
       ["Yuan",QM.YUAN[chart.yuan][0],QM.YUAN[chart.yuan][1]],
       ["Xun",chart.xun.han,"leader "+chart.xun.leaderHan],
       ["Void",chart.xun.voids,"空亡"],
-      ["Duty chief",chart.zhiFu.star,"palace "+chart.zhiFu.palace],
-      ["Duty door",chart.zhiShi.door,"palace "+chart.zhiShi.palace]
+      ["Chief 值符",chart.zhiFu.star,"palace "+chart.zhiFu.palace],
+      ["Envoy 值使",chart.zhiShi.door,"palace "+chart.zhiShi.palace]
     ];
     meta.innerHTML=rows.map(function(r){
       return '<div class="kv"><dt>'+r[0]+'</dt><dd>'+r[1]+
         (r[2]?'<em>'+r[2]+'</em>':"")+'</dd></div>';
     }).join("");
+
+    /* the asker and the matter — day stem against hour stem */
+    function side(o,label,han,right){
+      var A=QM.PAL[o.palace];
+      return '<div class="axis__end'+(right?" axis__end--r":"")+'" style="--el:'+ELC(A.el)+'">'+
+        '<em>'+label+'<i class="t-han">'+han+'</i></em>'+
+        '<b class="t-han">'+QM.STEM[o.stem]+'</b>'+
+        '<span>Palace '+o.palace+' · '+A.dirEn+'<br>'+A.el+
+          (o.hidden?' · hidden behind '+QM.STEM[chart.leaderStem]:'')+'</span></div>';
+    }
+    var R=chart.relation;
+    $("#sdAxis").innerHTML=
+      side(chart.asker,"Asker","日干")+
+      '<div class="axis__rel" style="--rc:var(--'+(R.tone==="earth"?"el-earth":R.tone)+')">'+
+        '<b class="t-han">'+R.han+'</b><em>'+R.en+'</em><p>'+R.txt+'</p></div>'+
+      side(chart.matter,"Matter","時干",true);
     QIFLOW.seed(chart);
     /* open on the duty chief rather than an empty panel — it is the palace a
        practitioner reads first anyway */
@@ -2873,8 +2963,11 @@ var QIFLOW=(function(){
     ["Time",'Your device\'s local clock and time zone. No longitude or equation-of-time correction is applied to derive local apparent time.'],
     ["Day boundary",'The day pillar advances at 23:00, when the <span class="han">子</span> hour opens — not at midnight.'],
     ["Centre",'<span class="han">中五寄坤二宮</span>. Palace 5 holds an earth-plate stem but no door and no deity; anything sent there is lodged in palace 2, and <span class="han">天禽</span> rides permanently with <span class="han">天芮</span>.'],
-    ["Duty chief",'<span class="han">值符加時干</span> — the chief star and the whole nine-star ring rotate so the chief lands on the palace holding the hour stem. When the hour stem is <span class="han">甲</span>, the xun\'s hidden leader stands in for it.'],
-    ["Duty door",'Counted from the chief\'s origin palace, one palace per hour elapsed in the xun, forward in Yang Dun and reverse in Yin Dun. The remaining seven doors follow rigidly clockwise.'],
+    ["Chief 值符",'<span class="han">值符加時干</span> — the chief star and the whole nine-star ring rotate so the chief lands on the palace holding the hour stem. When the hour stem is <span class="han">甲</span>, the xun\'s hidden leader stands in for it.'],
+    ["Envoy 值使",'Counted from the chief\'s origin palace, one palace per hour elapsed in the xun, forward in Yang Dun and reverse in Yin Dun. The remaining seven doors follow rigidly clockwise.'],
+    ["Asker &amp; matter",'The day stem is the asker, the hour stem is the matter enquired about — the convention used in hour-chart forecasting. Both are located on the earth plate and marked <span class="han">日</span> and <span class="han">時</span>; where either is <span class="han">甲</span>, its escort is read instead and the palace is marked <span class="han">甲</span>. Their relation is judged between the two palace elements.'],
+    ["Structure number",'The faint numeral in each palace is the structure number flown forward from the centre — the same figure Joey Yap\'s charts print, and a quick way to read the ju at a glance.'],
+    ["Naming",'Stars, doors and deities follow Joey Yap\'s English: Heavenly Grass, Grain, Destructor, Assistant, Bird, Heart, Pillar, Ambassador and Hero; Chief, Surging Snake, Moon, Harmony, White Tiger, Black Tortoise, Nine Earth and Nine Heaven; and <span class="han">值符</span> Chief with <span class="han">值使</span> Envoy.'],
     ["Deities",'<span class="han">值符 螣蛇 太陰 六合 白虎 玄武 九地 九天</span>, seated with the chief and running forward in Yang Dun, reverse in Yin Dun. Lineages that substitute <span class="han">勾陳</span> or <span class="han">朱雀</span> will read two palaces differently.'],
     ["Void",'<span class="han">空亡</span> marks the two branches the current xun does not cover, shown against the palaces those branches occupy.']
   ];
@@ -2908,16 +3001,20 @@ var QIFLOW=(function(){
 
 /* ── scroll wiring: pinned scenes + the GL camera ──────────── */
 (function(){
-  var origin=$("#origin"), stack=$("#stack");
+  var origin=$("#origin"), stack=$("#stack"), veilEl=$("#veil");
   onScroll(function(){
     LUO.render(pinProgress(origin));
     STACK.render(pinProgress(stack));
     var g=SY/SMAX;
     if(GLSCENE){
       GLSCENE.setSep(smoothstep(clamp(inv(.06,.55,g),0,1)));
-      GLSCENE.setDolly(g*3.1);
+      /* the camera must never reach the plates — inside them the scene
+         becomes a bright wash and the reading sections lose contrast */
+      GLSCENE.setDolly(g*1.45);
       GLSCENE.setAber(1+clamp(Math.abs(SY-SYs)/220,0,1.1));
     }
+    /* the hero wants the scene; the reading half wants it quiet */
+    veilEl.style.opacity=(0.74+0.22*smoothstep(clamp(inv(.10,.42,g),0,1))).toFixed(3);
   });
 })();
 
@@ -3017,7 +3114,7 @@ $$(".hud__mark, .btn, .hud__btn").forEach(function(e){magnetic(e,0.26)});
     pre.classList.add("done");
     document.body.classList.add("ready");
     AUD.prime();
-    if(GLSCENE){ GLSCENE.reveal(1); GLSCENE.flash(0.55) }
+    if(GLSCENE){ GLSCENE.reveal(1); GLSCENE.flash(0.34) }
     setTimeout(function(){ pre.remove() },1100);
     /* first reveal pass for anything already on screen */
     $$(".rv,[data-split]").forEach(function(e){
