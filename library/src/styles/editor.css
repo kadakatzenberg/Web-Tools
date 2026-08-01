@@ -1,0 +1,292 @@
+/** The editor form. Loaded with the editor chunk, not on first paint. */
+
+.editor {
+  display: grid;
+  gap: var(--gap-wide);
+}
+
+.editor__set {
+  border: none;
+  display: grid;
+  gap: var(--gap);
+  padding: 0;
+}
+
+.editor__set > legend {
+  font-family: var(--face-display);
+  font-size: var(--t-small);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  padding: 0 0 var(--gap-tight);
+  width: 100%;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--gap-tight);
+}
+
+.editor__set-hint {
+  font-family: var(--face-prose);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-faint);
+  margin-top: calc(var(--gap-tight) * -1);
+}
+
+.editor__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--gap);
+  align-items: start;
+}
+
+.dialog__foot-note {
+  margin-right: auto;
+  font-size: var(--t-micro);
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+/* ── Repeating rows ──────────────────────────────────────────────────────── */
+
+.rows {
+  display: grid;
+  gap: var(--gap-snug);
+}
+
+.row {
+  position: relative;
+  display: grid;
+  gap: var(--gap-snug);
+  padding: var(--gap) 2.6rem var(--gap) var(--gap);
+  background: color-mix(in oklab, var(--well) 55%, transparent);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.row__remove {
+  position: absolute;
+  top: var(--gap-snug);
+  right: var(--gap-snug);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  color: var(--ink-faint);
+  transition: color var(--dur-quick) var(--ease-out), background-color var(--dur-quick) var(--ease-out);
+}
+
+.row__remove:hover {
+  color: var(--vermilion);
+  background: var(--vermilion-wash);
+}
+
+.add-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.5rem;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--ink-faint);
+  transition: all var(--dur-quick) var(--ease-out);
+}
+
+.add-row:hover:not(:disabled) {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--gold-wash);
+}
+
+.add-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Tag picker ──────────────────────────────────────────────────────────── */
+
+.tag-picker {
+  display: grid;
+  gap: var(--gap-snug);
+}
+
+.tag-picker__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-tight);
+}
+
+.tag-picker .tag {
+  min-height: 32px;
+  padding: 0.3rem 0.6rem;
+}
+
+.tag[data-on] {
+  color: var(--ink);
+  background: color-mix(in oklab, var(--gold) 24%, transparent);
+  border-color: var(--gold);
+}
+
+.tag:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tag-picker__add {
+  display: flex;
+  gap: var(--gap-tight);
+}
+
+.tag-picker__add input {
+  flex: 1;
+  min-height: 40px;
+  padding: 0.45rem 0.6rem;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-family: var(--face-prose);
+  font-size: 1.05rem;
+}
+
+/* ── Entry picker ────────────────────────────────────────────────────────── */
+
+.picker {
+  position: relative;
+}
+
+.picker input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.5rem 0.65rem;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-family: var(--face-prose);
+  font-size: 1.05rem;
+}
+
+.picker input:focus-visible {
+  border-color: var(--gold);
+}
+
+.picker__list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 15rem;
+  overflow-y: auto;
+  background: var(--leaf-high);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--lift-high);
+}
+
+.picker__list button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.picker__list button[data-active] {
+  background: var(--gold-wash);
+}
+
+.picker__sigil {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.picker__name {
+  font-family: var(--face-display);
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.picker__alias {
+  font-family: var(--face-prose);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field__hint[data-linked] {
+  color: var(--verdigris);
+  font-weight: 600;
+}
+
+/* ── Portrait field ──────────────────────────────────────────────────────── */
+
+.portrait-field {
+  display: flex;
+  gap: var(--gap);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.portrait-field__preview {
+  width: 7.5rem;
+  aspect-ratio: 3 / 4;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.portrait-field__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.portrait-field__preview .sigil {
+  width: 62%;
+  height: 62%;
+}
+
+.portrait-field__controls {
+  flex: 1;
+  min-width: 12rem;
+  display: grid;
+  gap: var(--gap-snug);
+  align-content: start;
+}
+
+.portrait-field__pick {
+  cursor: pointer;
+  justify-self: start;
+}
+
+.field code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0.05em 0.3em;
+  border-radius: var(--radius);
+  background: var(--gold-wash);
+  color: var(--gold);
+}
+
+.button[data-on] {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--gold-wash);
+}

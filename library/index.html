@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-mode="vellum">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#e9dfc6" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <title>Hei Mao — Character Library</title>
+    <meta
+      name="description"
+      content="A record of souls, scattered across the reflections — the Hei Mao character archive, with a star map of who is bound to whom."
+    />
+
+    <!-- v1 had no social metadata at all, so every link posted to Discord
+         rendered as a bare URL with no title, image or description. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Hei Mao Character Library" />
+    <meta property="og:title" content="Hei Mao — Character Library" />
+    <meta
+      property="og:description"
+      content="A record of souls, scattered across the reflections."
+    />
+    <meta property="og:image" content="/social.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- The mode is applied before first paint so a reader who chose the
+         observatory does not get a frame of parchment thrown at them. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('heimao.library.mode');
+          var mode =
+            stored === 'vellum' || stored === 'astral'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'astral'
+                : 'vellum';
+          document.documentElement.dataset.mode = mode;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', mode === 'astral' ? '#0a0a15' : '#e9dfc6');
+        } catch (e) {
+          /* private mode; the default in the markup stands */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 3rem 1.5rem; font-family: Georgia, serif; max-width: 40rem; margin: 0 auto">
+        <h1 style="font-size: 1.6rem; margin-bottom: 0.6rem">Hei Mao Character Library</h1>
+        <p>
+          This archive needs JavaScript to read its database. If you have it disabled, the entries
+          are still public — they can be reached directly through the project's REST API.
+        </p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

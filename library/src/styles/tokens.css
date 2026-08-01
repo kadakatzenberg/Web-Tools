@@ -1,0 +1,268 @@
+/**
+ * Hei Mao Library — the codex and the observatory
+ *
+ * The archive is a bound book kept in an observatory, and it has two states
+ * that are art-directed rather than inverted:
+ *
+ *   VELLUM — the page under a lamp. Parchment, iron-gall ink, gold leaf,
+ *            foxing at the edges. The reading state, and the default.
+ *   ASTRAL — the same book at the telescope. The parchment goes to deep
+ *            indigo, the gold becomes starlight, and the star map's pigments
+ *            bleed up into the page.
+ *
+ * They share every measurement and every piece of structure. Only pigment and
+ * material change, which is what makes the switch read as time of night
+ * passing rather than as a different website.
+ *
+ * Three rules:
+ *
+ *   1. One pigment, one meaning. Gold is authorship — the archive's own voice:
+ *      seals, rules, marks of provenance. Era colour belongs to the eras and
+ *      is never borrowed for chrome. Vermilion is destructive action only.
+ *
+ *   2. Nothing smaller than 11px, ever. v1's labels were
+ *      `clamp(.34rem,.55vw,.4rem)` — between five and six pixels, in tracked
+ *      uppercase Cinzel. That is not small type, it is a decorative texture
+ *      that happens to contain words, and there were forty of them carrying
+ *      the only label a field had.
+ *
+ *   3. Colour is never the only signal. Every state carries a second cue —
+ *      a rule weight, a mark, a position, a shape.
+ */
+
+/* Animatable custom properties. Registering them lets the gold sweep and the
+   focus ring interpolate instead of stepping. */
+@property --sheen {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --glow {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+:root {
+  /* ══════════════════════════════════════════════════════════════════════
+     Measurements — identical in both modes
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* A 4px grid. Named by role, not by number, so usage stays honest. */
+  --gap-hair: 2px;
+  --gap-tight: 4px;
+  --gap-snug: 8px;
+  --gap: 12px;
+  --gap-wide: 20px;
+  --gap-loose: 32px;
+  --gap-vast: 56px;
+
+  --masthead-h: 72px;
+  --rail-w: 248px;
+  --measure: 68ch; /* prose column: where a serif stays readable */
+  --page-max: 1360px;
+
+  --radius-none: 0px;
+  --radius: 2px; /* the codex is cut, not rounded */
+  --radius-round: 999px;
+
+  /* ══ Type ══
+     Three faces, three jobs, as in the war table.
+
+       Cinzel            — carved Roman capital. Display and section heads.
+                           Never below 13px; it loses its counters.
+       Cormorant Garamond— prose, quotes, the reading voice. Never below 17px;
+                           its hairlines disappear.
+       IBM Plex Sans     — every label, count, control and piece of metadata.
+                           This is what replaced the 6px Cinzel.
+  */
+  --face-display: 'Cinzel', 'Cormorant Garamond', Georgia, serif;
+  --face-prose: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --face-ui: 'IBM Plex Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* A modular scale at 1.2, anchored to 16px. Fluid where fluidity helps. */
+  --t-micro: 0.6875rem; /* 11px — the floor, tracked uppercase only */
+  --t-small: 0.8125rem; /* 13px */
+  --t-base: 0.9375rem; /* 15px */
+  --t-body: clamp(1.0625rem, 0.98rem + 0.4vw, 1.1875rem); /* 17–19px prose */
+  --t-lead: clamp(1.1875rem, 1.06rem + 0.6vw, 1.375rem);
+  --t-h3: clamp(0.9375rem, 0.89rem + 0.22vw, 1.0625rem);
+  --t-h2: clamp(1.125rem, 1rem + 0.6vw, 1.5rem);
+  --t-h1: clamp(1.75rem, 1.3rem + 2.2vw, 3rem);
+  --t-hero: clamp(2.5rem, 1.4rem + 5.4vw, 5.5rem);
+
+  --track-label: 0.16em;
+  --track-display: 0.03em;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-prose: 1.68;
+
+  /* ══ Motion ══
+     Weight, not duration. Reveals ease out; things that leave ease in;
+     anything that overshoots does so once and settles. */
+  --ease-out: cubic-bezier(0.22, 0.68, 0.32, 1);
+  --ease-in: cubic-bezier(0.65, 0, 0.85, 0.35);
+  --ease-settle: cubic-bezier(0.34, 1.32, 0.5, 1);
+  --dur-tap: 90ms;
+  --dur-quick: 180ms;
+  --dur: 300ms;
+  --dur-slow: 620ms;
+  --dur-ink: 1100ms;
+
+  --z-rail: 40;
+  --z-masthead: 60;
+  --z-scrim: 80;
+  --z-dialog: 90;
+  --z-map: 100;
+  --z-toast: 120;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   VELLUM — the page under a lamp
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+:root[data-mode='vellum'] {
+  color-scheme: light;
+
+  /* Ground: five steps of parchment, each a real surface in the hierarchy. */
+  --shelf: #ddd0b0; /* behind the page — the desk */
+  --page: #e9dfc6; /* the leaf itself */
+  --leaf: #f2eada; /* a card resting on the leaf */
+  --leaf-high: #f8f2e4; /* raised: hover, the open dialog */
+  --well: #e2d6ba; /* recessed: inputs, tracks, wells */
+  --rail: #efe6d0;
+
+  /* Ink: iron gall, which browns as it ages. */
+  --ink: #241a0c; /* 13.4:1 on --page */
+  --ink-soft: #4d3a1c; /* 8.1:1 */
+  --ink-faint: #6e5730; /* 4.9:1 — the floor for body text */
+  --ink-ghost: #8a7550; /* 3.3:1 — decoration and rules only, never text */
+
+  /* Gold: the archive's own voice. */
+  --gold: #93701a; /* 4.8:1 on --page — safe for text */
+  --gold-bright: #c19a34;
+  --gold-leaf: #e8c964;
+  --gold-wash: color-mix(in oklab, var(--gold) 12%, transparent);
+
+  --rule: color-mix(in oklab, var(--ink) 18%, transparent);
+  --rule-soft: color-mix(in oklab, var(--ink) 9%, transparent);
+  --rule-strong: color-mix(in oklab, var(--ink) 34%, transparent);
+
+  --vermilion: #a8321f; /* 5.6:1 — destructive only */
+  --vermilion-wash: color-mix(in oklab, var(--vermilion) 10%, transparent);
+  --verdigris: #2f6b4c; /* success */
+
+  /* Material. Depth is a carved edge, not a blur. */
+  --carve:
+    inset 0 1px 0 color-mix(in oklab, #fffdf6 62%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--ink) 10%, transparent);
+  --lift: 0 1px 2px color-mix(in oklab, var(--ink) 10%, transparent);
+  --lift-high:
+    0 8px 28px color-mix(in oklab, var(--ink) 16%, transparent),
+    0 2px 6px color-mix(in oklab, var(--ink) 10%, transparent);
+
+  --grain-opacity: 0.4;
+  --foxing-opacity: 0.26;
+  --portrait-blend: multiply;
+  --portrait-treatment: saturate(0.86) contrast(1.04) sepia(0.14);
+
+  --focus: #1d4ed8;
+  --focus-ring: 0 0 0 2px var(--page), 0 0 0 4px var(--focus);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ASTRAL — the same book at the telescope
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root[data-mode='astral'] {
+  color-scheme: dark;
+
+  --shelf: #05050d;
+  --page: #0a0a15;
+  --leaf: #10101d;
+  --leaf-high: #171728;
+  --well: #07070f;
+  --rail: #0c0c18;
+
+  --ink: #ece5d4; /* 14.2:1 on --page */
+  --ink-soft: #c0b8a4; /* 9.6:1 */
+  --ink-faint: #948c7c; /* 5.4:1 */
+  --ink-ghost: #6b6558; /* decoration only */
+
+  --gold: #d0a748; /* 8.4:1 */
+  --gold-bright: #e8c96a;
+  --gold-leaf: #fff2c0;
+  --gold-wash: color-mix(in oklab, var(--gold) 14%, transparent);
+
+  --rule: color-mix(in oklab, var(--gold) 22%, transparent);
+  --rule-soft: color-mix(in oklab, var(--gold) 11%, transparent);
+  --rule-strong: color-mix(in oklab, var(--gold) 40%, transparent);
+
+  --vermilion: #e2604a; /* 6.1:1 */
+  --vermilion-wash: color-mix(in oklab, var(--vermilion) 16%, transparent);
+  --verdigris: #4ecf9a;
+
+  --carve:
+    inset 0 1px 0 color-mix(in oklab, var(--gold) 10%, transparent),
+    inset 0 -1px 0 #00000060;
+  --lift: 0 1px 2px #00000070;
+  --lift-high: 0 10px 34px #000000a0, 0 2px 8px #00000080;
+
+  --grain-opacity: 0.26;
+  --foxing-opacity: 0;
+  --portrait-blend: normal;
+  --portrait-treatment: saturate(0.9) contrast(1.06) brightness(0.94);
+
+  --focus: #8ab4ff;
+  --focus-ring: 0 0 0 2px var(--page), 0 0 0 4px var(--focus);
+}
+
+/* Someone arriving with a dark system preference and no stored choice gets
+   the observatory. The toggle overrides this either way, because
+   [data-mode] is set on the element and beats the media query. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode]) {
+    color-scheme: dark;
+
+    --shelf: #05050d;
+    --page: #0a0a15;
+    --leaf: #10101d;
+    --leaf-high: #171728;
+    --well: #07070f;
+    --rail: #0c0c18;
+
+    --ink: #ece5d4;
+    --ink-soft: #c0b8a4;
+    --ink-faint: #948c7c;
+    --ink-ghost: #6b6558;
+
+    --gold: #d0a748;
+    --gold-bright: #e8c96a;
+    --gold-leaf: #fff2c0;
+    --gold-wash: color-mix(in oklab, var(--gold) 14%, transparent);
+
+    --rule: color-mix(in oklab, var(--gold) 22%, transparent);
+    --rule-soft: color-mix(in oklab, var(--gold) 11%, transparent);
+    --rule-strong: color-mix(in oklab, var(--gold) 40%, transparent);
+
+    --vermilion: #e2604a;
+    --vermilion-wash: color-mix(in oklab, var(--vermilion) 16%, transparent);
+    --verdigris: #4ecf9a;
+
+    --carve:
+      inset 0 1px 0 color-mix(in oklab, var(--gold) 10%, transparent),
+      inset 0 -1px 0 #00000060;
+    --lift: 0 1px 2px #00000070;
+    --lift-high: 0 10px 34px #000000a0, 0 2px 8px #00000080;
+
+    --grain-opacity: 0.26;
+    --foxing-opacity: 0;
+    --portrait-blend: normal;
+    --portrait-treatment: saturate(0.9) contrast(1.06) brightness(0.94);
+
+    --focus: #8ab4ff;
+  }
+}

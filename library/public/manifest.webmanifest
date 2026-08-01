@@ -1,0 +1,17 @@
+{
+  "name": "Hei Mao Character Library",
+  "short_name": "Hei Mao",
+  "description": "A record of souls, scattered across the reflections.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a15",
+  "theme_color": "#0a0a15",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

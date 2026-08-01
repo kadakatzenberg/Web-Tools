@@ -1,0 +1,338 @@
+/**
+ * The star map is its own world: always the observatory, whatever mode the
+ * archive is in, because a parchment star map is a contradiction.
+ */
+
+.starmap {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-map);
+  overflow: hidden;
+  background: #04030c;
+  color: #ece5d4;
+
+  --map-gold: #d8b356;
+  --map-rule: rgba(216, 179, 86, 0.28);
+  --map-panel: rgba(8, 7, 20, 0.9);
+}
+
+.starmap__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.starmap__canvas:active {
+  cursor: grabbing;
+}
+
+/* ── Status ──────────────────────────────────────────────────────────────── */
+
+.starmap__status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 1.1rem;
+  background: var(--map-panel);
+  border: 1px solid var(--map-rule);
+  border-radius: var(--radius);
+  color: var(--map-gold);
+  pointer-events: none;
+}
+
+.starmap__pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--map-gold);
+  box-shadow: 0 0 12px var(--map-gold);
+  animation: map-pulse 1.4s var(--ease-out) infinite;
+}
+
+@keyframes map-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.starmap__failure {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--gap);
+  text-align: center;
+  padding: var(--gap-wide);
+  background: #04030c;
+}
+
+.starmap__failure .seal {
+  color: var(--map-gold);
+  max-width: 28rem;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+
+.starmap__controls {
+  position: absolute;
+  top: var(--gap);
+  right: var(--gap);
+  display: flex;
+  gap: var(--gap-tight);
+  padding: var(--gap-tight);
+  background: var(--map-panel);
+  border: 1px solid var(--map-rule);
+  border-radius: var(--radius);
+  backdrop-filter: blur(8px);
+}
+
+.starmap__controls .icon-button {
+  color: var(--map-gold);
+}
+
+.starmap__controls .icon-button:hover {
+  background: rgba(216, 179, 86, 0.16);
+  color: #fff2c0;
+}
+
+.starmap__close:hover {
+  background: rgba(226, 96, 74, 0.2) !important;
+  color: #ff9c88 !important;
+}
+
+/* The minus glyph has no path of its own; it is a rule. */
+.starmap__minus {
+  display: block;
+  width: 1.15em;
+  height: 1.4px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+
+.starmap__legend {
+  position: absolute;
+  top: var(--gap);
+  left: var(--gap);
+  display: grid;
+  gap: 2px;
+  padding: var(--gap-snug) var(--gap);
+  background: var(--map-panel);
+  border: 1px solid var(--map-rule);
+  border-radius: var(--radius);
+  backdrop-filter: blur(8px);
+  max-height: calc(100svh - 8rem);
+  overflow-y: auto;
+}
+
+.starmap__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(236, 229, 212, 0.72);
+  white-space: nowrap;
+}
+
+.starmap__legend-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.starmap__legend-count {
+  margin-left: auto;
+  padding-left: 0.6rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(236, 229, 212, 0.42);
+}
+
+/* ── Hint ────────────────────────────────────────────────────────────────── */
+
+.starmap__hint {
+  position: absolute;
+  bottom: var(--gap-snug);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--face-prose);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: rgba(236, 229, 212, 0.3);
+  pointer-events: none;
+  text-align: center;
+  padding-inline: var(--gap);
+}
+
+/* ── Selection panel ─────────────────────────────────────────────────────── */
+
+.starmap__panel {
+  position: absolute;
+  left: 50%;
+  bottom: var(--gap-wide);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  width: min(38rem, calc(100vw - 2rem));
+  padding: var(--gap-snug);
+  background: var(--map-panel);
+  border: 1px solid var(--map-rule);
+  border-top: 2px solid var(--map-gold);
+  border-radius: var(--radius);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .starmap__panel {
+    animation: panel-in var(--dur) var(--ease-settle);
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+
+.starmap__panel-portrait {
+  width: 54px;
+  height: 54px;
+  flex: none;
+  border: 1px solid var(--map-rule);
+  border-radius: var(--radius);
+}
+
+.starmap__panel-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.starmap__panel-name {
+  font-family: var(--face-display);
+  font-size: var(--t-h3);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.starmap__panel-alias {
+  font-family: var(--face-prose);
+  font-style: italic;
+  font-size: 1rem;
+  color: rgba(236, 229, 212, 0.62);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.starmap__panel-meta {
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(236, 229, 212, 0.42);
+}
+
+.starmap__panel .button--gold {
+  border-color: var(--map-rule);
+  background: rgba(216, 179, 86, 0.14);
+  color: var(--map-gold);
+}
+
+.starmap__panel .icon-button {
+  color: rgba(236, 229, 212, 0.5);
+}
+
+@media (max-width: 560px) {
+  .starmap__legend,
+  .starmap__hint {
+    display: none;
+  }
+
+  .starmap__panel {
+    left: var(--gap-snug);
+    right: var(--gap-snug);
+    bottom: var(--gap-snug);
+    width: auto;
+    transform: none;
+    flex-wrap: wrap;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .starmap__panel {
+      animation: none;
+    }
+  }
+}
+
+/* ── The keyboard index ──────────────────────────────────────────────────── */
+
+/**
+ * Off-screen but focusable, so tabbing walks the whole graph. `clip-path` and
+ * a 1px box are not used here because the buttons need to be reachable and
+ * scrollable once focused — moving it out of the viewport keeps the focus ring
+ * working when a browser scrolls it into view.
+ */
+.starmap__index {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.starmap__index:focus-within {
+  left: var(--gap);
+  top: var(--gap);
+  width: min(24rem, calc(100vw - 2rem));
+  height: auto;
+  max-height: calc(100svh - 10rem);
+  overflow-y: auto;
+  padding: var(--gap-snug);
+  background: var(--map-panel);
+  border: 1px solid var(--map-rule);
+  border-radius: var(--radius);
+  backdrop-filter: blur(10px);
+  z-index: 5;
+}
+
+.starmap__index button {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  font-size: var(--t-small);
+  color: rgba(236, 229, 212, 0.82);
+  border-radius: var(--radius);
+}
+
+.starmap__index button:hover,
+.starmap__index button:focus-visible {
+  background: rgba(216, 179, 86, 0.16);
+  color: #fff2c0;
+}

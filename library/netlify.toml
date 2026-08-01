@@ -1,0 +1,56 @@
+# Netlify configuration for the Hei Mao Character Library.
+#
+# This is a subdirectory of the Web-Tools repository, so the site's
+# "Base directory" must be set to `library` in the Netlify UI
+# (Site configuration → Build & deploy → Build settings). Everything else is
+# read from here.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The app is client-routed: /c/kada and /archive are real URLs that must serve
+# the shell rather than 404. v1 had no routes at all, so it needed none of this
+# — and could not be linked into either.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=(), interest-cohort=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    # No 'unsafe-inline' on script-src, which is only possible because nothing
+    # is inline. v1 loaded d3 from cdnjs and fonts from Google, so its policy
+    # would have had to trust both; everything here is bundled and self-hosted
+    # and the only outbound origin is Supabase.
+    #
+    # 'unsafe-inline' remains on style-src because React writes inline style
+    # attributes for the per-entry era pigments. Those are colour values from
+    # a closed vocabulary, never author input.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self'; connect-src 'self' https://*.supabase.co; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+
+# Fingerprinted assets are immutable. The shell must never be cached, or a
+# deploy leaves people on the old bundle pointing at new asset names.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"

@@ -1,3 +1,19 @@
+# Web Tools
+
+Two applications for the Hei Mao roleplay community, deployed as separate
+Netlify sites from this one repository.
+
+| Directory | App | Site |
+| --- | --- | --- |
+| `.` (root) | **Hei Mao Combat** — the war table | — |
+| `library/` | **Hei Mao Character Library** — the archive and star map | [hmlibrary.netlify.app](https://hmlibrary.netlify.app) |
+
+The library has its own `package.json`, `netlify.toml` and docs; see
+`library/README.md`. Its Netlify site must have its **base directory set to
+`library`**. The combat app builds from the repository root and is unaffected.
+
+---
+
 # Hei Mao Combat
 
 A tactical war table for running live Hei Mao roleplay encounters — phase and round

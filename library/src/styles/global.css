@@ -1,0 +1,477 @@
+/**
+ * Base, material, and the things every view depends on.
+ *
+ * The paper is generated, not photographed: two layers of `feTurbulence` in a
+ * data URI, one fine (the grain of the vellum) and one coarse and warm (the
+ * foxing that parchment develops as it ages). No image is fetched, both scale
+ * to any viewport and any DPR, and they cost nothing to change.
+ */
+
+/**
+ * Latin subsets only.
+ *
+ * The unsuffixed @fontsource entrypoints declare every subset the family
+ * ships — Cyrillic, Greek, Vietnamese — and while `unicode-range` means a
+ * browser never *downloads* the ones it does not need, every declaration is
+ * still bytes in the critical CSS. Naming the subset cut the stylesheet
+ * roughly in half for characters this archive does not contain.
+ *
+ * All four faces are self-hosted. v1 pulled them from `fonts.googleapis.com`,
+ * which is a render-blocking request to a third party on every cold load, and
+ * which is what forced its content security policy to trust Google's CDN.
+ */
+@import '@fontsource/cinzel/latin-400.css';
+@import '@fontsource/cinzel/latin-600.css';
+@import '@fontsource/cinzel/latin-700.css';
+@import '@fontsource/cormorant-garamond/latin-400.css';
+@import '@fontsource/cormorant-garamond/latin-400-italic.css';
+@import '@fontsource/cormorant-garamond/latin-600.css';
+@import '@fontsource-variable/ibm-plex-sans/wght.css';
+@import './tokens.css';
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  /* The masthead is sticky; anchored jumps must clear it. */
+  scroll-padding-top: calc(var(--masthead-h) + var(--gap-wide));
+}
+
+body {
+  min-height: 100svh;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--face-ui);
+  font-size: var(--t-base);
+  line-height: var(--leading-snug);
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+}
+
+:target {
+  scroll-margin-top: calc(var(--masthead-h) + var(--gap-wide));
+}
+
+/* ── The paper ───────────────────────────────────────────────────────────── */
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Fine grain: the tooth of the sheet. */
+body::before {
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--portrait-blend);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.42'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* Foxing: the warm blooms parchment develops. Vellum only — starlight has
+   no rust in it. */
+body::after {
+  opacity: var(--foxing-opacity);
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.42 0 0 0 0 0.2 0 0 0 -1.4 0.72'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23f)'/%3E%3C/svg%3E");
+  background-size: 900px 900px;
+}
+
+/* The observatory gets a slow pour of light from above instead. */
+:root[data-mode='astral'] body,
+:root:not([data-mode]) body {
+  background-image: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode]) body::after {
+    opacity: 0;
+  }
+}
+
+.page-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      120% 70% at 50% -10%,
+      color-mix(in oklab, var(--gold) 9%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(90% 55% at 12% 8%, color-mix(in oklab, var(--gold) 5%, transparent), transparent 58%);
+}
+
+/* ── Type ────────────────────────────────────────────────────────────────── */
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+.display {
+  font-family: var(--face-display);
+  letter-spacing: var(--track-display);
+  font-weight: 700;
+}
+
+.prose {
+  font-family: var(--face-prose);
+  font-size: var(--t-body);
+  line-height: var(--leading-prose);
+  color: var(--ink-soft);
+  max-width: var(--measure);
+}
+
+.prose p + p {
+  margin-top: 0.75em;
+}
+
+/**
+ * The label face.
+ *
+ * v1 set these in Cinzel at five to six pixels. Cinzel is a display capital —
+ * at that size its counters close and it becomes a texture. This is Plex at
+ * 11px, which is the smallest tracked uppercase that stays a word.
+ */
+.label {
+  font-family: var(--face-ui);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+.seal {
+  font-family: var(--face-display);
+  font-size: var(--t-small);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* The gold sweep. One registered property, so it interpolates. */
+.gilt {
+  background:
+    linear-gradient(
+        100deg,
+        var(--gold) 0%,
+        var(--gold-bright) 30%,
+        var(--gold-leaf) 46%,
+        var(--gold-bright) 62%,
+        var(--gold) 100%
+      )
+      no-repeat;
+  background-size: 260% 100%;
+  background-position: var(--sheen) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen 9s var(--ease-out) infinite;
+}
+
+@keyframes sheen {
+  0%,
+  62% {
+    --sheen: 100%;
+  }
+  100% {
+    --sheen: 0%;
+  }
+}
+
+/* ── Rules and seals ─────────────────────────────────────────────────────── */
+
+.rule {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, var(--rule-strong), var(--rule-soft) 60%, transparent);
+}
+
+.lozenge {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  background: currentColor;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+/* ── Focus ───────────────────────────────────────────────────────────────── */
+
+/**
+ * v1 had no focus styling at all beyond the browser default, which its own
+ * `outline:none` on inputs then removed — so tabbing through the editor was
+ * invisible. This is a two-tone ring that survives both grounds.
+ */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius);
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--gap-snug);
+  left: var(--gap-snug);
+  z-index: 200;
+  padding: var(--gap-snug) var(--gap);
+  background: var(--leaf-high);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  font-size: var(--t-small);
+  font-weight: 600;
+  transform: translateY(-200%);
+  transition: transform var(--dur-quick) var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border: 3px solid var(--page);
+  border-radius: var(--radius-round);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
+}
+
+/* ── Selection ───────────────────────────────────────────────────────────── */
+
+::selection {
+  background: color-mix(in oklab, var(--gold) 34%, transparent);
+  color: var(--ink);
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────── */
+
+/**
+ * v1 animated everything unconditionally: every card faded up on every
+ * filter change, every character name was rebuilt letter by letter with a
+ * 28ms stagger, and the star map ran a requestAnimationFrame loop forever.
+ * None of it asked.
+ *
+ * Reduced motion here means *reduced*, not removed — opacity still resolves,
+ * so nothing appears out of nowhere, but nothing travels, and the star map
+ * settles to a static frame instead of drifting.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .gilt {
+    background-position: 50% 0;
+  }
+}
+
+/* ── View transitions ────────────────────────────────────────────────────── */
+
+/**
+ * Progressive enhancement in the strictest sense: with no support the routes
+ * simply swap, which is what v1 did. With support, the portrait a reader
+ * clicked is the portrait that grows into the detail page.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: var(--dur);
+    animation-timing-function: var(--ease-out);
+  }
+
+  ::view-transition-old(root) {
+    animation-name: vt-out;
+  }
+
+  ::view-transition-new(root) {
+    animation-name: vt-in;
+  }
+
+  ::view-transition-group(portrait) {
+    animation-duration: var(--dur-slow);
+    animation-timing-function: var(--ease-out);
+  }
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── Shared reveal ───────────────────────────────────────────────────────── */
+
+/**
+ * Scroll-driven where the browser can do it, which keeps the reveal off the
+ * main thread entirely and, unlike an IntersectionObserver, runs backwards
+ * when the reader scrolls back up.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 26%;
+    }
+  }
+
+  @supports not (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-in var(--dur-slow) var(--ease-out) both;
+    }
+  }
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Print ───────────────────────────────────────────────────────────────── */
+
+/**
+ * People print character sheets. v1 printed the fixed masthead over the top of
+ * the text and dropped everything below the fold.
+ */
+@media print {
+  :root {
+    --page: #fff;
+    --leaf: #fff;
+    --ink: #000;
+    --ink-soft: #333;
+  }
+
+  body::before,
+  body::after,
+  .page-glow {
+    display: none;
+  }
+
+  .masthead,
+  .rail,
+  .no-print {
+    display: none !important;
+  }
+
+  .shell {
+    display: block !important;
+    padding: 0 !important;
+  }
+
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.8em;
+    color: #555;
+  }
+}
