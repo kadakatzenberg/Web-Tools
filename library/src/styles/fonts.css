@@ -1,0 +1,28 @@
+/**
+ * The three faces, self-hosted.
+ *
+ * v1 pulled these from `fonts.googleapis.com`, which cost a render-blocking
+ * request to a third party before a single word could be set in the right
+ * typeface, put a second origin in the critical path, and meant the content
+ * security policy had to trust Google with script-adjacent resources. These
+ * ship from the same origin as everything else, under the SIL Open Font
+ * License — see ATTRIBUTIONS.md.
+ *
+ * Cinzel and Cormorant Garamond are imported as their Latin subsets only;
+ * the archive is written in English and the display faces have no coverage
+ * worth carrying beyond it. IBM Plex Sans is the full variable font: it is
+ * one file for every weight from 100 to 700, and `unicode-range` means a
+ * browser fetches only the subsets a page actually needs, so the Cyrillic and
+ * Greek cuts declared here cost nothing unless someone writes in them.
+ *
+ * The standalone single-file build swaps this for `fonts.standalone.css`,
+ * where unicode-range cannot help because everything is inlined regardless.
+ */
+
+@import '@fontsource/cinzel/latin-400.css';
+@import '@fontsource/cinzel/latin-600.css';
+@import '@fontsource/cinzel/latin-700.css';
+@import '@fontsource/cormorant-garamond/latin-400.css';
+@import '@fontsource/cormorant-garamond/latin-400-italic.css';
+@import '@fontsource/cormorant-garamond/latin-600.css';
+@import '@fontsource-variable/ibm-plex-sans/wght.css';

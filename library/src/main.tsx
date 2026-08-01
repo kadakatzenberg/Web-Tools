@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { historyAvailable } from './app/router';
 import './styles/global.css';
 import './styles/components.css';
 
@@ -23,6 +24,7 @@ createRoot(host).render(
  * reloading the shell.
  */
 document.addEventListener('click', (event) => {
+  if (!historyAvailable) return;
   if (event.defaultPrevented) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
 

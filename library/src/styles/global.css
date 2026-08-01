@@ -20,13 +20,7 @@
  * which is a render-blocking request to a third party on every cold load, and
  * which is what forced its content security policy to trust Google's CDN.
  */
-@import '@fontsource/cinzel/latin-400.css';
-@import '@fontsource/cinzel/latin-600.css';
-@import '@fontsource/cinzel/latin-700.css';
-@import '@fontsource/cormorant-garamond/latin-400.css';
-@import '@fontsource/cormorant-garamond/latin-400-italic.css';
-@import '@fontsource/cormorant-garamond/latin-600.css';
-@import '@fontsource-variable/ibm-plex-sans/wght.css';
+@import '@/styles/fonts.css';
 @import './tokens.css';
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */

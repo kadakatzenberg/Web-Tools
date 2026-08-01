@@ -94,8 +94,43 @@ export function archiveRoute(filters: Partial<Filters> = {}, sort: SortKey = 'al
   return { name: 'archive', filters: { ...NO_FILTERS, ...filters }, sort };
 }
 
+/**
+ * Whether the address bar is ours to write to.
+ *
+ * It is not, in two situations that both matter: a `file://` document, where
+ * pushing an absolute path like `/c/kada` throws a SecurityError because the
+ * origin is opaque, and a sandboxed iframe without `allow-top-navigation`,
+ * where the same call fails the same way. The single-file build of this
+ * archive is opened both ways.
+ *
+ * Where it fails, routing falls back to memory: navigation still works,
+ * because `useRouter` drives rendering from React state and only mirrors that
+ * into history as a side effect. What is lost is the back button and
+ * linkable URLs, which a document opened off a disk never had.
+ */
+export const historyAvailable: boolean =
+  typeof window !== 'undefined' &&
+  window.location.protocol !== 'file:' &&
+  typeof window.history?.pushState === 'function';
+
 export function currentRoute(): Route {
+  if (!historyAvailable) return { name: 'home' };
   return parseLocation(new URL(window.location.href));
+}
+
+/**
+ * Back, for the entry view's return control.
+ *
+ * `history.back()` is right on the web and wrong in a standalone file, where
+ * there is no history to go back through and the call walks the reader out of
+ * the document entirely.
+ */
+export function goBack(fallback: () => void): void {
+  if (historyAvailable && window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+  fallback();
 }
 
 /**
@@ -126,10 +161,16 @@ export interface Navigation {
 }
 
 export function pushRoute(route: Route, replace = false): void {
+  if (!historyAvailable) return;
   const path = routeToPath(route);
   if (path === `${window.location.pathname}${window.location.search}`) return;
-  if (replace) window.history.replaceState(null, '', path);
-  else window.history.pushState(null, '', path);
+  try {
+    if (replace) window.history.replaceState(null, '', path);
+    else window.history.pushState(null, '', path);
+  } catch {
+    // Some embedders reject the write even when the API is present. The route
+    // has already been applied to state by the caller; only the URL is lost.
+  }
 }
 
 /** The document title is the other half of a working back button. */

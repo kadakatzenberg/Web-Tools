@@ -1,0 +1,87 @@
+/**
+ * Fonts for the standalone single-file build.
+ *
+ * The same seven faces as `fonts.css`, declared by hand rather than through
+ * Fontsource's stylesheets, for two reasons that only bite when everything is
+ * inlined as base64:
+ *
+ *   1. **woff2 only.** Fontsource declares each face with a `woff` fallback
+ *      beside the `woff2`. On the web that fallback is free — a browser picks
+ *      one and downloads one. Inlined, both are embedded, and the `woff` is
+ *      the larger of the pair. Every browser that can run this app has
+ *      supported woff2 since 2016.
+ *
+ *   2. **One declaration each.** Pulling the faces in through `@import`
+ *      chains let the same face reach the bundle by more than one specifier,
+ *      and each arrival was emitted again — 28 `@font-face` rules and 52
+ *      embedded blobs for what should be seven of each.
+ *
+ * Between them: 1.56MB of font down to about 240KB.
+ *
+ * `unicode-range` is deliberately omitted on Cinzel and Cormorant. Fontsource
+ * omits it on its Latin-only builds too, and without it the browser uses the
+ * face for whatever it is asked to set rather than declining anything outside
+ * a declared range.
+ */
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/cinzel/files/cinzel-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/cinzel/files/cinzel-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/cinzel/files/cinzel-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/cormorant-garamond/files/cormorant-garamond-latin-400-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/cormorant-garamond/files/cormorant-garamond-latin-400-italic.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/cormorant-garamond/files/cormorant-garamond-latin-600-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

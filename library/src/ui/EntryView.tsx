@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArchiveError } from '@/data/client';
 import { fetchEntry } from '@/data/entries';
-import { type Route, archiveRoute } from '@/app/router';
+import { type Route, archiveRoute, goBack } from '@/app/router';
 import {
   alignmentLabel,
   eraColor,
@@ -149,7 +149,11 @@ function Record({ entry, known, onNavigate, onEdit, onDelete, notify, partial }:
   return (
     <article className="record" style={{ '--record-pigment': pigment ?? 'var(--gold)' } as React.CSSProperties}>
       <nav className="record__bar no-print" aria-label="Entry actions">
-        <button type="button" className="button button--quiet" onClick={() => window.history.back()}>
+        <button
+          type="button"
+          className="button button--quiet"
+          onClick={() => goBack(() => onNavigate(archiveRoute()))}
+        >
           <Glyph name="back" />
           <span>Back</span>
         </button>

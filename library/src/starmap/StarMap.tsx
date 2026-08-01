@@ -5,6 +5,7 @@ import type { Entry } from '@/domain/types';
 import { Glyph, Portrait } from '@/ui/Primitives';
 import { buildGraph, radiusOf } from './graph';
 import type { LayoutMessage } from './layout.worker';
+import { createLayoutWorker } from '@/starmap/worker-factory';
 import { type Camera, StarMapRenderer } from './renderer';
 import './starmap.css';
 
@@ -209,7 +210,7 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
     if (!graph || graph.nodes.length === 0) return;
     setSettling(true);
 
-    const worker = new Worker(new URL('./layout.worker.ts', import.meta.url), { type: 'module' });
+    const worker = createLayoutWorker();
     workerRef.current = worker;
 
     const clusterByKey = new Map(graph.clusters.map((cluster) => [cluster.key, cluster]));

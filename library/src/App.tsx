@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useAnnouncer, useArchive, useMode, useRouter } from '@/app/hooks';
-import { titleFor } from '@/app/router';
+import { goBack, historyAvailable, titleFor } from '@/app/router';
 import { ArchiveError } from '@/data/client';
 import { fetchEntry, removeEntry } from '@/data/entries';
 import type { Entry } from '@/domain/types';
@@ -51,7 +51,7 @@ export function App() {
   /* A legacy ?id= link is honoured, then quietly rewritten so what people
      copy from the address bar afterwards is the good URL. */
   useEffect(() => {
-    if (route.name === 'entry' && window.location.search.includes('id=')) {
+    if (historyAvailable && route.name === 'entry' && window.location.search.includes('id=')) {
       window.history.replaceState(null, '', `/c/${encodeURIComponent(route.id)}`);
     }
   }, [route]);
@@ -154,7 +154,7 @@ export function App() {
           <StarMap
             entries={archive.entries}
             loading={archive.state === 'loading'}
-            onClose={() => window.history.back()}
+            onClose={() => goBack(() => navigate({ name: 'home' }))}
             onOpenEntry={(id) => navigate({ name: 'entry', id })}
           />
         </Suspense>
