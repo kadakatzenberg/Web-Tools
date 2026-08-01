@@ -167,3 +167,68 @@ test('the star map puts faces on the stars it has portraits for', async ({ page 
 
   expect(tiles).toBeGreaterThan(0);
 });
+
+/**
+ * Edges have to survive a high-DPR screen.
+ *
+ * They were drawn with `gl.LINES`, and every WebGL implementation clamps
+ * `lineWidth` to 1 — a *device* pixel. At dpr 1 that is a visible hairline; at
+ * dpr 2 it is half a CSS pixel, and the relationships simply disappeared. The
+ * first attempt at fixing this raised the alpha, which cannot help: the
+ * problem was geometry, not opacity, and the bug was invisible in a dpr 1
+ * test run.
+ *
+ * So this counts lit pixels at both ratios. Edges are now quads whose width is
+ * given in CSS pixels, which means the *proportion* of the frame they cover is
+ * ratio-independent. Under `gl.LINES` the dpr 2 frame covered roughly half as
+ * much of itself as the dpr 1 frame did.
+ */
+test.describe('edges survive a retina screen', () => {
+  async function litFraction(page: import('@playwright/test').Page) {
+    await mockArchive(page);
+    await page.goto('/map');
+    await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 30_000 });
+    await page.waitForTimeout(2000);
+
+    const shot = await page.locator('.starmap__canvas').screenshot();
+    // Decode in the browser, which has an image decoder and we do not.
+    return page.evaluate(async (bytes) => {
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // The band an edge occupies: clearly above the nebula ground, well below
+      // a star's core. Stars and background are both excluded.
+      let lit = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const sum = data[i]! + data[i + 1]! + data[i + 2]!;
+        if (sum > 190 && sum < 560) lit++;
+      }
+      return lit / (canvas.width * canvas.height);
+    }, Array.from(shot));
+  }
+
+  test('at device pixel ratio 1', async ({ page }) => {
+    expect(await litFraction(page)).toBeGreaterThan(0.002);
+  });
+
+  test.describe('on a retina screen', () => {
+    // test.use rather than a hand-built context: a context created with
+    // browser.newContext() inherits none of the project config, including
+    // baseURL, so every goto in it silently hangs.
+    test.use({ deviceScaleFactor: 2 });
+
+    test('at device pixel ratio 2', async ({ page }) => {
+      // Four times the pixels through a software rasteriser. On real hardware
+      // this is a frame; here it is most of a minute, and that is the harness
+      // rather than the map.
+      test.setTimeout(180_000);
+      expect(await litFraction(page)).toBeGreaterThan(0.002);
+    });
+  });
+});

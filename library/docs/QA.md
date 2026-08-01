@@ -208,3 +208,83 @@ reach the atlas. Before the fixes the first returned 0.
 Every screenshot below was taken against the production standalone build with
 fixture data, at 1440 and 390, in both modes: no horizontal overflow, no
 console errors, no page exceptions.
+
+## Round three — invisible edges, and idle cost
+
+### The star map's connection lines were invisible on a retina screen
+
+Drawn with `gl.LINES`. Every WebGL implementation clamps `lineWidth` to 1,
+because the core profile dropped wide lines and the drivers followed — and
+that 1 is a **device** pixel. At dpr 1 that is a visible hairline. At dpr 2 it
+is half a CSS pixel, which is most of the machines this runs on.
+
+The previous round's fix — roughly doubling the edge alphas — could not have
+worked. The problem was geometry, not opacity, and it was invisible in a
+screenshot pass taken at dpr 1.
+
+Edges are now instanced quads expanded along their own normal, with the width
+given in CSS pixels and scaled by the device ratio at pack time. That also buys
+two things `gl.LINES` never could: per-edge thickness, so a selected thread is
+visibly heavier than a background one, and a soft shoulder across the width, so
+the lines are antialiased instead of stair-stepped.
+
+Guarded by a test that screenshots the canvas at **both** ratios and asserts
+the fraction of the frame lit in the band an edge occupies. Under `gl.LINES`
+the dpr 2 frame covered about half as much of itself as the dpr 1 frame did.
+
+One tripwire worth recording: the first version of the vertex shader named a
+local `half`, which GLSL reserves. The shader failed to compile and the entire
+edge pass vanished without a console error.
+
+### The map redrew itself forever
+
+The scene is a full pass — sky, nebulae, edges, stars, a bright cut, four blur
+passes, a composite — at device resolution. It ran unconditionally at 60fps, so
+a settled map nobody was touching cost exactly as much as one being flung
+around, indefinitely, on battery.
+
+Two changes:
+
+**Instance buffers are packed only when their inputs change.** Repacking 304
+stars and every edge, then uploading both, happened every frame. None of it can
+change unless the layout moved, the selection moved, or a portrait landed.
+
+**Frames are drawn on demand,** in three tiers: every frame while something is
+actually changing; at 30fps when idle, since the twinkle and nebula drift are
+slow enough that half rate is indistinguishable; and *not at all* under reduced
+motion, where the shader is fed a frozen clock and consecutive frames are
+byte-identical pixels.
+
+Camera, selection and hover are detected by object identity rather than by
+flagging every mutation site — every pan, zoom and fit replaces `camera.current`
+wholesale, so identity is a complete and free change detector. Only the two
+things that mutate in place (worker layout ticks, atlas tile uploads) raise the
+flag explicitly.
+
+Measured under SwiftShader at 1440×900 dpr 2, idle with reduced motion: median
+frame 16.7ms — that is, free — against a continuous ~800ms software draw
+before. On real hardware the win is not the frame time, it is that a static map
+stops asking the GPU for anything.
+
+### The landing page constellation
+
+Two textbook canvas mistakes, neither of which was showing up as dropped frames
+on a desktop but both of which cost real battery on a phone:
+
+- `createRadialGradient` was called once per star per frame — ninety gradient
+  allocations and ramp rebuilds every 16ms. Now one small offscreen sprite per
+  colour, baked once, blitted thereafter.
+- Neighbour links were found by testing every star against every other: 90
+  stars is 4,005 distance tests a frame, growing with the square of the count.
+  Now bucketed into a grid sized to the link range, so only adjacent buckets
+  are considered.
+
+## Round three verification
+
+| Suite | Count | Result |
+| --- | --- | --- |
+| Vitest | 65 | pass |
+| Playwright — 1440, 1280, 390, plus dpr 2 | 121 | pass (2 skipped) |
+
+Production bundle unchanged in shape: the star map (42KB) and editor (20KB)
+stay lazy, so neither is on the path to reading the archive.

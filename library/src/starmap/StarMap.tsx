@@ -28,6 +28,13 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
   const labelCanvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<StarMapRenderer | null>(null);
   const labelsRef = useRef<LabelLayer | null>(null);
+  /**
+   * Set when something the renderer cannot infer has changed — node positions
+   * moving under it, or a portrait arriving. Camera, selection and hover are
+   * detected by identity in the loop instead, since every mutation of those
+   * replaces the whole object.
+   */
+  const dirtyRef = useRef(true);
   const workerRef = useRef<Worker | null>(null);
   const frameRef = useRef(0);
 
@@ -157,6 +164,7 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
       canvas.style.height = `${rect.height}px`;
       renderer.resize(rect.width, rect.height);
       labels?.resize(rect.width, rect.height, Math.min(window.devicePixelRatio || 1, 2));
+      dirtyRef.current = true;
     };
 
     applySize();
@@ -165,11 +173,64 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
     const observer = new ResizeObserver(applySize);
     observer.observe(host);
 
+    /**
+     * Draw on demand.
+     *
+     * The scene is a full pass — sky, nebulae, edges, stars, a bright cut,
+     * four blur passes and a composite, all at device resolution. Running that
+     * unconditionally at 60fps meant a settled map that nobody was touching
+     * burned the same GPU budget as one being flung around, forever, on a
+     * laptop battery.
+     *
+     * Three tiers:
+     *
+     *   - Something changed (panning, selecting, the layout still settling,
+     *     the reveal still fading, a portrait landing) — draw every frame.
+     *   - Nothing changed, but the sky is alive: the twinkle and the nebula
+     *     drift are slow enough that half rate is indistinguishable, and it
+     *     halves the cost of sitting still.
+     *   - Reduced motion — the shader is fed a frozen clock, so consecutive
+     *     frames are *identical pixels*. Redrawing them is pure waste; stop
+     *     entirely until something actually changes.
+     */
     let running = true;
-    const loop = () => {
+    let lastDraw = 0;
+    let lastCamera = camera.current;
+    let lastSelected = selectedRef.current;
+    let lastHovered = hoveredRef.current;
+    const IDLE_INTERVAL = 1000 / 30;
+
+    const loop = (now: number) => {
       if (!running) return;
-      // Fade the sky up as the layout settles rather than snapping in.
-      reveal.current = Math.min(1, reveal.current + 0.035);
+      frameRef.current = requestAnimationFrame(loop);
+
+      const settling = reveal.current < 1;
+      if (settling) reveal.current = Math.min(1, reveal.current + 0.035);
+
+      // Every pan, zoom and fit replaces camera.current wholesale, so identity
+      // is a complete and free change detector for it.
+      const changed =
+        dirtyRef.current ||
+        settling ||
+        camera.current !== lastCamera ||
+        selectedRef.current !== lastSelected ||
+        hoveredRef.current !== lastHovered;
+
+      if (changed) {
+        dirtyRef.current = false;
+        lastCamera = camera.current;
+        lastSelected = selectedRef.current;
+        lastHovered = hoveredRef.current;
+      }
+
+      if (!changed) {
+        // Nothing moved. A frozen clock means the next frame is the same
+        // pixels, so there is nothing to draw at all.
+        if (reducedMotion) return;
+        if (now - lastDraw < IDLE_INTERVAL) return;
+      }
+      lastDraw = now;
+
       renderer.render({
         camera: camera.current,
         selected: selectedRef.current,
@@ -184,7 +245,6 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
         hovered: hoveredRef.current,
         reveal: reveal.current,
       });
-      frameRef.current = requestAnimationFrame(loop);
     };
     frameRef.current = requestAnimationFrame(loop);
 
@@ -242,6 +302,11 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
         node.x = positions[i * 2]!;
         node.y = positions[i * 2 + 1]!;
       }
+      // Positions were mutated in place; nothing about them is detectable by
+      // identity, so say so explicitly.
+      dirtyRef.current = true;
+      rendererRef.current?.invalidate();
+
       if (event.data.type === 'done') {
         setSettling(false);
         frameAll();
@@ -249,7 +314,7 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
         // requests competing with the settling simulation buys nothing: what
         // matters in the first second is the shape, not whose face is where.
         rendererRef.current?.loadPortraits(() => {
-          /* the render loop is already running; the next frame picks it up */
+          dirtyRef.current = true;
         });
       }
     };

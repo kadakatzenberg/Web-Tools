@@ -167,33 +167,75 @@ void main() {
 }
 `;
 
+/**
+ * Edges are quads, not `gl.LINES`.
+ *
+ * Every WebGL implementation worth naming clamps `lineWidth` to 1 — the core
+ * profile dropped wide lines and the drivers followed. That 1 is a *device*
+ * pixel, so on a retina display every relationship in the archive was drawn
+ * half a CSS pixel wide. Raising the alpha, which was the first attempt at
+ * this, cannot fix a line that is thinner than the screen can show: it was
+ * visible at dpr 1 and invisible at dpr 2, which is most of the machines this
+ * runs on.
+ *
+ * So each edge is an instanced quad expanded along its own normal, with a
+ * width given in CSS pixels and multiplied up by the device ratio. That also
+ * buys per-edge thickness — a selected thread can be visibly heavier than a
+ * background one, which `gl.LINES` could never do — and a soft edge across
+ * the width, so the lines are antialiased rather than stair-stepped.
+ */
 const EDGE_VERTEX = `#version 300 es
-layout(location = 0) in vec2 a_position;
-layout(location = 1) in vec3 a_colour;
-layout(location = 2) in float a_alpha;
+layout(location = 0) in vec2 a_corner;   // x: 0..1 along, y: -1..1 across
+layout(location = 1) in vec2 a_from;
+layout(location = 2) in vec2 a_to;
+layout(location = 3) in vec3 a_colour;
+layout(location = 4) in float a_alpha;
+layout(location = 5) in float a_width;   // device pixels
 
 uniform vec2  u_resolution;
 uniform vec2  u_translate;
 uniform float u_scale;
 
-out vec3 v_colour;
+out vec3  v_colour;
 out float v_alpha;
+out float v_across;
 
 void main() {
   v_colour = a_colour;
   v_alpha = a_alpha;
-  vec2 screen = a_position * u_scale + u_translate;
+  v_across = a_corner.y;
+
+  vec2 from = a_from * u_scale + u_translate;
+  vec2 to   = a_to   * u_scale + u_translate;
+
+  vec2 along = to - from;
+  float span = length(along);
+  vec2 unit = span > 0.0001 ? along / span : vec2(1.0, 0.0);
+  vec2 normal = vec2(-unit.y, unit.x);
+
+  // Half a pixel of bleed on each side so the smoothstep below has somewhere
+  // to land; without it a one-pixel line antialiases itself out of existence.
+  // Deliberately not called "half": GLSL reserves that word, and the compile
+  // error it raises takes the entire edge pass down without a sound.
+  float reach = a_width * 0.5 + 0.5;
+  vec2 screen = mix(from, to, a_corner.x) + normal * a_corner.y * reach;
+
   gl_Position = vec4(screen / (u_resolution * 0.5), 0.0, 1.0);
 }
 `;
 
 const EDGE_FRAGMENT = `#version 300 es
 precision highp float;
-in vec3 v_colour;
+in vec3  v_colour;
 in float v_alpha;
+in float v_across;
 out vec4 fragColour;
+
 void main() {
-  fragColour = vec4(v_colour * v_alpha, 1.0);
+  // Soft shoulders across the width. Additive, so this is the whole of the
+  // antialiasing — there is no destination alpha to blend against.
+  float coverage = 1.0 - smoothstep(0.45, 1.0, abs(v_across));
+  fragColour = vec4(v_colour * v_alpha * coverage, 1.0);
 }
 `;
 
@@ -460,6 +502,9 @@ export interface RenderState {
 
 const MAX_DPR = 2;
 
+/** Floats per edge instance: from(2) to(2) colour(3) alpha(1) width(1). */
+const EDGE_STRIDE = 9;
+
 /** Floats per star instance: centre(2) radius(1) colour(3) flags(1) phase(1) tile(1). */
 const STAR_STRIDE = 9;
 
@@ -495,6 +540,20 @@ export class StarMapRenderer {
   private edgeCount = 0;
 
   private atlas: PortraitAtlas | null = null;
+
+  /**
+   * What the instance buffers were last packed from.
+   *
+   * Repacking 304 stars and every edge, then uploading both, ran on every
+   * single frame — including the thousands of frames where a settled map sits
+   * untouched on screen. None of that work can change unless the layout moved,
+   * the selection moved, or a portrait landed, so it is skipped unless one of
+   * those did.
+   */
+  private packedFor = { selected: '\u0000', hovered: '\u0000', geometry: -1 };
+
+  /** Bumped by whoever moves nodes or adds a face. */
+  private geometryVersion = 0;
 
   private start = performance.now();
   private disposed = false;
@@ -540,7 +599,7 @@ export class StarMapRenderer {
 
     this.nodeIndex = new Map(graph.nodes.map((node, index) => [node.id, index]));
     this.starData = new Float32Array(graph.nodes.length * STAR_STRIDE);
-    this.edgeData = new Float32Array(graph.edges.length * 2 * 6);
+    this.edgeData = new Float32Array(graph.edges.length * EDGE_STRIDE);
 
     this.buildGeometry();
   }
@@ -624,26 +683,49 @@ export class StarMapRenderer {
       this.nebulaVao = vao;
     }
 
-    /* Edges: a plain line list, rewritten when the selection changes. */
+    /* Edges: one instanced quad each, rewritten when the selection changes. */
     {
       const vao = gl.createVertexArray()!;
       gl.bindVertexArray(vao);
+
+      // t along the edge, side across it.
+      const ends = new Float32Array([0, -1, 0, 1, 1, -1, 1, 1]);
+      const endBuffer = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, endBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, ends, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
       this.edgeBuffer = gl.createBuffer()!;
       gl.bindBuffer(gl.ARRAY_BUFFER, this.edgeBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, this.edgeData.byteLength, gl.DYNAMIC_DRAW);
 
-      const stride = 6 * 4;
-      gl.enableVertexAttribArray(0);
-      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0);
-      gl.enableVertexAttribArray(1);
-      gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 8);
-      gl.enableVertexAttribArray(2);
-      gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 20);
+      // from(2) to(2) colour(3) alpha(1) width(1) = 9 floats.
+      const stride = EDGE_STRIDE * 4;
+      const attributes: Array<[number, number, number]> = [
+        [1, 2, 0], // from
+        [2, 2, 8], // to
+        [3, 3, 16], // colour
+        [4, 1, 28], // alpha
+        [5, 1, 32], // width
+      ];
+      for (const [location, size, offset] of attributes) {
+        gl.enableVertexAttribArray(location);
+        gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
+        gl.vertexAttribDivisor(location, 1);
+      }
 
       gl.bindVertexArray(null);
       this.edgeVao = vao;
     }
+  }
+
+  /**
+   * Say that node positions — or the set of faces — have changed, so the next
+   * frame repacks. Called by the layout worker's tick and by the atlas.
+   */
+  invalidate(): void {
+    this.geometryVersion++;
   }
 
   /* ── Portraits ────────────────────────────────────────────────────────── */
@@ -669,7 +751,12 @@ export class StarMapRenderer {
     if (withPortraits.length === 0) return;
 
     this.atlas = new PortraitAtlas(this.gl, withPortraits.length);
-    this.atlas.onTileReady = onTileReady;
+    this.atlas.onTileReady = () => {
+      // A new face changes what packStars would write, so the buffer has to be
+      // rebuilt before it can appear.
+      this.invalidate();
+      onTileReady();
+    };
     withPortraits.forEach((node, index) => {
       this.atlas!.request(node.id, node.portrait, index);
     });
@@ -726,6 +813,9 @@ export class StarMapRenderer {
       const active = selected === edge.source || selected === edge.target;
       let colour: [number, number, number];
       let alpha: number;
+      // CSS pixels. Multiplied by the device ratio at pack time, so a line is
+      // the same thickness to the eye on every screen.
+      let width: number;
 
       /**
        * Edge weights.
@@ -742,9 +832,11 @@ export class StarMapRenderer {
         if (active) {
           colour = hexToRgb(a.id === selected ? b.colour : a.colour);
           alpha = 1.15;
+          width = 2.2;
         } else {
           colour = [0.4, 0.38, 0.34];
           alpha = 0.06;
+          width = 1;
         }
       } else if (edge.voidbound) {
         // The Void's threads are the one relationship the archive treats as
@@ -752,25 +844,30 @@ export class StarMapRenderer {
         // that belongs to no era.
         colour = [0.92, 0.45, 0.72];
         alpha = 0.8;
+        width = 1.8;
       } else if (edge.sameCluster) {
         colour = hexToRgb(a.colour);
-        alpha = 0.48;
+        alpha = 0.55;
+        width = 1.5;
       } else if (edge.sameWorld) {
         colour = hexToRgb(a.worldColour);
-        alpha = 0.3;
+        alpha = 0.38;
+        width = 1.3;
       } else {
         // Cross-world: a soul that turned up in more than one reflection.
         colour = [0.78, 0.72, 0.5];
-        alpha = 0.22;
+        alpha = 0.3;
+        width = 1.2;
       }
 
-      this.edgeData.set([a.x, a.y, colour[0], colour[1], colour[2], alpha], cursor);
-      cursor += 6;
-      this.edgeData.set([b.x, b.y, colour[0], colour[1], colour[2], alpha], cursor);
-      cursor += 6;
+      this.edgeData.set(
+        [a.x, a.y, b.x, b.y, colour[0], colour[1], colour[2], alpha, width * this.dpr],
+        cursor,
+      );
+      cursor += EDGE_STRIDE;
     }
 
-    this.edgeCount = cursor / 6;
+    this.edgeCount = cursor / EDGE_STRIDE;
 
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.edgeBuffer);
@@ -814,8 +911,17 @@ export class StarMapRenderer {
     const translateY = state.camera.y * this.dpr;
     const scale = state.camera.scale * this.dpr;
 
-    this.packStars(state);
-    this.packEdges(state);
+    const selected = state.selected ?? '\u0000';
+    const hovered = state.hovered ?? '\u0000';
+    if (
+      this.packedFor.selected !== selected ||
+      this.packedFor.hovered !== hovered ||
+      this.packedFor.geometry !== this.geometryVersion
+    ) {
+      this.packStars(state);
+      this.packEdges(state);
+      this.packedFor = { selected, hovered, geometry: this.geometryVersion };
+    }
 
     /* 1–4: the scene. */
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.scene.framebuffer);
@@ -845,7 +951,7 @@ export class StarMapRenderer {
       gl.useProgram(this.programs.edge!);
       this.setCommon('edge', translateX, translateY, scale, time);
       gl.bindVertexArray(this.edgeVao);
-      gl.drawArrays(gl.LINES, 0, this.edgeCount);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.edgeCount);
     }
 
     // Stars, with their faces
