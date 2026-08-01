@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Mode } from '@/app/hooks';
 import { type Route, archiveRoute } from '@/app/router';
+import { BrandMark } from './BrandMark';
 import { Glyph } from './Primitives';
 
 interface MastheadProps {
@@ -96,9 +97,7 @@ export function Masthead({
           onNavigate({ name: 'home' });
         }}
       >
-        <span className="brand__mark" aria-hidden="true">
-          <BrandSigil />
-        </span>
+        <BrandMark size={40} className="brand__mark" />
         <span className="brand__words">
           <span className="brand__name display gilt">Hei Mao</span>
           <span className="brand__sub">Character Library</span>
@@ -156,42 +155,5 @@ export function Masthead({
         </button>
       </div>
     </header>
-  );
-}
-
-/**
- * The house mark, drawn rather than fetched.
- *
- * v1 hotlinked an 80×80 PNG from Supabase storage into the masthead and again
- * into the hero at 160px, so the first paint waited on two network round trips
- * to a storage bucket for a logo. This is 400 bytes of geometry: a cat's ear
- * silhouette inside an astrolabe ring.
- */
-function BrandSigil() {
-  return (
-    <svg viewBox="0 0 48 48" className="brand__sigil" aria-hidden="true">
-      <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="1.1" opacity="0.5" />
-      <circle
-        cx="24"
-        cy="24"
-        r="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="0.8"
-        opacity="0.3"
-        strokeDasharray="2 3.5"
-      />
-      <path
-        d="M13 30c0-7 5-12 11-12s11 5 11 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path d="M13 30 11 19l7 4M35 30l2-11-7 4" fill="currentColor" opacity="0.9" />
-      <circle cx="19.5" cy="27" r="1.6" fill="currentColor" />
-      <circle cx="28.5" cy="27" r="1.6" fill="currentColor" />
-      <path d="M24 31v2M21 34.5c1.8 1.2 4.2 1.2 6 0" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
   );
 }

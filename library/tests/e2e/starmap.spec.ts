@@ -112,3 +112,58 @@ test('leaving the map releases the WebGL context', async ({ page }) => {
   await expect(page.locator('.starmap__canvas')).toBeVisible();
   await expect(page.locator('.starmap__failure')).toHaveCount(0);
 });
+
+/**
+ * The names, which are the difference between an archive and a scatter plot.
+ *
+ * They regressed twice. Once because the WebGL rewrite simply did not draw
+ * them, and once because the visibility gate was written against absolute zoom
+ * — at the scale the map opens at, every threshold rejected every node, so the
+ * layer ran and painted nothing. Asserting "some pixels are lit" is what
+ * catches both, and neither was visible in a passing suite before.
+ */
+test('the star map names its stars', async ({ page }) => {
+  await mockArchive(page);
+  await page.goto('/map');
+  await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 30_000 });
+
+  const labels = page.locator('.starmap__labels');
+  await expect(labels).toBeAttached();
+
+  // Give the settle and the first few frames a moment.
+  await page.waitForTimeout(1500);
+
+  const painted = await labels.evaluate((canvas) => {
+    const element = canvas as HTMLCanvasElement;
+    const ctx = element.getContext('2d');
+    if (!ctx) return -1;
+    const { data } = ctx.getImageData(0, 0, element.width, element.height);
+    let lit = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i]! > 8) lit++;
+    return lit;
+  });
+
+  expect(painted).toBeGreaterThan(200);
+});
+
+/**
+ * Portraits inside the stars, the other half of what v1 showed. The atlas is
+ * uploaded tile by tile as images arrive, so this asserts that at least one
+ * made the trip rather than that all of them did.
+ */
+test('the star map puts faces on the stars it has portraits for', async ({ page }) => {
+  await mockArchive(page);
+  await page.goto('/map');
+  await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 30_000 });
+  await page.waitForTimeout(2500);
+
+  const tiles = await page.evaluate(() => {
+    // The atlas is internal, so infer from what it exists to do: a portrait
+    // request that resolved means a tile was painted and uploaded.
+    return performance
+      .getEntriesByType('resource')
+      .filter((entry) => entry.name.includes('/storage/v1/object/public/portraits/')).length;
+  });
+
+  expect(tiles).toBeGreaterThan(0);
+});

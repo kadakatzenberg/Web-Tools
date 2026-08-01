@@ -35,6 +35,7 @@ import {
   resizeTarget,
   uniforms,
 } from './gl';
+import { PortraitAtlas } from './atlas';
 import { type Graph, isHub, radiusOf } from './graph';
 
 /* ── Shaders ─────────────────────────────────────────────────────────────── */
@@ -203,11 +204,13 @@ layout(location = 2) in float a_radius;
 layout(location = 3) in vec3 a_colour;
 layout(location = 4) in float a_flags;   // x: hub, y: dimmed, z: selected
 layout(location = 5) in float a_phase;
+layout(location = 6) in float a_tile;    // atlas tile index, or -1
 
 uniform vec2  u_resolution;
 uniform vec2  u_translate;
 uniform float u_scale;
 uniform float u_time;
+uniform float u_atlasColumns;
 
 out vec2  v_local;
 out vec3  v_colour;
@@ -215,6 +218,10 @@ out float v_hub;
 out float v_dim;
 out float v_selected;
 out float v_twinkle;
+out float v_disc;      // node radius in local units
+out float v_hasFace;
+out vec2  v_tileOrigin;
+out float v_tileSpan;
 
 void main() {
   v_local = a_corner;
@@ -231,8 +238,23 @@ void main() {
 
   // The quad is sized in screen pixels so a star never collapses below a
   // usable size when zoomed out, and never becomes a dinner plate zoomed in.
-  float screenRadius = clamp(a_radius * u_scale, 4.5, 46.0);
+  // Nodes carrying a face get a wider floor: below about nine pixels a
+  // portrait is mush, and a mush of faces reads worse than a clean star.
+  // A face needs more pixels than a point light does before it stops being a
+  // coloured dot. 12px across is about where the fixture's blobs — and a real
+  // character portrait — start reading as a face rather than as a smudge.
+  float minRadius = a_tile >= 0.0 ? 12.0 : 4.5;
+  float screenRadius = clamp(a_radius * u_scale, minRadius, 46.0);
   float halo = v_selected > 0.5 ? 5.5 : (v_hub > 0.5 ? 4.0 : 3.0);
+
+  // The disc is the node itself; the rest of the quad is the glow around it.
+  v_disc = 1.0 / halo;
+
+  v_hasFace = step(0.0, a_tile);
+  float column = mod(max(a_tile, 0.0), u_atlasColumns);
+  float row = floor(max(a_tile, 0.0) / u_atlasColumns);
+  v_tileSpan = 1.0 / u_atlasColumns;
+  v_tileOrigin = vec2(column, row) * v_tileSpan;
 
   vec2 screen = a_centre * u_scale + u_translate + a_corner * screenRadius * halo;
   gl_Position = vec4(screen / (u_resolution * 0.5), 0.0, 1.0);
@@ -247,9 +269,14 @@ in float v_hub;
 in float v_dim;
 in float v_selected;
 in float v_twinkle;
+in float v_disc;
+in float v_hasFace;
+in vec2  v_tileOrigin;
+in float v_tileSpan;
 out vec4 fragColour;
 
 uniform float u_time;
+uniform sampler2D u_atlas;
 
 void main() {
   float d = length(v_local);
@@ -271,6 +298,20 @@ void main() {
     spikes = (horizontal + vertical) * (v_selected > 0.5 ? 0.55 : 0.3);
   }
 
+  /**
+   * A star carrying a face keeps its halo and loses most of its core.
+   *
+   * The core is a near-white blowout — that is what makes a bare star read as
+   * light rather than as a disc — and compositing a photograph on top of it
+   * washes the photograph out completely, which is exactly what happened on
+   * the first pass: the portraits were present, uploaded correctly, and
+   * invisible under their own glow.
+   */
+  float faceMask = 0.0;
+  if (v_hasFace > 0.5) faceMask = smoothstep(v_disc * 1.02, v_disc * 0.9, d);
+
+  core *= mix(1.0, 0.08, faceMask);
+
   float energy = (core + halo + spikes) * v_twinkle;
 
   vec3 colour = mix(v_colour, vec3(1.0), core * 0.72);
@@ -282,7 +323,40 @@ void main() {
   }
 
   energy *= mix(1.0, 0.1, v_dim);
-  fragColour = vec4(colour * energy, 1.0);
+  vec3 result = colour * energy;
+
+  /**
+   * The face.
+   *
+   * Composited over the star rather than instead of it, so a portrait still
+   * sits inside its era's glow and still twinkles — the archive is a sky, and
+   * a flat photograph pasted into it would break the whole conceit.
+   *
+   * The rim is a hard-ish ring in the node's own pigment: at a distance it is
+   * what tells one era from another when the face is too small to read.
+   */
+  if (faceMask > 0.001) {
+    vec2 local = clamp(v_local / v_disc * 0.5 + 0.5, 0.0, 1.0);
+    // The atlas is uploaded top-down, so v is flipped back here.
+    vec2 uv = v_tileOrigin + vec2(local.x, 1.0 - local.y) * v_tileSpan;
+    vec3 face = texture(u_atlas, uv).rgb;
+
+    // Lifted, not tinted: the portrait has to survive being seen against a
+    // lit nebula, and everything here is additively blended.
+    face *= 1.5 * (0.9 + 0.1 * v_twinkle);
+    face = mix(face, face * v_colour * 2.2, 0.18);
+    face *= mix(1.0, 0.14, v_dim);
+    if (v_selected > 0.5) face *= 1.3;
+
+    // A ring in the node's own pigment. At a distance, when the face is only
+    // a few pixels, this is the thing that still says which era it belongs to.
+    float rim = smoothstep(v_disc * 0.72, v_disc * 0.98, d) * faceMask;
+    face = mix(face, v_colour * 2.4, rim * 0.85);
+
+    result = mix(result, face, faceMask);
+  }
+
+  fragColour = vec4(result, 1.0);
 }
 `;
 
@@ -386,8 +460,8 @@ export interface RenderState {
 
 const MAX_DPR = 2;
 
-/** Floats per star instance: centre(2) radius(1) colour(3) flags(1) phase(1). */
-const STAR_STRIDE = 8;
+/** Floats per star instance: centre(2) radius(1) colour(3) flags(1) phase(1) tile(1). */
+const STAR_STRIDE = 9;
 
 export class StarMapRenderer {
   private gl: WebGL2RenderingContext;
@@ -419,6 +493,8 @@ export class StarMapRenderer {
   private starData: Float32Array;
   private edgeData: Float32Array;
   private edgeCount = 0;
+
+  private atlas: PortraitAtlas | null = null;
 
   private start = performance.now();
   private disposed = false;
@@ -490,7 +566,7 @@ export class StarMapRenderer {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.starInstance);
       gl.bufferData(gl.ARRAY_BUFFER, this.starData.byteLength, gl.DYNAMIC_DRAW);
 
-      // centre(2) radius(1) colour(3) flags(1) phase(1) = 8 floats.
+      // centre(2) radius(1) colour(3) flags(1) phase(1) tile(1) = 9 floats.
       const stride = STAR_STRIDE * 4;
       const attributes: Array<[number, number, number]> = [
         [1, 2, 0], // centre
@@ -498,6 +574,7 @@ export class StarMapRenderer {
         [3, 3, 12], // colour
         [4, 1, 24], // flags
         [5, 1, 28], // phase
+        [6, 1, 32], // atlas tile, or -1
       ];
       for (const [location, size, offset] of attributes) {
         gl.enableVertexAttribArray(location);
@@ -569,6 +646,35 @@ export class StarMapRenderer {
     }
   }
 
+  /* ── Portraits ────────────────────────────────────────────────────────── */
+
+  /**
+   * Start pulling faces into the atlas.
+   *
+   * Called once the layout has settled rather than at construction: 304 image
+   * requests firing while the force simulation is still running competes with
+   * it for the main thread, and the map that matters in the first second is
+   * the shape of the constellation, not whose face is on which star.
+   *
+   * Nodes are requested most-connected first. If the archive ever outgrows the
+   * atlas, the hubs — the ones drawn biggest and labelled first — keep their
+   * portraits and the long tail falls back to a plain star.
+   */
+  loadPortraits(onTileReady: () => void): void {
+    if (this.disposed || this.atlas) return;
+
+    const withPortraits = this.graph.nodes
+      .filter((node) => node.portrait)
+      .sort((a, b) => b.degree - a.degree);
+    if (withPortraits.length === 0) return;
+
+    this.atlas = new PortraitAtlas(this.gl, withPortraits.length);
+    this.atlas.onTileReady = onTileReady;
+    withPortraits.forEach((node, index) => {
+      this.atlas!.request(node.id, node.portrait, index);
+    });
+  }
+
   /* ── Per-frame data ───────────────────────────────────────────────────── */
 
   private packStars(state: RenderState): void {
@@ -599,6 +705,7 @@ export class StarMapRenderer {
       // A stable per-node offset so the field twinkles out of phase with
       // itself rather than pulsing as one.
       this.starData[at + 7] = index * 2.399963;
+      this.starData[at + 8] = this.atlas ? this.atlas.tileFor(node.id) : -1;
     });
 
     const gl = this.gl;
@@ -620,30 +727,41 @@ export class StarMapRenderer {
       let colour: [number, number, number];
       let alpha: number;
 
+      /**
+       * Edge weights.
+       *
+       * These were roughly v1's canvas alphas carried across unchanged, and
+       * that was wrong: v1 composited them with `source-over` onto a flat
+       * dark canvas, where 0.24 is a clearly visible line. Here they are
+       * additive, over a lit nebula, and then run through a bloom threshold
+       * that discards anything under 0.42 — so the same numbers produced
+       * threads that were technically present and effectively invisible.
+       * Roughly doubled, which lands them back where v1 read.
+       */
       if (selected) {
         if (active) {
           colour = hexToRgb(a.id === selected ? b.colour : a.colour);
-          alpha = 0.95;
+          alpha = 1.15;
         } else {
           colour = [0.4, 0.38, 0.34];
-          alpha = 0.025;
+          alpha = 0.06;
         }
       } else if (edge.voidbound) {
         // The Void's threads are the one relationship the archive treats as
         // different in kind, so they are the one thing drawn in a colour
         // that belongs to no era.
         colour = [0.92, 0.45, 0.72];
-        alpha = 0.55;
+        alpha = 0.8;
       } else if (edge.sameCluster) {
         colour = hexToRgb(a.colour);
-        alpha = 0.24;
+        alpha = 0.48;
       } else if (edge.sameWorld) {
         colour = hexToRgb(a.worldColour);
-        alpha = 0.13;
+        alpha = 0.3;
       } else {
         // Cross-world: a soul that turned up in more than one reflection.
         colour = [0.78, 0.72, 0.5];
-        alpha = 0.1;
+        alpha = 0.22;
       }
 
       this.edgeData.set([a.x, a.y, colour[0], colour[1], colour[2], alpha], cursor);
@@ -730,9 +848,13 @@ export class StarMapRenderer {
       gl.drawArrays(gl.LINES, 0, this.edgeCount);
     }
 
-    // Stars
+    // Stars, with their faces
     gl.useProgram(this.programs.star!);
     this.setCommon('star', translateX, translateY, scale, time);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.atlas ? this.atlas.texture : null);
+    gl.uniform1i(this.locations.star!.u_atlas!, 0);
+    gl.uniform1f(this.locations.star!.u_atlasColumns!, this.atlas ? this.atlas.columns : 1);
     gl.bindVertexArray(this.starVao);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.graph.nodes.length);
 
@@ -820,6 +942,8 @@ export class StarMapRenderer {
     if (this.disposed) return;
     this.disposed = true;
     const gl = this.gl;
+    this.atlas?.dispose();
+    this.atlas = null;
     for (const program of Object.values(this.programs)) gl.deleteProgram(program);
     disposeTarget(gl, this.scene);
     disposeTarget(gl, this.bright);

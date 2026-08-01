@@ -336,3 +336,18 @@
   background: rgba(216, 179, 86, 0.16);
   color: #fff2c0;
 }
+
+/**
+ * The name layer.
+ *
+ * A 2D canvas stacked over the GL one. It has to sit above the WebGL canvas
+ * so labels land on top of the bloom rather than inside it, and it must never
+ * take a pointer event — every click, drag and wheel belongs to the map
+ * underneath.
+ */
+.starmap__labels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}

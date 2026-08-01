@@ -210,15 +210,33 @@ export async function uploadObject(
 }
 
 /**
- * Ask Supabase's image transformer for a portrait at the size actually being
- * shown. v1 used the full upload everywhere, so the 54px thumbnails in
- * "Recently Added" each pulled a multi-megabyte original.
+ * Whether to ask Supabase to resize portraits for us.
  *
- * If the project is on a plan without transforms the URL still resolves to the
- * original image, so this degrades to exactly the old behaviour.
+ * **Off by default, and that is a correction.** An earlier version of this
+ * file rewrote every portrait URL from `/storage/v1/object/public/` to
+ * `/storage/v1/render/image/public/` to fetch each image at the size actually
+ * displayed — a real saving, since v1 pulled multi-megabyte originals to fill
+ * 48px thumbnails.
+ *
+ * The problem is that image transformation is a paid Supabase add-on. On a
+ * plan without it, `/render/image/` does not fall back to the original: it
+ * returns 400. So the optimisation did not degrade, it broke — every portrait
+ * in the archive, on every view, at once.
+ *
+ * Turn it on with `VITE_SUPABASE_IMAGE_TRANSFORMS=true` once the add-on is
+ * enabled on the project, and the sizing below starts applying.
+ */
+const IMAGE_TRANSFORMS =
+  (import.meta.env.VITE_SUPABASE_IMAGE_TRANSFORMS as string | undefined) === 'true';
+
+/**
+ * A portrait URL for a box `width` CSS pixels across.
+ *
+ * Without the add-on this returns the stored URL untouched, which is what v1
+ * did and what works everywhere.
  */
 export function portraitAt(url: string, width: number): string {
-  if (!url) return '';
+  if (!url || !IMAGE_TRANSFORMS) return url;
   const marker = '/storage/v1/object/public/';
   const at = url.indexOf(marker);
   if (at < 0) return url;

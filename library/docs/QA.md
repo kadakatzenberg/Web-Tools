@@ -121,3 +121,90 @@ Two real accessibility bugs were caught by these during development and fixed:
 - **Screen readers.** The markup is checked structurally — roles, names,
   `aria-describedby`, live regions — but nothing here has been listened to with
   VoiceOver or NVDA.
+
+## Round two — the four things that were wrong
+
+Reported after the first build, and each one fixed against a screenshot rather
+than against a guess.
+
+### Portraits everywhere were broken
+
+`portraitAt()` rewrote every portrait URL from `/storage/v1/object/public/` to
+`/storage/v1/render/image/public/` to fetch each image at its displayed size.
+That is a real saving — v1 pulled multi-megabyte originals to fill 48px
+thumbnails — but Supabase image transformation is a **paid add-on**, and
+without it `/render/image/` does not fall back to the original. It returns 400.
+So the optimisation did not degrade; it broke every portrait in the archive at
+once.
+
+Now off by default and behind `VITE_SUPABASE_IMAGE_TRANSFORMS=true`, so it can
+be switched on if the add-on is ever enabled.
+
+### The star map had no names and no faces
+
+Both were in v1 and neither survived the WebGL rewrite. Three separate bugs:
+
+1. **No label layer at all.** Added as a 2D canvas over the GL one, drawn after
+   bloom — bloomed text is mush, and text that does not bloom reads as an
+   interface label rather than as part of the sky.
+
+2. **The visibility gate rejected everything.** Written against absolute zoom,
+   using v1's thresholds. Measured, the map opens at scale 0.40, below every
+   one of them — so the layer ran, culled all 12 nodes, and painted nothing. A
+   *larger* archive settles wider and would have been worse. Rewritten to gate
+   on degree rank and rendered node size, which is independent of how many
+   souls there are.
+
+3. **The vertical axis was not flipped.** World space is y-up, matching the
+   shader's NDC conversion; a 2D canvas is y-down. This does not look like a
+   mirror when it is wrong — labels near mid-height land almost exactly right
+   and the rest drift by an amount that grows with distance from the centre, so
+   it reads as a random per-node offset. It took drawing a debug crosshair at
+   each computed centre to see it. Now a pure `projectToScreen()` with seven
+   unit tests, one of which is specifically the centre-line case that let it
+   hide.
+
+Portraits came back as a texture atlas — one 128px tile per entry, uploaded
+per-tile with `texSubImage2D` as each image lands, sampled in the star shader.
+The field stays a single instanced draw call. The first attempt composited the
+face *over* the star's core, which is a near-white blowout, and washed the
+portraits out completely; the core is now suppressed where a face is drawn.
+
+Edge alphas were carried over from v1 unchanged, which was wrong: v1
+composited `source-over` onto flat dark, these are additive over a lit nebula
+and then run through a bloom threshold that discards anything under 0.42.
+Roughly doubled, which lands them back where v1 read.
+
+### The Hei Mao logo was missing
+
+Replaced in the first pass with a drawn cat-in-an-astrolabe, on the grounds
+that hotlinking a PNG put a storage round trip on the critical path. The
+reasoning was fine and the conclusion was wrong — a brand mark is not a
+decoration to be substituted for a tasteful equivalent.
+
+The real logo is back in the masthead and the hero. The drawn mark is retained
+as the placeholder while it loads and as the fallback if storage is
+unreachable, and is removed from the DOM once the image is ready — leaving it
+underneath would show gold geometry through the transparent parts of the PNG.
+
+### Animation was too fast
+
+Duration tokens up roughly 1.5× (`--dur` 300→420ms, `--dur-slow` 620→900ms),
+the scroll-driven reveal range widened from `entry 8% cover 26%` to
+`entry 4% cover 38%`, and the gold sweep across the wordmark slowed to 14s.
+Tap feedback deliberately left near-instant.
+
+## Round two verification
+
+| Suite | Count | Result |
+| --- | --- | --- |
+| Vitest — domain, projection, legacy hash | 65 | pass |
+| Playwright — 1440, 1280, 390 | 109 | pass (2 skipped) |
+
+Two new browser tests guard the regressions that a passing suite had missed:
+the label canvas must actually paint lit pixels, and at least one portrait must
+reach the atlas. Before the fixes the first returned 0.
+
+Every screenshot below was taken against the production standalone build with
+fixture data, at 1440 and 390, in both modes: no horizontal overflow, no
+console errors, no page exceptions.

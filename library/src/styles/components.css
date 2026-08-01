@@ -1863,3 +1863,56 @@ details[open] > .rail__world .rail__chevron {
   background: #05040e;
   color: var(--gold);
 }
+
+/* ══ Brand mark ══════════════════════════════════════════════════════════ */
+
+/**
+ * The logo, with the drawn sigil beneath it.
+ *
+ * Both occupy the same grid cell, so the sigil is what is painted while the
+ * PNG is in flight and what remains if storage is unreachable. The box is
+ * sized by the component, so nothing reflows when the image lands.
+ */
+.brand-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.brand-mark > * {
+  grid-area: 1 / 1;
+}
+
+.brand-mark__sigil {
+  width: 100%;
+  height: 100%;
+  color: var(--gold);
+  opacity: 0.75;
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent;
+  /* Held back until decoded so it does not flash in half-painted over the
+     sigil it is replacing. */
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.brand-mark img[data-ready] {
+  opacity: 1;
+}
+
+.hero__mark {
+  width: clamp(96px, 13vw, 148px) !important;
+  height: clamp(96px, 13vw, 148px) !important;
+  margin-bottom: var(--gap-tight);
+}
+
+/* The masthead copy is small enough that the ring reads as noise under it. */
+.brand__mark .brand-mark__sigil {
+  opacity: 0.85;
+}

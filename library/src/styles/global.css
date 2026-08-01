@@ -410,7 +410,10 @@ p {
     .reveal {
       animation: reveal-in linear both;
       animation-timeline: view();
-      animation-range: entry 8% cover 26%;
+      /* A longer range means the card resolves over more of its travel up the
+         viewport, so the motion is tied to the scroll rather than snapping
+         shut a fraction after it starts. */
+      animation-range: entry 4% cover 38%;
     }
   }
 
@@ -418,6 +421,11 @@ p {
     .reveal {
       animation: reveal-in var(--dur-slow) var(--ease-out) both;
     }
+  }
+
+  /* The gold sweep across the wordmark: a slow highlight, not a shimmer. */
+  .gilt {
+    animation-duration: 14s;
   }
 }
 

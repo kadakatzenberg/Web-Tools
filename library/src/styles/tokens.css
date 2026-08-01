@@ -105,11 +105,23 @@
   --ease-out: cubic-bezier(0.22, 0.68, 0.32, 1);
   --ease-in: cubic-bezier(0.65, 0, 0.85, 0.35);
   --ease-settle: cubic-bezier(0.34, 1.32, 0.5, 1);
-  --dur-tap: 90ms;
-  --dur-quick: 180ms;
-  --dur: 300ms;
-  --dur-slow: 620ms;
-  --dur-ink: 1100ms;
+  /**
+   * Durations.
+   *
+   * Slowed across the board from an earlier pass that read as twitchy: a
+   * reveal that resolves in 620ms is an effect you notice finishing, and when
+   * forty cards do it at once the grid reads as flickering rather than
+   * settling. Roughly 1.5× throughout, which is close to the range hand-built
+   * motion tends to land in.
+   *
+   * The ratios are kept: taps stay near-instant because a control that lags
+   * its own press feels broken, and only the largest reveals get the long end.
+   */
+  --dur-tap: 110ms;
+  --dur-quick: 240ms;
+  --dur: 420ms;
+  --dur-slow: 900ms;
+  --dur-ink: 1500ms;
 
   --z-rail: 40;
   --z-masthead: 60;

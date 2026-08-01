@@ -47,6 +47,8 @@ function stats(
   return [player, race, gender, age, alignment, affiliation, reflection, era, lineage];
 }
 
+const SUPABASE = 'https://srvqlrmefjyluocwtvkt.supabase.co';
+
 export const ROWS: Row[] = [
   {
     id: 'kada-katzenberg',
@@ -92,6 +94,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'dawn-khihothe',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/dawn-khihothe.png`,
     name: 'Dawn Khihothe',
     alias: 'The Lightwarden’s Clerk',
     blurb: 'Keeps the ledgers of a city that should not have survived.',
@@ -106,6 +109,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'lux-veritas',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/lux-veritas.png`,
     name: 'Lux Veritas',
     alias: 'Envy’s Auditor',
     blurb: 'Solution Nine keeps its accounts in blood and she signs every page.',
@@ -117,6 +121,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'riven-alter',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/riven-alter.png`,
     name: 'Riven',
     alias: 'The Ender',
     blurb: 'Beyond causality there is only the work.',
@@ -128,6 +133,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'voidbound-one',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/voidbound-one.png`,
     name: 'Nemeia',
     alias: 'Of the Thirteenth',
     blurb: 'What came back was not what went in.',
@@ -139,6 +145,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'voidbound-two',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/voidbound-two.png`,
     name: 'Nachtigal',
     stats: stats('Kit', 'Voidsent', 'M', 'unknown', 'CE', '', 'The Thirteenth', 'TV'),
     relations: [['Nemeia', 'bound', 'voidbound-one']],
@@ -148,6 +155,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'seven-hells-warden',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/seven-hells-warden.png`,
     name: 'Barbatos',
     alias: 'Warden of the Fourth',
     blurb: 'A world the archive was never taught to expect.',
@@ -159,6 +167,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'fifth-astral-relic',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/fifth-astral-relic.png`,
     name: 'Ythirn Vaelor',
     alias: 'Of an older calamity',
     // The era stored as prose rather than a code, as two live rows have it.
@@ -169,6 +178,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'venat-echo',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/venat-echo.png`,
     name: 'Hythlodaeus',
     alias: 'Of the Bureau',
     blurb: 'Before the sundering, before any of it.',
@@ -179,6 +189,7 @@ export const ROWS: Row[] = [
   },
   {
     id: 'tianxia-blade',
+    portrait_url: `${SUPABASE}/storage/v1/object/public/portraits/tianxia-blade.png`,
     name: 'Ma Chenxu',
     alias: 'The Ninth Sword',
     blurb: 'Wulin remembers every debt of blood.',
@@ -197,7 +208,6 @@ export const ROWS: Row[] = [
   },
 ];
 
-const SUPABASE = 'https://srvqlrmefjyluocwtvkt.supabase.co';
 
 /**
  * A stand-in portrait, generated rather than pasted.
@@ -209,11 +219,43 @@ const SUPABASE = 'https://srvqlrmefjyluocwtvkt.supabase.co';
  * fixture is what it says it is: a 64×64 vertical gradient, opaque, so the
  * portrait treatment filter and the fade-in are both visibly exercised.
  */
-let cachedPortrait: Buffer | null = null;
+const portraitCache = new Map<number, Buffer>();
 
-function portraitPng(): Buffer {
-  if (cachedPortrait) return cachedPortrait;
+function hsl(h: number, s: number, l: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [r, g, b] =
+    h < 60 ? [c, x, 0]
+    : h < 120 ? [x, c, 0]
+    : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c]
+    : h < 300 ? [x, 0, c]
+    : [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+
+/**
+ * A distinct portrait per entry.
+ *
+ * Seeded from the requested path, so every character gets a recognisably
+ * different image. That matters for the star map: a single shared swatch
+ * would light up all 300 nodes identically and prove nothing about whether
+ * the atlas maps the right face to the right star.
+ *
+ * A hue, a darker ground, and an off-centre blob roughly where a head goes —
+ * enough to tell tiles apart at a glance and to see top-anchored cropping
+ * working.
+ */
+function portraitPng(seed = 0): Buffer {
+  const cached = portraitCache.get(seed);
+  if (cached) return cached;
   const size = 64;
+
+  // A hue per seed, well spread by the golden angle.
+  const hue = (seed * 137.508) % 360;
+  const [hr, hg, hb] = hsl(hue, 0.55, 0.62);
+  const [dr, dg, db] = hsl((hue + 28) % 360, 0.5, 0.22);
 
   const raw = Buffer.alloc(size * (size * 3 + 1));
   let at = 0;
@@ -221,9 +263,23 @@ function portraitPng(): Buffer {
     raw[at++] = 0; // filter: none
     for (let x = 0; x < size; x++) {
       const t = y / (size - 1);
-      raw[at++] = Math.round(74 + t * 120); // r
-      raw[at++] = Math.round(52 + t * 96); // g
-      raw[at++] = Math.round(96 + t * 40); // b
+      // Ground: a vertical ramp from the dark tone to the hue.
+      let r = dr + (hr - dr) * t;
+      let g = dg + (hg - dg) * t;
+      let b = db + (hb - db) * t;
+
+      // A head-ish blob in the upper third, so top-anchored cropping is
+      // visibly doing something.
+      const dx = (x - size * 0.5) / (size * 0.26);
+      const dy = (y - size * 0.34) / (size * 0.3);
+      const head = Math.max(0, 1 - (dx * dx + dy * dy));
+      r += (245 - r) * head * 0.8;
+      g += (232 - g) * head * 0.8;
+      b += (214 - b) * head * 0.8;
+
+      raw[at++] = Math.round(Math.min(255, Math.max(0, r)));
+      raw[at++] = Math.round(Math.min(255, Math.max(0, g)));
+      raw[at++] = Math.round(Math.min(255, Math.max(0, b)));
     }
   }
 
@@ -245,13 +301,14 @@ function portraitPng(): Buffer {
   ihdr[11] = 0;
   ihdr[12] = 0;
 
-  cachedPortrait = Buffer.concat([
+  const png = Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr),
     chunk('IDAT', deflateSync(raw)),
     chunk('IEND', Buffer.alloc(0)),
   ]);
-  return cachedPortrait;
+  portraitCache.set(seed, png);
+  return png;
 }
 
 const CRC_TABLE = (() => {
@@ -294,7 +351,19 @@ export async function mockArchive(page: Page, options: ArchiveMockOptions = {}):
     const path = url.pathname;
 
     if (path.startsWith('/storage/')) {
-      await route.fulfill({ status: 200, contentType: 'image/png', body: portraitPng() });
+      // Seeded from the path so each entry keeps its own face across reloads.
+      let seed = 0;
+      for (let i = 0; i < path.length; i++) seed = (seed * 31 + path.charCodeAt(i)) >>> 0;
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: portraitPng(seed % 997),
+        headers: {
+          // The star map uploads portraits into a WebGL texture, which taints
+          // and throws without this. Real Supabase storage sends it.
+          'access-control-allow-origin': '*',
+        },
+      });
       return;
     }
 

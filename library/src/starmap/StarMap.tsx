@@ -3,6 +3,7 @@ import { usePrefersReducedMotion } from '@/app/hooks';
 import { eraLabel, worldColor } from '@/domain/taxonomy';
 import type { Entry } from '@/domain/types';
 import { Glyph, Portrait } from '@/ui/Primitives';
+import { LabelLayer } from './labels';
 import { buildGraph, radiusOf } from './graph';
 import type { LayoutMessage } from './layout.worker';
 import { createLayoutWorker } from '@/starmap/worker-factory';
@@ -24,7 +25,9 @@ const DRAG_SLOP = 6;
 export default function StarMap({ entries, loading, onClose, onOpenEntry }: StarMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const labelCanvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<StarMapRenderer | null>(null);
+  const labelsRef = useRef<LabelLayer | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const frameRef = useRef(0);
 
@@ -143,12 +146,17 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
     }
     rendererRef.current = renderer;
 
+    const labelCanvas = labelCanvasRef.current;
+    const labels = labelCanvas ? new LabelLayer(labelCanvas, graph) : null;
+    labelsRef.current = labels;
+
     const applySize = () => {
       const rect = host.getBoundingClientRect();
       size.current = { width: rect.width, height: rect.height };
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
       renderer.resize(rect.width, rect.height);
+      labels?.resize(rect.width, rect.height, Math.min(window.devicePixelRatio || 1, 2));
     };
 
     applySize();
@@ -168,6 +176,13 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
         hovered: hoveredRef.current,
         reveal: reveal.current,
         reducedMotion,
+      });
+      // After the GL frame, so names sit on top of the bloom rather than in it.
+      labels?.draw({
+        camera: camera.current,
+        selected: selectedRef.current,
+        hovered: hoveredRef.current,
+        reveal: reveal.current,
       });
       frameRef.current = requestAnimationFrame(loop);
     };
@@ -200,7 +215,9 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
       document.removeEventListener('visibilitychange', onVisibility);
       canvas.removeEventListener('webglcontextlost', onLost);
       renderer.dispose();
+      labels?.clear();
       rendererRef.current = null;
+      labelsRef.current = null;
     };
   }, [graph, reducedMotion, frameAll]);
 
@@ -228,6 +245,12 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
       if (event.data.type === 'done') {
         setSettling(false);
         frameAll();
+        // Faces only once the constellation has stopped moving. 300 image
+        // requests competing with the settling simulation buys nothing: what
+        // matters in the first second is the shape, not whose face is where.
+        rendererRef.current?.loadPortraits(() => {
+          /* the render loop is already running; the next frame picks it up */
+        });
       }
     };
 
@@ -460,6 +483,7 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
   return (
     <div className="starmap" ref={hostRef} role="dialog" aria-modal="true" aria-label="Star map">
       <canvas ref={canvasRef} className="starmap__canvas" />
+      <canvas ref={labelCanvasRef} className="starmap__labels" aria-hidden="true" />
 
       {failure ? (
         <div className="starmap__failure">

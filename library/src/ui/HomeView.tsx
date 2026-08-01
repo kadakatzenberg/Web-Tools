@@ -4,6 +4,7 @@ import { Constellation } from '@/fx/Constellation';
 import { buildFacets } from '@/domain/search';
 import { eraColor, eraLabel, worldColor, worldMeta } from '@/domain/taxonomy';
 import type { Entry } from '@/domain/types';
+import { BrandMark } from './BrandMark';
 import { Glyph, Portrait } from './Primitives';
 import { formatDate } from './EntryView';
 
@@ -52,6 +53,10 @@ export function HomeView({ entries, loading, onNavigate }: HomeViewProps) {
         <Constellation palette={palette} />
 
         <div className="hero__inner">
+          {/* The logo, at the size v1 showed it. It is the front page's
+              largest contentful paint, so it is eager and boxed. */}
+          <BrandMark size={148} className="hero__mark" />
+
           <p className="hero__eyebrow label">A record of souls, scattered across the reflections</p>
 
           <h1 className="hero__title display gilt">Hei Mao</h1>
