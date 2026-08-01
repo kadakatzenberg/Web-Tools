@@ -327,6 +327,71 @@ function crc32(buffer: Buffer): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
+/**
+ * A synthetic archive at the real thing's size.
+ *
+ * Three separate legibility failures reached the user because every check ran
+ * against the twelve-row fixture below: too few labels, nebulae bright enough
+ * to swallow the content, and connection lines lost in the glow. None of them
+ * are visible at twelve sparse nodes. All of them are obvious at three hundred
+ * clustered ones.
+ *
+ * Populations and the five-in-304 portrait gap are taken from the live table.
+ */
+export function bigArchive(count = 304): Row[] {
+  const POPULATIONS: Array<[string, string, number]> = [
+    ['The Source', '7A', 67], ['The Ninth', 'EVK', 33], ['Tianxia', 'SD', 33],
+    ['The First', 'HIN', 25], ['The Unsundered World', 'DOP', 22], ['The First', 'CRY', 13],
+    ['The First', 'VOE', 13], ['End of Time', 'BC', 12], ['The Source', 'NK', 11],
+    ['The Ninth', 'ALX', 11], ['The Thirteenth', 'PF', 11], ['The First', 'RON', 9],
+    ['The Source', 'LM', 9], ['The Thirteenth', 'TV', 9], ['The First', 'NAB', 8],
+    ['The Seven Hells', '', 8], ['The Eleventh', 'CE2', 2], ['The First', 'HINF', 2],
+    ['The Source', '5A', 2], ['The Source', '7U', 2],
+  ];
+  const FIRST = 'Kada Ayer Dawn Lux Riven Maja Noire Sato Loki Muu Astraea Amaterasu Barbatos Nemeia Peony Cocoa Silas Odenta Tafi Sienna'.split(' ');
+  const LAST = 'Katzenberg Kahjaa Khihothe Veritas Alter Dotharl Sulie Oswell Carver Yasuda Flaiare Northglow Redhare Xique Amariyo'.split(' ');
+
+  let seed = 12345;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+
+  const rows: Row[] = [];
+  let n = 0;
+  for (const [reflection, era, population] of POPULATIONS) {
+    for (let i = 0; i < population && rows.length < count; i++) {
+      const id = `soul-${n}`;
+      rows.push({
+        id,
+        name: `${FIRST[n % FIRST.length]} ${LAST[(n * 7) % LAST.length]}`,
+        portrait_url:
+          n % 61 === 0 ? '' : `${SUPABASE}/storage/v1/object/public/portraits/${id}.png`,
+        stats: stats('Player', 'Miqo’te', 'F', '27', 'CN', 'Hei Mao', reflection, era, ''),
+        relations: [],
+        created_at: '2025-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      });
+      n++;
+    }
+  }
+
+  // Mostly local ties, a few reaching across, and a handful of hubs.
+  const hubs = [0, 12, 40, 88, 140, 200, 260].filter((h) => h < rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const links = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < links; k++) {
+      const target =
+        rnd() < 0.22
+          ? hubs[Math.floor(rnd() * hubs.length)]!
+          : Math.max(0, Math.min(rows.length - 1, i + Math.floor((rnd() - 0.5) * 26)));
+      if (target === i) continue;
+      rows[i]!.relations!.push([rows[target]!.name, 'known to', rows[target]!.id]);
+    }
+  }
+  return rows;
+}
+
 export interface ArchiveMockOptions {
   /** Fail the list request, to exercise the failure path. */
   failList?: boolean;
@@ -334,6 +399,8 @@ export interface ArchiveMockOptions {
   empty?: boolean;
   /** Record every write attempt instead of performing one. */
   onWrite?: (name: string, body: unknown) => void;
+  /** Serve a synthetic archive of this size instead of the twelve-row set. */
+  scale?: number;
 }
 
 /**
@@ -344,7 +411,7 @@ export interface ArchiveMockOptions {
  * behaviour is still exercised.
  */
 export async function mockArchive(page: Page, options: ArchiveMockOptions = {}): Promise<void> {
-  const rows = options.empty ? [] : ROWS;
+  const rows = options.empty ? [] : options.scale ? bigArchive(options.scale) : ROWS;
 
   await page.route(`${SUPABASE}/**`, async (route: Route) => {
     const url = new URL(route.request().url());

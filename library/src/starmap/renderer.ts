@@ -160,9 +160,17 @@ out vec4 fragColour;
 void main() {
   float d = length(v_local);
   if (d > 1.0) discard;
-  // Two falloffs stacked: a wide haze and a tighter core.
-  float haze = pow(max(0.0, 1.0 - d), 2.4) * 0.16;
-  float core = pow(max(0.0, 1.0 - d * 3.4), 2.0) * 0.20;
+  /**
+   * Two falloffs stacked: a wide haze and a tighter core.
+   *
+   * Brought down hard. These are additive and then bloomed, so what read as a
+   * tasteful 0.16 in the source arrived on screen bright enough that every
+   * portrait and every connection line was being drawn against a lit ground
+   * instead of against the dark. v1's clusters peaked at 0.12 outer, 0.22
+   * inner, with no bloom behind them at all.
+   */
+  float haze = pow(max(0.0, 1.0 - d), 2.6) * 0.075;
+  float core = pow(max(0.0, 1.0 - d * 3.4), 2.0) * 0.10;
   fragColour = vec4(v_colour * (haze + core), 1.0);
 }
 `;
@@ -232,19 +240,42 @@ in float v_across;
 out vec4 fragColour;
 
 void main() {
-  // Soft shoulders across the width. Additive, so this is the whole of the
-  // antialiasing — there is no destination alpha to blend against.
+  // Source-over, not additive. Additive over a lit nebula is what made these
+  // vanish: a line at alpha 0.5 adds half its colour to a background that is
+  // already bright, which is no contrast at all. v1 drew them source-over on
+  // a dark ground at alpha 0.28 and they read perfectly.
   float coverage = 1.0 - smoothstep(0.45, 1.0, abs(v_across));
-  fragColour = vec4(v_colour * v_alpha * coverage, 1.0);
+  fragColour = vec4(v_colour, v_alpha * coverage);
 }
 `;
 
+/**
+ * Stars are drawn twice, into two different worlds.
+ *
+ * `u_pass` 0 is the **glow**: an additive halo, rendered into the scene buffer
+ * with the sky and the nebulae, and fed to the bloom. That is the atmosphere.
+ *
+ * `u_pass` 1 is the **body**: the portrait, or a procedural disc, plus the era
+ * ring. It is drawn *after* the bloom composite, straight to the screen, with
+ * ordinary source-over alpha.
+ *
+ * The first version drew both together, additively, and bloomed the lot. The
+ * result was a field of identical blue-white smudges: a photograph composited
+ * additively over its own halo and then blurred is no longer a photograph, and
+ * a 1px line under the same treatment is no longer a line. v1 had no bloom at
+ * all, drew everything source-over on a dark ground, and gave a normal node a
+ * glow alpha of 0.1 — a whisper — which is exactly why its faces read.
+ *
+ * Bloom on the atmosphere, source-over for anything carrying information, is
+ * also the standard selective-bloom arrangement: content that must stay legible
+ * is composited after the blur rather than through it.
+ */
 const STAR_VERTEX = `#version 300 es
 layout(location = 0) in vec2 a_corner;
 layout(location = 1) in vec2 a_centre;
 layout(location = 2) in float a_radius;
 layout(location = 3) in vec3 a_colour;
-layout(location = 4) in float a_flags;   // x: hub, y: dimmed, z: selected
+layout(location = 4) in float a_flags;   // 1 hub, 2 dimmed, 4 selected
 layout(location = 5) in float a_phase;
 layout(location = 6) in float a_tile;    // atlas tile index, or -1
 
@@ -253,6 +284,8 @@ uniform vec2  u_translate;
 uniform float u_scale;
 uniform float u_time;
 uniform float u_atlasColumns;
+uniform float u_dpr;
+uniform int   u_pass;                    // 0 glow, 1 body
 
 out vec2  v_local;
 out vec3  v_colour;
@@ -260,10 +293,12 @@ out float v_hub;
 out float v_dim;
 out float v_selected;
 out float v_twinkle;
-out float v_disc;      // node radius in local units
+out float v_disc;        // disc edge, in local units
+out float v_px;          // one device pixel, in local units
 out float v_hasFace;
 out vec2  v_tileOrigin;
 out float v_tileSpan;
+out float v_degree;
 
 void main() {
   v_local = a_corner;
@@ -276,35 +311,50 @@ void main() {
   flags -= v_dim * 2.0;
   v_hub = flags;
 
-  v_twinkle = 0.78 + 0.22 * sin(u_time * 2.1 + a_phase);
-
-  // The quad is sized in screen pixels so a star never collapses below a
-  // usable size when zoomed out, and never becomes a dinner plate zoomed in.
-  // Nodes carrying a face get a wider floor: below about nine pixels a
-  // portrait is mush, and a mush of faces reads worse than a clean star.
-  // A face needs more pixels than a point light does before it stops being a
-  // coloured dot. 12px across is about where the fixture's blobs — and a real
-  // character portrait — start reading as a face rather than as a smudge.
-  float minRadius = a_tile >= 0.0 ? 12.0 : 4.5;
-  float screenRadius = clamp(a_radius * u_scale, minRadius, 46.0);
-  float halo = v_selected > 0.5 ? 5.5 : (v_hub > 0.5 ? 4.0 : 3.0);
-
-  // The disc is the node itself; the rest of the quad is the glow around it.
-  v_disc = 1.0 / halo;
-
+  // A portrait does not twinkle. v1 was explicit about this and it matters:
+  // a pulsing face reads as a rendering fault, not as a star.
   v_hasFace = step(0.0, a_tile);
+  v_twinkle = v_hasFace > 0.5 ? 1.0 : 0.78 + 0.22 * sin(u_time * 2.1 + a_phase);
+
   float column = mod(max(a_tile, 0.0), u_atlasColumns);
   float row = floor(max(a_tile, 0.0) / u_atlasColumns);
   v_tileSpan = 1.0 / u_atlasColumns;
   v_tileOrigin = vec2(column, row) * v_tileSpan;
 
-  vec2 screen = a_centre * u_scale + u_translate + a_corner * screenRadius * halo;
+  // The disc, in device pixels. Faces get a wider floor than bare points do:
+  // below about twenty across, a portrait is a smudge.
+  float floorPx = (v_hasFace > 0.5 ? 11.0 : 3.5) * u_dpr;
+  float ceilPx = 78.0 * u_dpr;
+  float discPx = clamp(a_radius * u_scale, floorPx, ceilPx);
+
+  float halfPx;
+  if (u_pass == 0) {
+    // Halo. v1's multipliers, which are generous for a selection and modest
+    // for everything else.
+    float spread = v_selected > 0.5 ? 5.0 : (v_hub > 0.5 ? 3.2 : 2.4);
+    halfPx = discPx * spread;
+    v_disc = 1.0 / spread;
+  } else {
+    // Body: the disc plus room for the ring and its antialiasing.
+    float ringPad = (v_selected > 0.5 ? 7.0 : 3.0) * u_dpr;
+    halfPx = discPx + ringPad;
+    v_disc = discPx / halfPx;
+  }
+
+  v_px = 1.0 / halfPx;
+  v_degree = a_radius;
+
+  vec2 screen = a_centre * u_scale + u_translate + a_corner * halfPx;
   gl_Position = vec4(screen / (u_resolution * 0.5), 0.0, 1.0);
 }
 `;
 
 const STAR_FRAGMENT = `#version 300 es
 precision highp float;
+// GLSL ES 3.00 defaults int to highp in a vertex shader and mediump in a
+// fragment shader. A uniform declared in both must agree, so u_pass fails to
+// link unless this is stated — and the link error is the only clue.
+precision highp int;
 in vec2  v_local;
 in vec3  v_colour;
 in float v_hub;
@@ -312,93 +362,96 @@ in float v_dim;
 in float v_selected;
 in float v_twinkle;
 in float v_disc;
+in float v_px;
 in float v_hasFace;
 in vec2  v_tileOrigin;
 in float v_tileSpan;
+in float v_degree;
 out vec4 fragColour;
 
 uniform float u_time;
 uniform sampler2D u_atlas;
+uniform float u_dpr;
+uniform int u_pass;
 
 void main() {
   float d = length(v_local);
   if (d > 1.0) discard;
 
-  // Core: a hard-ish disc with a soft shoulder.
-  float core = smoothstep(0.42, 0.0, d);
-  // Halo: inverse-square-ish falloff, which is what makes it read as light
-  // rather than as a circle.
-  float halo = pow(max(0.0, 1.0 - d), 2.8) * 0.7;
+  /* ── Pass 0: the halo, additive, bloomed ──────────────────────────────── */
+  if (u_pass == 0) {
+    // v1's alphas. A plain node is 0.1; anything louder buries its own face.
+    float strength =
+      v_selected > 0.5 ? 0.62 :
+      v_hub > 0.5      ? 0.20 :
+                         0.10;
 
-  // Diffraction spikes, on hubs and the selection only. Cheap: distance to
-  // the two axes, raised to a high power.
-  float spikes = 0.0;
-  if (v_hub > 0.5 || v_selected > 0.5) {
-    vec2 a = abs(v_local);
-    float horizontal = pow(max(0.0, 1.0 - a.y * 14.0), 3.0) * pow(max(0.0, 1.0 - a.x), 2.4);
-    float vertical   = pow(max(0.0, 1.0 - a.x * 14.0), 3.0) * pow(max(0.0, 1.0 - a.y), 2.4);
-    spikes = (horizontal + vertical) * (v_selected > 0.5 ? 0.55 : 0.3);
+    // Falls off from the disc edge outward, so the halo surrounds the body
+    // rather than sitting on top of it.
+    float falloff = pow(max(0.0, 1.0 - d), 2.6);
+    float energy = falloff * strength * v_twinkle * mix(1.0, 0.12, v_dim);
+
+    // Diffraction spikes stay on hubs and the selection only.
+    if (v_hub > 0.5 || v_selected > 0.5) {
+      vec2 a = abs(v_local);
+      float h = pow(max(0.0, 1.0 - a.y * 16.0), 3.0) * pow(max(0.0, 1.0 - a.x), 2.4);
+      float v = pow(max(0.0, 1.0 - a.x * 16.0), 3.0) * pow(max(0.0, 1.0 - a.y), 2.4);
+      energy += (h + v) * (v_selected > 0.5 ? 0.4 : 0.16) * mix(1.0, 0.12, v_dim);
+    }
+
+    fragColour = vec4(v_colour * energy, 1.0);
+    return;
   }
 
-  /**
-   * A star carrying a face keeps its halo and loses most of its core.
-   *
-   * The core is a near-white blowout — that is what makes a bare star read as
-   * light rather than as a disc — and compositing a photograph on top of it
-   * washes the photograph out completely, which is exactly what happened on
-   * the first pass: the portraits were present, uploaded correctly, and
-   * invisible under their own glow.
-   */
-  float faceMask = 0.0;
-  if (v_hasFace > 0.5) faceMask = smoothstep(v_disc * 1.02, v_disc * 0.9, d);
+  /* ── Pass 1: the body, source-over, crisp ─────────────────────────────── */
+  float aa = v_px * (1.4 * u_dpr);
+  float disc = 1.0 - smoothstep(v_disc - aa, v_disc + aa, d);
+  if (disc <= 0.0005 && d < v_disc) discard;
 
-  core *= mix(1.0, 0.08, faceMask);
-
-  float energy = (core + halo + spikes) * v_twinkle;
-
-  vec3 colour = mix(v_colour, vec3(1.0), core * 0.72);
-  if (v_selected > 0.5) {
-    // A pulsing ring, so the selection is legible without colour alone.
-    float ring = smoothstep(0.06, 0.0, abs(d - (0.52 + sin(u_time * 3.0) * 0.05)));
-    colour = mix(colour, vec3(1.0, 0.94, 0.62), ring);
-    energy += ring * 0.85;
-  }
-
-  energy *= mix(1.0, 0.1, v_dim);
-  vec3 result = colour * energy;
-
-  /**
-   * The face.
-   *
-   * Composited over the star rather than instead of it, so a portrait still
-   * sits inside its era's glow and still twinkles — the archive is a sky, and
-   * a flat photograph pasted into it would break the whole conceit.
-   *
-   * The rim is a hard-ish ring in the node's own pigment: at a distance it is
-   * what tells one era from another when the face is too small to read.
-   */
-  if (faceMask > 0.001) {
+  vec3 body;
+  if (v_hasFace > 0.5) {
     vec2 local = clamp(v_local / v_disc * 0.5 + 0.5, 0.0, 1.0);
     // The atlas is uploaded top-down, so v is flipped back here.
     vec2 uv = v_tileOrigin + vec2(local.x, 1.0 - local.y) * v_tileSpan;
-    vec3 face = texture(u_atlas, uv).rgb;
-
-    // Lifted, not tinted: the portrait has to survive being seen against a
-    // lit nebula, and everything here is additively blended.
-    face *= 1.5 * (0.9 + 0.1 * v_twinkle);
-    face = mix(face, face * v_colour * 2.2, 0.18);
-    face *= mix(1.0, 0.14, v_dim);
-    if (v_selected > 0.5) face *= 1.3;
-
-    // A ring in the node's own pigment. At a distance, when the face is only
-    // a few pixels, this is the thing that still says which era it belongs to.
-    float rim = smoothstep(v_disc * 0.72, v_disc * 0.98, d) * faceMask;
-    face = mix(face, v_colour * 2.4, rim * 0.85);
-
-    result = mix(result, face, faceMask);
+    // Untouched. No tint, no twinkle, no additive lift — it is a photograph
+    // of somebody's character and it should look like one.
+    body = texture(u_atlas, uv).rgb;
+  } else {
+    // v1's procedural disc: a lit shoulder toward the upper left, falling to
+    // the era colour.
+    float lit = 1.0 - smoothstep(0.0, v_disc * 1.5, length(v_local - vec2(-0.28, 0.28) * v_disc));
+    body = mix(v_colour * 0.55, mix(v_colour, vec3(1.0), 0.75), lit);
+    body *= v_twinkle;
   }
 
-  fragColour = vec4(result, 1.0);
+  // The ring, in the node's own pigment. This is what separates one era from
+  // another at a glance, and what gives every node a hard edge instead of a
+  // soft blob.
+  float ringPx = (v_selected > 0.5 ? 3.0 : v_hub > 0.5 ? 1.8 : 1.2) * u_dpr;
+  float ringHalf = ringPx * 0.5 * v_px;
+  float ring = 1.0 - smoothstep(ringHalf, ringHalf + aa, abs(d - v_disc));
+
+  vec3 ringColour =
+    v_selected > 0.5 ? vec3(1.0, 0.94, 0.51) : mix(v_colour, vec3(1.0), 0.25);
+  float ringAlpha = clamp(0.42 + v_degree * 0.012, 0.0, 0.95);
+  if (v_selected > 0.5) ringAlpha = 1.0;
+
+  vec3 rgb = mix(body, ringColour, ring * ringAlpha);
+  float alpha = max(disc, ring * ringAlpha);
+
+  // A dimmed node is still there, just quiet.
+  alpha *= mix(1.0, 0.16, v_dim);
+
+  if (v_selected > 0.5) {
+    // The pulse, drawn just outside the ring.
+    float pulse = 0.45 + sin(u_time * 3.0) * 0.55;
+    float halo = 1.0 - smoothstep(0.0, aa * 2.5, abs(d - (v_disc + 5.0 * u_dpr * v_px)));
+    alpha = max(alpha, halo * 0.5 * pulse);
+    rgb = mix(rgb, vec3(1.0, 0.92, 0.32), halo);
+  }
+
+  if (alpha <= 0.002) discard;
+  fragColour = vec4(rgb, alpha);
 }
 `;
 
@@ -946,23 +999,14 @@ export class StarMapRenderer {
     gl.bindVertexArray(this.nebulaVao);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.graph.clusters.length);
 
-    // Edges
-    if (this.edgeCount > 0) {
-      gl.useProgram(this.programs.edge!);
-      this.setCommon('edge', translateX, translateY, scale, time);
-      gl.bindVertexArray(this.edgeVao);
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.edgeCount);
-    }
-
-    // Stars, with their faces
-    gl.useProgram(this.programs.star!);
-    this.setCommon('star', translateX, translateY, scale, time);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.atlas ? this.atlas.texture : null);
-    gl.uniform1i(this.locations.star!.u_atlas!, 0);
-    gl.uniform1f(this.locations.star!.u_atlasColumns!, this.atlas ? this.atlas.columns : 1);
-    gl.bindVertexArray(this.starVao);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.graph.nodes.length);
+    /**
+     * Star halos, and nothing else.
+     *
+     * Only the atmosphere goes into this buffer, because only the atmosphere
+     * should be bloomed. Edges and node bodies are drawn after the composite,
+     * straight to the screen.
+     */
+    this.drawStars(translateX, translateY, scale, time, 0);
 
     gl.disable(gl.BLEND);
 
@@ -1017,16 +1061,61 @@ export class StarMapRenderer {
     gl.uniform1i(compositeLoc.u_bloom!, 1);
     gl.uniform1f(compositeLoc.u_time!, time);
     // The map fades up as the layout settles rather than snapping into place.
-    gl.uniform1f(compositeLoc.u_bloomStrength!, 0.9 * state.reveal);
+    // Lower now that bloom only sees the atmosphere: the halos it lifts are
+    // subtle, and a strong multiplier on them just fogs the frame back up.
+    gl.uniform1f(compositeLoc.u_bloomStrength!, 0.55 * state.reveal);
     gl.uniform1f(compositeLoc.u_grain!, 0.032);
     // 0.16 put roughly 58px of separation at the frame edge on a 1440 canvas,
-  // which split every star into three coloured dots. A lens fringe is a
-  // fraction of a pixel until well out toward the corners.
-  gl.uniform1f(compositeLoc.u_aberration!, 0.012);
+    // which split every star into three coloured dots. A lens fringe is a
+    // fraction of a pixel until well out toward the corners.
+    gl.uniform1f(compositeLoc.u_aberration!, 0.012);
     gl.bindVertexArray(this.fullscreen);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+    /**
+     * 7: the content, on top of the finished atmosphere.
+     *
+     * Edges and node bodies are drawn straight to the screen after the bloom,
+     * with ordinary source-over alpha. Nothing here is blurred, tinted, grained
+     * or added to what is behind it — a portrait looks like a photograph and a
+     * relationship looks like a line, which is the entire job of the map.
+     */
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    if (this.edgeCount > 0) {
+      gl.useProgram(this.programs.edge!);
+      this.setCommon('edge', translateX, translateY, scale, time);
+      gl.bindVertexArray(this.edgeVao);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.edgeCount);
+    }
+
+    this.drawStars(translateX, translateY, scale, time, 1);
+
+    gl.disable(gl.BLEND);
     gl.bindVertexArray(null);
+  }
+
+  /** One instanced draw of the whole field, in either the glow or body pass. */
+  private drawStars(
+    translateX: number,
+    translateY: number,
+    scale: number,
+    time: number,
+    pass: 0 | 1,
+  ): void {
+    const gl = this.gl;
+    const loc = this.locations.star!;
+    gl.useProgram(this.programs.star!);
+    this.setCommon('star', translateX, translateY, scale, time);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.atlas ? this.atlas.texture : null);
+    if (loc.u_atlas) gl.uniform1i(loc.u_atlas, 0);
+    if (loc.u_atlasColumns) gl.uniform1f(loc.u_atlasColumns, this.atlas ? this.atlas.columns : 1);
+    if (loc.u_dpr) gl.uniform1f(loc.u_dpr, this.dpr);
+    if (loc.u_pass) gl.uniform1i(loc.u_pass, pass);
+    gl.bindVertexArray(this.starVao);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.graph.nodes.length);
   }
 
   private setCommon(

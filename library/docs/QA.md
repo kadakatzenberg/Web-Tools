@@ -288,3 +288,82 @@ on a desktop but both of which cost real battery on a phone:
 
 Production bundle unchanged in shape: the star map (42KB) and editor (20KB)
 stay lazy, so neither is on the path to reading the archive.
+
+## Round four — the compositing was wrong, not the parameters
+
+Put side by side with v1, the map was worse in every way that mattered: nodes
+were uniform blue-white smudges instead of faces, the connection web had
+effectively vanished, and eight labels were doing the work of three hundred.
+
+The previous two rounds treated this as a tuning problem — raise the edge
+alpha, loosen the label gate. It was not. It was the render architecture.
+
+### What v1 actually did
+
+Reading its draw loop back, the numbers are unambiguous:
+
+| | v1 | This map, before |
+| --- | --- | --- |
+| Glow alpha, ordinary node | **0.10** | a dominant additive halo |
+| Portrait | full opacity, untinted, no twinkle | tinted, twinkled, additively lifted |
+| Ring | era colour, `0.3 + degree × 0.025` | none |
+| Compositing | source-over throughout | additive throughout |
+| Cluster nebula | 0.12 outer, 0.22 inner | 0.16 / 0.20, then bloomed |
+| Post-processing | **none** | full-scene bloom |
+
+v1 was dark ground plus high-contrast content. This was bright ground plus
+content dissolved into it. A photograph composited additively over its own
+halo and then blurred is no longer a photograph; a 1px line under the same
+treatment is no longer a line.
+
+### The fix
+
+The scene is now two composited layers, which is the standard selective-bloom
+arrangement — anything carrying information is composited *after* the blur
+rather than through it:
+
+1. **Atmosphere**, into the scene buffer, additive, bloomed: sky, nebulae, and
+   star *halos* only. Nebulae roughly halved; bloom strength 0.9 → 0.55.
+2. **Content**, straight to the screen after the composite, source-over, no
+   bloom, no grain, no tint: connection lines, then node bodies — portrait or
+   procedural disc, plus an era-coloured ring.
+
+Stars are drawn twice from the same instance buffer with a `u_pass` uniform.
+Portraits are now untouched: no tint, no twinkle, no additive lift. Glow alphas
+went back to v1's — 0.10 for an ordinary node.
+
+Two tripwires on the way, both silent:
+
+- `u_pass` failed to **link**, because GLSL ES 3.00 defaults `int` to `highp`
+  in a vertex shader and `mediump` in a fragment shader, and a uniform declared
+  in both must agree. Fixed with an explicit `precision highp int`.
+- The star map's error path was showing one generic sentence and discarding the
+  driver's log. That is how a local variable named `half` — a reserved word —
+  took the whole edge pass down in the previous round with nothing in the
+  console. It now reports the cause.
+
+### Labels
+
+Rewritten to place greedily in priority order with collision culling, on a
+bucketed grid. No zoom thresholds at all.
+
+The two previous attempts both gated on absolute zoom, and a fixed budget of 90
+was no better: at real density the ninety best-connected names all land in the
+same crowded middle and overprint into a grey mat while the outer reaches stay
+blank. Greedy placement fixes it at any density — important names win the space
+they need, crowded regions thin themselves, empty regions fill in, and zooming
+makes room so more appear.
+
+### Why this kept happening
+
+Every previous round was verified against the twelve-row fixture. Twelve sparse
+nodes cannot show you that your labels are too few, your nebulae too bright, or
+your lines lost in the glow — all three only appear in a crowd.
+
+`bigArchive()` in `tests/e2e/fixture.ts` now generates a synthetic archive at
+the real thing's scale, with the live table's world populations, its
+five-in-304 portrait gap, and a relationship web of comparable density. Two
+tests use it: labels must leave ink between a floor (the scatter-plot failure)
+and a ceiling (the grey-mat failure), and the connection web must cover a
+minimum fraction of the frame. They run at one viewport only — each costs a
+couple of minutes on a software rasteriser.

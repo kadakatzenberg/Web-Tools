@@ -92,6 +92,14 @@ test('the legend counts every world the archive holds', async ({ page }) => {
 });
 
 test('leaving the map releases the WebGL context', async ({ page }) => {
+  /**
+   * Five full open-and-close cycles, each one a complete WebGL init and
+   * teardown through a software rasteriser. It is comfortably the slowest test
+   * here, and it shares its workers with the density checks, which saturate the
+   * CPU for two minutes at a time — so it needs headroom that has nothing to do
+   * with the code under test.
+   */
+  test.setTimeout(150_000);
   await page.goto('/map');
   await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 30_000 });
 
@@ -230,5 +238,83 @@ test.describe('edges survive a retina screen', () => {
       test.setTimeout(180_000);
       expect(await litFraction(page)).toBeGreaterThan(0.002);
     });
+  });
+});
+
+/**
+ * The whole archive, at the size it actually is.
+ *
+ * Every legibility failure in this map — no names, then names on top of each
+ * other, then lines swallowed by the glow — got through because it was checked
+ * against twelve sparse nodes. Three hundred clustered ones is a different
+ * picture, and this is the test that makes the difference visible to CI rather
+ * than to the person who has to look at it.
+ */
+test.describe('at the archive\'s real size', () => {
+  test('names the stars without printing them on top of each other', async ({ page }) => {
+    // Desktop only. These are density checks, not layout checks, and each
+    // costs a couple of minutes on a software rasteriser — running them at
+    // every viewport would treble that for no extra information.
+    test.skip(test.info().project.name !== 'desktop-1440', 'checked once, at one viewport');
+
+    // 150 rather than the real 304: this runs on a software rasteriser, where
+    // every frame is most of a second, and 150 clustered nodes already produce
+    // the crowding that twelve never could.
+    test.setTimeout(180_000);
+    await mockArchive(page, { scale: 150 });
+    await page.goto('/map');
+    await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 60_000 });
+    await page.waitForTimeout(3000);
+
+    const ink = await page.locator('.starmap__labels').evaluate((canvas) => {
+      const element = canvas as HTMLCanvasElement;
+      const ctx = element.getContext('2d')!;
+      const { data } = ctx.getImageData(0, 0, element.width, element.height);
+      let lit = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i]! > 8) lit++;
+      return lit / (element.width * element.height);
+    });
+
+    // Below the floor is the "eight labels on a scatter plot" failure. Above
+    // the ceiling is the "grey mat of overprinted serif" failure. Collision
+    // culling is what keeps it between the two at any density.
+    expect(ink).toBeGreaterThan(0.004);
+    expect(ink).toBeLessThan(0.06);
+  });
+
+  test('draws a connection web dense enough to read', async ({ page }) => {
+    // Desktop only. These are density checks, not layout checks, and each
+    // costs a couple of minutes on a software rasteriser — running them at
+    // every viewport would treble that for no extra information.
+    test.skip(test.info().project.name !== 'desktop-1440', 'checked once, at one viewport');
+
+    // 150 rather than the real 304: this runs on a software rasteriser, where
+    // every frame is most of a second, and 150 clustered nodes already produce
+    // the crowding that twelve never could.
+    test.setTimeout(180_000);
+    await mockArchive(page, { scale: 150 });
+    await page.goto('/map');
+    await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 60_000 });
+    await page.waitForTimeout(3000);
+
+    const shot = await page.locator('.starmap__canvas').screenshot();
+    const litFraction = await page.evaluate(async (bytes) => {
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let lit = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const sum = data[i]! + data[i + 1]! + data[i + 2]!;
+        if (sum > 190 && sum < 560) lit++;
+      }
+      return lit / (canvas.width * canvas.height);
+    }, Array.from(shot));
+
+    expect(litFraction).toBeGreaterThan(0.02);
   });
 });

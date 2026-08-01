@@ -22,12 +22,12 @@ import { type Graph, radiusOf } from './graph';
 import type { Camera } from './renderer';
 
 /**
- * How many names are on screen at the widest view.
+ * A ceiling on labels actually drawn, after collision culling.
  *
- * Enough that the constellation reads as a cast list; few enough that they do
- * not collide into a grey mat. Tuned against the real archive's 304 entries.
+ * Collision culling does the real work — this only stops a pathological zoom
+ * from spending a frame measuring text nobody asked for.
  */
-const LABEL_BUDGET = 40;
+const MAX_LABELS = 160;
 
 export interface LabelState {
   camera: Camera;
@@ -109,70 +109,134 @@ export class LabelLayer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-
     /**
-     * Which names are worth the ink.
+     * Gather the candidates, then place as many as will fit without touching.
      *
-     * Showing all 304 at once is illegible and showing none is useless, so
-     * the threshold moves with the zoom, exactly as v1's did: hubs carry
-     * their names from far out, everyone else earns one as you come closer.
-     * The selection and whatever is under the cursor are always named.
+     * A budget alone does not work at real density. With 304 souls settled into
+     * clusters, the ninety best-connected names all land in the same crowded
+     * middle and overprint each other into a grey mat, while the sparse outer
+     * reaches stay blank — the worst of both. v1 dodged this by naming almost
+     * nobody when zoomed out, which is why its screenshots look clean.
+     *
+     * Greedy placement in priority order solves it properly and needs no zoom
+     * thresholds at all: important names win the space they need, crowded
+     * regions thin themselves out, empty regions fill in, and zooming in makes
+     * room so more appear. It is the standard cartographic approach and it is
+     * the only one that behaves at both twelve entries and three hundred.
      */
+    interface Candidate {
+      node: Graph['nodes'][number];
+      priority: number;
+      x: number;
+      y: number;
+      radius: number;
+      size: number;
+      alpha: number;
+      colour: string;
+    }
+
+    const candidates: Candidate[] = [];
+
     for (const node of this.graph.nodes) {
       const isSelected = node.id === selected;
       const isHovered = node.id === hovered;
       const isNeighbour = Boolean(neighbours?.has(node.id));
       const dimmed = Boolean(selected) && !isSelected && !isNeighbour;
 
-      const screenRadius = Math.min(46, Math.max(node.portrait ? 9 : 4.5, radiusOf(node.degree) * scale));
-
-      /**
-       * Whether this name is worth the ink.
-       *
-       * Two earlier attempts gated on absolute zoom — v1's thresholds, then
-       * looser ones — and both were wrong in the same way. The zoom the map
-       * opens at is whatever `frameAll` needs to fit the layout, and that
-       * depends on how many souls there are and how far the simulation spread
-       * them. Measured here it was 0.40, below every threshold, so the map
-       * opened naming nobody; and a *larger* archive settles wider, so the
-       * real 304-entry version would have named even fewer. The number was
-       * never the point.
-       *
-       * So: rank, and rendered size. The best-connected names are always
-       * legible, however far out the reader is, and everyone else earns a
-       * label once their star is actually big enough to sit under one.
-       */
-      const rank = this.rank.get(node.id) ?? Number.MAX_SAFE_INTEGER;
-      const visible =
-        isSelected ||
-        isHovered ||
-        (!dimmed && (rank < LABEL_BUDGET || screenRadius >= 10 || isNeighbour));
-
-      if (!visible) continue;
+      // A dimmed node is deliberately quiet; naming it fights the selection.
+      if (dimmed && !isSelected && !isHovered) continue;
 
       const { x, y } = projectToScreen(node, camera, this.width, this.height);
+      if (x < -180 || x > this.width + 180 || y < -70 || y > this.height + 70) continue;
 
-      // Cull generously — a label whose anchor is just off screen may still
-      // have half its text on it.
-      if (x < -160 || x > this.width + 160 || y < -60 || y > this.height + 60) continue;
+      // Mirrors the vertex shader's disc sizing, so the label sits against the
+      // radius the node is actually drawn at.
+      const radius = Math.min(
+        78,
+        Math.max(node.portrait ? 11 : 3.5, radiusOf(node.degree) * scale),
+      );
 
-      const size = clamp(screenRadius * 0.72, 11, 17);
+      const rank = this.rank.get(node.id) ?? Number.MAX_SAFE_INTEGER;
+      const priority = isSelected ? 1e9 : isHovered ? 9e8 : isNeighbour ? 8e8 : -rank;
 
-      ctx.font = `600 ${size}px Cinzel, Georgia, serif`;
+      candidates.push({
+        node,
+        priority,
+        x,
+        y,
+        radius,
+        size: clamp(radius * 0.62, 11, 18),
+        alpha:
+          (isSelected ? 1 : isHovered ? 0.98 : isNeighbour ? 0.94 : 0.86) * reveal,
+        colour: isSelected ? '#ffe98a' : isHovered ? '#fff6dc' : node.colour,
+      });
+    }
 
-      const alpha =
-        (isSelected ? 1 : isHovered ? 0.98 : isNeighbour ? 0.9 : dimmed ? 0.16 : 0.82) * reveal;
-      const top = y + screenRadius + 5;
+    candidates.sort((a, b) => b.priority - a.priority);
+
+    // Occupied boxes, bucketed so overlap testing stays cheap at any density.
+    const CELL = 64;
+    const columns = Math.ceil(this.width / CELL) + 2;
+    const taken = new Map<number, Array<[number, number, number, number]>>();
+
+    const fits = (left: number, top: number, right: number, bottom: number): boolean => {
+      const c0 = Math.max(0, Math.floor(left / CELL));
+      const c1 = Math.floor(right / CELL);
+      const r0 = Math.max(0, Math.floor(top / CELL));
+      const r1 = Math.floor(bottom / CELL);
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const bucket = taken.get(r * columns + c);
+          if (!bucket) continue;
+          for (const [bl, bt, br, bb] of bucket) {
+            if (left < br && right > bl && top < bb && bottom > bt) return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    const occupy = (left: number, top: number, right: number, bottom: number): void => {
+      const c0 = Math.max(0, Math.floor(left / CELL));
+      const c1 = Math.floor(right / CELL);
+      const r0 = Math.max(0, Math.floor(top / CELL));
+      const r1 = Math.floor(bottom / CELL);
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const key = r * columns + c;
+          const bucket = taken.get(key);
+          if (bucket) bucket.push([left, top, right, bottom]);
+          else taken.set(key, [[left, top, right, bottom]]);
+        }
+      }
+    };
+
+    let placed = 0;
+
+    for (const item of candidates) {
+      if (placed >= MAX_LABELS) break;
+
+      ctx.font = `600 ${item.size}px Cinzel, Georgia, serif`;
+      const width = ctx.measureText(item.node.name).width;
+      const top = item.y + item.radius + 4;
+      const left = item.x - width / 2;
+
+      // A little breathing room, so neighbours are separated rather than
+      // merely not overlapping.
+      const pad = 3;
+      if (!fits(left - pad, top - pad, left + width + pad, top + item.size + pad)) continue;
+      occupy(left - pad, top - pad, left + width + pad, top + item.size + pad);
+      placed++;
 
       // Shadow first, in the same two-pass way v1 did it: a dark copy offset
       // by a pixel is what keeps a thin serif legible over a bright nebula.
-      ctx.globalAlpha = alpha * 0.75;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-      ctx.fillText(node.name, x + 1, top + 1);
+      ctx.globalAlpha = item.alpha * 0.8;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
+      ctx.fillText(item.node.name, item.x + 1, top + 1);
 
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = isSelected ? '#ffe98a' : isHovered ? '#fff6dc' : node.colour;
-      ctx.fillText(node.name, x, top);
+      ctx.globalAlpha = item.alpha;
+      ctx.fillStyle = item.colour;
+      ctx.fillText(item.node.name, item.x, top);
     }
 
     ctx.globalAlpha = 1;

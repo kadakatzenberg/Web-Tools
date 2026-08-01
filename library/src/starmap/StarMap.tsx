@@ -144,10 +144,20 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
     try {
       renderer = new StarMapRenderer(canvas, graph);
     } catch (cause) {
+      /**
+       * Say what actually went wrong.
+       *
+       * This used to swallow the cause and show one generic sentence, which is
+       * how a GLSL compile error — a local named `half`, a reserved word —
+       * took the entire edge pass down with nothing in the console to explain
+       * it. A driver's shader log is the only useful diagnostic there is here.
+       */
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      console.error('[star map] failed to start:', detail);
       setFailure(
-        cause instanceof Error && /WebGL2/.test(cause.message)
+        /WebGL2/.test(detail)
           ? 'This browser cannot open the star map — it needs WebGL2.'
-          : 'The star map could not start.',
+          : `The star map could not start. ${detail}`,
       );
       return;
     }
