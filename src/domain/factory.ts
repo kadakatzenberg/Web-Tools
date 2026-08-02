@@ -60,6 +60,9 @@ function baseCombatant(partial: Partial<Combatant> & { name: string; role: Role 
     sheetSkills: partial.sheetSkills ?? {},
     done: partial.done ?? false,
     player: partial.player ?? "",
+    // Left undefined rather than "" so an absent portrait stays absent through
+    // a JSON round trip instead of becoming an empty <img src>.
+    ...(partial.portrait ? { portrait: partial.portrait } : {}),
   };
 }
 
@@ -154,6 +157,7 @@ export function combatantFromSheet(sheet: CombatSheet): Combatant {
     sheetSkills: skills,
     notes: sheet.notes ?? "",
     player: sheet.player ?? "",
+    portrait: sheet.portrait_url,
   });
 }
 

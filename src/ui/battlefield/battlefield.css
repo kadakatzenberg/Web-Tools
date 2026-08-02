@@ -333,6 +333,23 @@
   place-items: center;
 }
 
+/* The face sits under the health fill, which is why the fill is translucent
+   rather than opaque wherever a portrait is present. */
+.tok__face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  border-radius: inherit;
+}
+
+.tok:has(.tok__face) .tok__fill {
+  opacity: 0.55;
+  mix-blend-mode: hard-light;
+}
+
 .tok__fill {
   position: absolute;
   left: 0;

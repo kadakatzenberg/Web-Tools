@@ -33,6 +33,7 @@ export type Command =
   | { type: "COMBATANT_STATS_SET"; id: string; stats: Stats }
   | { type: "COMBATANT_NOTES_SET"; id: string; notes: string }
   | { type: "COMBATANT_MAXHP_SET"; id: string; maxHp: number }
+  | { type: "COMBATANT_PORTRAIT_SET"; id: string; portrait: string }
   /* health */
   | { type: "DAMAGE_APPLIED"; ids: string[]; amount: number; damageType: DamageType }
   | { type: "HEAL_APPLIED"; ids: string[]; amount: number }
@@ -103,6 +104,8 @@ export function commandLabel(cmd: Command): string {
       return "edit notes";
     case "COMBATANT_MAXHP_SET":
       return "edit max HP";
+    case "COMBATANT_PORTRAIT_SET":
+      return cmd.portrait ? "set portrait" : "remove portrait";
     case "DAMAGE_APPLIED":
       return `${cmd.amount} ${cmd.damageType} damage`;
     case "HEAL_APPLIED":

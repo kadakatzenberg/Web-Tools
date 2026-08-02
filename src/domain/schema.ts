@@ -145,6 +145,15 @@ export const combatantSchema = z
     sheetSkills: z.unknown().transform((v) => (looseJson(v) ?? {}) as object),
     done: z.coerce.boolean().catch(false),
     player: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
+    /**
+     * Only http(s) survives parsing. A persisted encounter is loaded straight
+     * into an <img src>, so a `javascript:` or `data:` URL smuggled into a
+     * shared session file would otherwise be handed to the browser verbatim.
+     */
+    portrait: z
+      .unknown()
+      .transform((v) => (typeof v === "string" && /^https?:\/\//i.test(v.trim()) ? v.trim() : undefined))
+      .optional(),
   })
   .transform((c) => {
     // maxHp must be positive or every percentage calculation divides by zero.

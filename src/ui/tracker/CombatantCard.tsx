@@ -33,7 +33,8 @@ import { d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
 import { useStoreApi } from "@/state/store";
 import { announce, useCopy, useId } from "../hooks";
 import { Badge, Button, DetailTabs, IconButton, Meter, Modal, NumberInput, useToast } from "../primitives";
-import { IconCheck, IconClose, IconDuplicate, rankMark, statusMark } from "../icons";
+import { IconCheck, IconClose, IconDuplicate, statusMark } from "../icons";
+import { Portrait } from "../Portrait";
 import { FloatingMarks, useFeedback, useImpact } from "@/fx/feedback";
 import { playCue } from "@/fx/sound";
 import "./tracker.css";
@@ -667,7 +668,6 @@ export const CombatantCard = memo(function CombatantCard({
         : c.type === "Elite"
           ? "elite"
           : "normal";
-  const RankMark = rankMark(c.role, c.type, c.hp <= 0);
 
   return (
     <article
@@ -703,12 +703,11 @@ export const CombatantCard = memo(function CombatantCard({
           </IconButton>
         </div>
 
-        {/* The rank emblem. Standing is carried by shape and frame weight as
-            well as pigment, so a boss stays distinguishable from a mook in
-            greyscale and at a glance. */}
-        <span className="card__emblem" data-rank={rank} aria-hidden="true">
-          <RankMark size={17} />
-        </span>
+        {/* The emblem slot: the character's portrait when the library has one,
+            otherwise the rank mark. Standing is carried by the frame keyline
+            either way, so a boss stays distinguishable from a mook in greyscale
+            and at a glance. */}
+        <Portrait c={c} size={34} className="card__emblem" />
 
         <div className="card__identity">
           {renaming ? (
@@ -1046,6 +1045,27 @@ export const CombatantCard = memo(function CombatantCard({
                       <div><dt>P.Res</dt><dd className="tnum">{derived.physicalResist}</dd></div>
                       <div><dt>M.Res</dt><dd className="tnum">{derived.magicalResist}</dd></div>
                     </dl>
+
+                    {/* For anyone the character library does not cover, or to
+                        override what it resolved. Clearing the field removes
+                        the portrait and the rank mark takes over again. */}
+                    <label className="maxhp">
+                      <span>Portrait</span>
+                      <input
+                        type="url"
+                        inputMode="url"
+                        value={c.portrait ?? ""}
+                        placeholder="Image URL — blank to clear"
+                        aria-label={`Portrait URL for ${c.name}`}
+                        onChange={(e) =>
+                          dispatch({
+                            type: "COMBATANT_PORTRAIT_SET",
+                            id: c.id,
+                            portrait: e.target.value,
+                          })
+                        }
+                      />
+                    </label>
 
                     <label className="maxhp">
                       <span>Max HP</span>

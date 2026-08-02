@@ -14,7 +14,8 @@
 import { memo, useMemo } from "react";
 import type { Combatant, EncounterState } from "@/domain/types";
 import { healthBand, healthPercent } from "@/domain/rules";
-import { rankMark, statusMark, IconCheck, IconDown } from "../icons";
+import { statusMark, IconCheck, IconDown } from "../icons";
+import { Portrait } from "../Portrait";
 import "./orderrail.css";
 
 /** Which side the given phase belongs to. Phase 2 is the environment's. */
@@ -64,7 +65,6 @@ const Unit = memo(function Unit({
   const band = healthBand(c.hp, c.maxHp);
   const pct = healthPercent(c.hp, c.maxHp);
   const rank = rankOf(c);
-  const Rank = rankMark(c.role, c.type, c.hp <= 0);
   const down = c.hp <= 0;
 
   // Two marks is the useful ceiling in a 272px rail; the rest become a count.
@@ -84,10 +84,8 @@ const Unit = memo(function Unit({
         onClick={() => onSelect(c.id)}
         aria-current={focused ? "true" : undefined}
       >
-        {/* The turn marker. Position and shape, not just colour. */}
-        <span className="unit__mark" aria-hidden="true">
-          <Rank size={14} />
-        </span>
+        {/* The face when there is one, the rank mark when there is not. */}
+        <Portrait c={c} size={26} className="unit__mark" />
 
         <span className="unit__body">
           <span className="unit__top">

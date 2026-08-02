@@ -974,3 +974,80 @@ test("healing lifts a downed combatant back above zero", async ({ page }) => {
   await c.getByRole("button", { name: "Mend", exact: true }).click();
   expect(await hpOf(page, "Alpha")).toBe("4/10");
 });
+
+/* ── Portraits ── */
+
+test("shows a portrait where there is one and the rank mark where there is not", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const mk = (id: string, name: string, portrait?: string) => ({
+      id,
+      name,
+      role: "Player",
+      type: "",
+      hp: 20,
+      maxHp: 30,
+      shield: 0,
+      tempShields: [],
+      dots: [],
+      hpRegens: [],
+      stats: { STR: 1, DEX: 1, INT: 0, WIS: 1, AGI: 1, CON: 1 },
+      statuses: [],
+      abilities: [],
+      tempMods: [],
+      position: "Front",
+      notes: "",
+      done: false,
+      ...(portrait ? { portrait } : {}),
+    });
+    window.localStorage.setItem(
+      "heimao.encounter.backup.v2",
+      JSON.stringify({
+        state: {
+          // A real image, a URL that 404s, and no portrait at all.
+          combatants: [
+            mk("a", "Has Portrait", `${location.origin}/favicon.svg`),
+            mk("b", "Broken Portrait", `${location.origin}/nope-not-here.png`),
+            mk("c", "No Portrait"),
+          ],
+          phase: 0,
+          round: 1,
+          locked: true,
+          playerPhaseCount: 0,
+          enemyPhaseCount: 0,
+        },
+        savedAt: Date.now(),
+        sessionCode: null,
+      }),
+    );
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  const emblem = (name: string) => card(page, name).locator(".card__emblem");
+
+  await expect(emblem("Has Portrait").locator("img")).toBeVisible();
+
+  // A dead link must fall back to the rank mark, not leave a broken-image glyph
+  // sitting where the combatant's identity should be.
+  await expect(emblem("Broken Portrait").locator("img")).toHaveCount(0);
+  await expect(emblem("Broken Portrait").locator("svg")).toBeVisible();
+
+  await expect(emblem("No Portrait").locator("img")).toHaveCount(0);
+  await expect(emblem("No Portrait").locator("svg")).toBeVisible();
+});
+
+test("a portrait can be set and cleared by hand", async ({ page }) => {
+  await addCombatant(page, "Stranger");
+  const c = card(page, "Stranger");
+  await c.getByRole("button", { name: "Stats" }).click();
+
+  const field = c.getByLabel("Portrait URL for Stranger");
+  await field.fill(`${new URL(page.url()).origin}/favicon.svg`);
+  await expect(c.locator(".card__emblem img")).toBeVisible();
+
+  await field.fill("");
+  await expect(c.locator(".card__emblem img")).toHaveCount(0);
+  await expect(c.locator(".card__emblem svg")).toBeVisible();
+});

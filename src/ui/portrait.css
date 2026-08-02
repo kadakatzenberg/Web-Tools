@@ -1,0 +1,74 @@
+/**
+ * The portrait frame.
+ *
+ * Same footprint and same rank keyline whether it holds a picture or a mark, so
+ * a roster of mixed library and hand-added combatants stays on one grid instead
+ * of jittering wherever a face is missing.
+ */
+
+.portrait {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--inlay);
+  box-shadow: inset 0 0 0 1px var(--metal-800);
+  color: var(--rank-normal);
+}
+
+.portrait[data-rank="player"] {
+  color: var(--rank-player);
+  box-shadow: inset 0 0 0 1px var(--jade-deep);
+}
+.portrait[data-rank="normal"] {
+  color: var(--rank-normal);
+  box-shadow: inset 0 0 0 1px var(--cinnabar-deep);
+}
+.portrait[data-rank="elite"] {
+  color: var(--rank-elite);
+  box-shadow: inset 0 0 0 1px var(--candle-deep);
+}
+.portrait[data-rank="boss"] {
+  color: var(--rank-boss);
+  background: radial-gradient(circle at 50% 40%, rgba(164, 135, 234, 0.16), var(--inlay));
+  box-shadow: inset 0 0 0 1px var(--violet-dim), 0 0 14px -4px rgba(164, 135, 234, 0.55);
+}
+.portrait[data-rank="down"] {
+  color: var(--rank-down);
+  opacity: 0.7;
+}
+
+.portrait__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Faces sit high in a portrait crop, so bias the framing upward rather than
+     centring on the chest. */
+  object-position: 50% 22%;
+  display: block;
+}
+
+/* The keyline has to survive on top of the image, so it is redrawn over it —
+   an inset shadow sits behind the <img> and would be hidden. */
+.portrait--image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px currentColor;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* A downed combatant's portrait drains rather than disappearing — the face is
+   still the fastest way to find them in the roster. */
+.portrait[data-rank="down"] .portrait__img {
+  filter: grayscale(1) brightness(0.65);
+}
+
+/* A boss keeps a faint inner glow over the image too. */
+.portrait[data-rank="boss"].portrait--image::after {
+  opacity: 0.85;
+}

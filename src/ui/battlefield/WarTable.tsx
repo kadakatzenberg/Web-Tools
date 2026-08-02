@@ -103,10 +103,16 @@ function Token({
       onPointerDown={(e) => onDragStart(e, c)}
       onClick={onSelect}
     >
+      {/* The vessel keeps its health fill behind the face: on the table the
+          token has to answer "how hurt is this one" as fast as "who is this
+          one", and a portrait alone answers only the second. */}
       <span className="tok__vessel" aria-hidden="true">
+        {c.portrait && (
+          <img className="tok__face" src={c.portrait} alt="" loading="lazy" decoding="async" draggable={false} />
+        )}
         <span
           className="tok__fill"
-          style={{ height: `${pct}%`, background: BAND_TONE[band] }}
+          style={{ height: `${pct}%`, backgroundColor: BAND_TONE[band] }}
         />
         {BAND_GLYPH[band] && <span className="tok__glyph">{BAND_GLYPH[band]}</span>}
       </span>

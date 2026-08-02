@@ -198,6 +198,28 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
       };
     }
 
+    /**
+     * A portrait set by hand, for anyone the character library does not cover.
+     * Only http(s) is accepted — the value goes straight into an <img src>, and
+     * an encounter file is something people share.
+     */
+    case "COMBATANT_PORTRAIT_SET": {
+      const raw = cmd.portrait.trim();
+      const portrait = /^https?:\/\//i.test(raw) ? raw : undefined;
+      return {
+        state: {
+          ...state,
+          combatants: mapOne(state, cmd.id, (c) => {
+            const next = { ...c };
+            if (portrait) next.portrait = portrait;
+            else delete next.portrait;
+            return next;
+          }),
+        },
+        log: [],
+      };
+    }
+
     /* ── health ── */
 
     case "DAMAGE_APPLIED": {

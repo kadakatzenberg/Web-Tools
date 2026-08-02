@@ -138,6 +138,16 @@ export interface Combatant {
    * field existed parse unchanged.
    */
   player?: string;
+  /**
+   * Absolute URL of a portrait, resolved from the character library when the
+   * combatant is pulled from a sheet, or set by hand on the card.
+   *
+   * Stored on the combatant rather than looked up at render time on purpose:
+   * an encounter saved today must still show the right faces if the library
+   * row is renamed or deleted, and the tracker must not need the network to
+   * draw a roster. Optional and additive.
+   */
+  portrait?: string;
 }
 
 /** 0 = Player Phase, 1 = Enemy Phase, 2 = Environment Phase. */
@@ -168,6 +178,8 @@ export interface CombatSheet {
   notes?: string;
   approved?: boolean;
   updated_at?: string;
+  /** Joined from `entries` at fetch time; not a column on `combat_sheets`. */
+  portrait_url?: string;
 }
 
 /** A row from `combat_skills`, used to populate generated enemies. */
