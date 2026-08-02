@@ -16,6 +16,7 @@ import { createSheet, fetchSheets, updateSheet } from "@/persistence/repositorie
 import { SupabaseError } from "@/persistence/supabase";
 import { useStoreApi } from "@/state/store";
 import { announce, useDebounced } from "../hooks";
+import { Portrait } from "../Portrait";
 import { Badge, Button, Disclosure, EmptyState, ErrorPanel, Modal, NumberInput, useToast } from "../primitives";
 import "./library.css";
 
@@ -41,8 +42,16 @@ function SheetDetail({ sheet, onClose }: { sheet: CombatSheet; onClose: () => vo
   const d = deriveStats(sheet.stats);
   return (
     <Modal open onClose={onClose} title={sheet.character_name || sheet.name || "Sheet"} width={560}>
-      {sheet.sheet_name && <p className="sheet__variant">{sheet.sheet_name}</p>}
-      {sheet.player && <p className="sheet__player">Player: {sheet.player}</p>}
+      <div className="sheet__ident">
+        <Portrait
+          c={{ role: sheet.role, type: sheet.type ?? "", hp: 1, portrait: sheet.portrait_url }}
+          size={72}
+        />
+        <div>
+          {sheet.sheet_name && <p className="sheet__variant">{sheet.sheet_name}</p>}
+          {sheet.player && <p className="sheet__player">Player: {sheet.player}</p>}
+        </div>
+      </div>
 
       <div className="sheet__stats">
         {STAT_KEYS.map((k) => (
@@ -445,6 +454,18 @@ export function LibraryTab({ onAdded }: { onAdded: () => void }) {
       {grouped.map(([character, list]) => (
         <section key={character} className="charblock">
           <h2 className="charblock__name display">
+            {/* One portrait per character, on the heading rather than on each
+                sheet: the variants below are the same person. */}
+            <Portrait
+              c={{
+                role: list[0]?.role ?? "Player",
+                type: list[0]?.type ?? "",
+                hp: 1,
+                portrait: list.find((s) => s.portrait_url)?.portrait_url,
+              }}
+              size={40}
+              className="charblock__face"
+            />
             {character}
             {list[0]?.player && <span className="charblock__player">· {list[0].player}</span>}
           </h2>

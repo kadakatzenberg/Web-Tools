@@ -61,6 +61,23 @@ export type ReactionTrigger =
 /** When a limited-use skill gets its uses back. */
 export type RefillCadence = "round" | "combat";
 
+/**
+ * A gate on another skill the same combatant owns.
+ *
+ * Dawn's ult reads "Requires Sangre Lanza at max (+4 STR)" — the skill is
+ * unusable until a *different* skill has accrued. Nothing in the tracker could
+ * say that, so the ult sat there looking available and the table had to
+ * remember the link.
+ */
+export interface AbilityRequirement {
+  /** Name of the sibling skill, matched case-insensitively. */
+  skill: string;
+  /** Satisfied when the sibling is at its ceiling. */
+  atMax?: boolean;
+  /** Satisfied when the sibling holds at least this much. */
+  atLeast?: number;
+}
+
 export interface Ability {
   id: string;
   name: string;
@@ -86,6 +103,8 @@ export interface Ability {
    * phase — three times as fast as a round.
    */
   refill?: RefillCadence;
+  /** Gate on a sibling skill. Unmet, this ability is shown but not usable. */
+  requires?: AbilityRequirement;
   charging?: boolean;
   phaseLock?: number;
   phaseLockType?: PhaseLockType;

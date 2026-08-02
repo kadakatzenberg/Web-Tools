@@ -357,6 +357,103 @@ export function tickAbility(ab: Ability): Ability {
   return { ...ab };
 }
 
+/* ── When will this be ready? ── */
+
+/**
+ * Presses of Next Phase between now and the next round boundary.
+ *
+ * Abilities accrue only when the round turns over, but the control a GM
+ * actually presses is the phase. Reporting readiness in rounds meant a
+ * one-round charge sat unchanged through three presses — technically correct
+ * and useless. Counting in phases makes the wait match the button.
+ */
+export function phasesUntilRoundTick(phase: number): number {
+  return PHASE_COUNT - (phase % PHASE_COUNT);
+}
+
+const PHASE_COUNT = 3;
+
+/**
+ * How many phases until an ability is usable, or 0 if it already is.
+ * Returns null when the answer is not a wait — a spent ammo clip, a gate that
+ * is not satisfied, an idle charge nobody has started.
+ */
+export function phasesUntilReady(ab: Ability, phase: number): number | null {
+  const rounds =
+    ab.mode === "charge"
+      ? ab.charging && ab.cur < ab.max
+        ? Math.ceil((ab.max - ab.cur) / (ab.gainPerPhase || 1))
+        : 0
+      : ab.mode === "cooldown" || ab.mode === "reaction"
+        ? ab.cur
+        : 0;
+
+  if (rounds <= 0) return 0;
+  return (rounds - 1) * PHASE_COUNT + phasesUntilRoundTick(phase);
+}
+
+/* ── Requirements ── */
+
+export interface RequirementState {
+  /** Whether this ability is gated at all. */
+  gated: boolean;
+  met: boolean;
+  /** Sentence explaining the gate, for the chip and the disabled control. */
+  label: string;
+}
+
+/**
+ * Whether a skill's prerequisite is satisfied, and how to say so.
+ *
+ * A gated skill is shown and explained rather than hidden or silently dead:
+ * an inactive control that gives no reason is the single most common way an
+ * interface leaves someone stuck, and in a turn-based game there is plenty of
+ * room to just write the condition down.
+ */
+export function requirementState(
+  ab: Pick<Ability, "requires">,
+  siblings: Ability[],
+): RequirementState {
+  const req = ab.requires;
+  if (!req?.skill) return { gated: false, met: true, label: "" };
+
+  const want = req.skill.trim().toLowerCase();
+  const other = siblings.find(
+    (s) => s.name.trim().toLowerCase() === want || s.name.trim().toLowerCase().endsWith(want),
+  );
+
+  if (!other) {
+    return { gated: true, met: false, label: `Needs ${req.skill}, which this combatant does not have` };
+  }
+
+  const threshold = req.atMax ? other.max : (req.atLeast ?? other.max);
+  const met = other.cur >= threshold && threshold > 0;
+  return {
+    gated: true,
+    met,
+    label: met
+      ? `${other.name} at ${other.cur}/${other.max}`
+      : `Needs ${other.name} at ${threshold}/${other.max} — currently ${other.cur}`,
+  };
+}
+
+/**
+ * Readiness including any prerequisite.
+ *
+ * A charge whose gate is met counts as charged. Dawn's ult is not something the
+ * player winds up separately; it becomes available the moment Sangre Lanza
+ * reaches four, and making them press Charge as well would be bookkeeping the
+ * skill text never asked for.
+ */
+export function isAbilityReadyWith(ab: Ability, siblings: Ability[]): boolean {
+  const req = requirementState(ab, siblings);
+  if (req.gated) {
+    if (!req.met) return false;
+    if (ab.mode === "charge") return true;
+  }
+  return isAbilityReady(ab);
+}
+
 /* ── Reactions ── */
 
 /** Something that just happened, which a reaction might answer. */

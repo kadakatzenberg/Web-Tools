@@ -26,9 +26,11 @@ import {
   effectiveStats,
   healthBand,
   healthPercent,
-  isAbilityReady,
+  isAbilityReadyWith,
   isAmmoEmpty,
   isPhaseLocked,
+  phasesUntilReady,
+  requirementState,
   tempShieldDuration,
 } from "@/domain/rules";
 import { POSITIONS, SKILL_MODES, SKILL_MODE_LABELS, STACK_PRESETS, STAT_KEYS, STATUS_OPTIONS } from "@/domain/constants";
@@ -96,27 +98,52 @@ const DMG_TONE: Record<string, string> = {
 
 const AbilityChip = memo(function AbilityChip({
   ab,
+  siblings,
   combatantId,
+  phase,
   playerPhaseCount,
   enemyPhaseCount,
   onEdit,
 }: {
   ab: Ability;
+  /** Every ability on this combatant, so a gate can read its sibling. */
+  siblings: Ability[];
   combatantId: string;
+  /** Current phase index, so a wait can be counted in Next Phase presses. */
+  phase: number;
   playerPhaseCount: number;
   enemyPhaseCount: number;
   onEdit: (ab: Ability) => void;
 }) {
   const { dispatch } = useStoreApi();
-  const locked = isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount);
-  const ready = isAbilityReady(ab);
+  const req = requirementState(ab, siblings);
+  const locked = isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount) || (req.gated && !req.met);
+  const ready = isAbilityReadyWith(ab, siblings);
   const empty = isAmmoEmpty(ab);
   const tone = MODE_TONE[ab.mode];
 
   const isCharge = ab.mode === "charge";
-  const chargeReady = isCharge && ab.cur >= ab.max;
+  // A met gate charges the skill on its own — Dawn's ult is not wound up
+  // separately, it becomes available the moment Sangre Lanza fills.
+  const chargeReady = isCharge && (ab.cur >= ab.max || (req.gated && req.met));
   const chargeActive = isCharge && !!ab.charging && ab.cur < ab.max;
-  const chargeIdle = isCharge && !ab.charging && ab.cur === 0;
+  const chargeIdle = isCharge && !ab.charging && ab.cur === 0 && !req.gated;
+
+  /**
+   * How many more rounds of charging remain. Abilities only accrue on the
+   * round boundary, so a 1-round charge sat at 0/1 through three presses of
+   * Next Phase with nothing to say it was working. Saying when it lands is the
+   * whole fix — a turn-based game has room for the actual number.
+   */
+  const waitPhases = phasesUntilReady(ab, phase) ?? 0;
+  /** One phrase, built once. Assembling it at each call site produced
+      "Ready in next phase". */
+  const readyIn =
+    waitPhases <= 0
+      ? "Ready"
+      : waitPhases === 1
+        ? "Ready next phase"
+        : `Ready in ${waitPhases} phases`;
 
   const wasReady = useRef(ready);
   useEffect(() => {
@@ -144,23 +171,32 @@ const AbilityChip = memo(function AbilityChip({
   const clampCur = (v: number) => Math.max(0, Math.min(ab.max, v));
 
   // State word carries the meaning; colour only reinforces it.
-  const stateWord = locked
-    ? "Locked"
-    : ab.mode === "reaction"
-      ? ab.cur === 0
-        ? ab.trigger
-          ? "Armed"
-          : "Ready"
-        : `${ab.cur} left`
-      : ab.mode === "cooldown"
-        ? ab.cur === 0
-          ? "Ready"
-          : `${ab.cur} left`
-        : ab.mode === "passive"
-          ? ab.refill
-            ? `${ab.cur}/${ab.max} this ${ab.refill}`
-            : "Passive"
-          : `${ab.cur}/${ab.max}`;
+  // Every waiting state answers the same question the same way: when.
+  const stateWord = req.gated && !req.met
+    ? "Gated"
+    : isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount)
+      ? "Locked"
+      : // A met gate *is* the charge. Reporting the raw counter here read
+        // "0/1" next to a live Fire button, which says the opposite.
+        req.gated && req.met && isCharge
+        ? "Ready"
+      : chargeActive
+        ? readyIn
+        : ab.mode === "reaction"
+          ? ab.cur === 0
+            ? ab.trigger
+              ? "Armed"
+              : "Ready"
+            : readyIn
+          : ab.mode === "cooldown"
+            ? ab.cur === 0
+              ? "Ready"
+              : readyIn
+            : ab.mode === "passive"
+              ? ab.refill
+                ? `${ab.cur}/${ab.max} this ${ab.refill}`
+                : "Passive"
+              : `${ab.cur}/${ab.max}`;
 
   return (
     <div
@@ -192,6 +228,18 @@ const AbilityChip = memo(function AbilityChip({
       </div>
 
       {ab.effectText && <p className="ability__effect">{ab.effectText}</p>}
+
+      {/* The prerequisite, always shown. A control that is inactive without
+          saying why is the fastest way to leave someone stuck, and there is
+          room here to simply write the condition down. */}
+      {req.gated && (
+        <p className="ability__req" data-met={req.met ? "1" : undefined}>
+          <span className="ability__req-mark" aria-hidden="true">
+            {req.met ? <IconCheck size={11} /> : <IconTarget size={11} />}
+          </span>
+          {req.label}
+        </p>
+      )}
 
       {/* What arms a reaction. A reaction is defined by its trigger, not its
           timer, and this is what lets the tracker raise it when the moment
@@ -371,6 +419,10 @@ function AbilityEditor({
   const [dice, setDice] = useState(ab.dice ?? "");
   const [trigger, setTrigger] = useState<string>(ab.trigger ?? "");
   const [refill, setRefill] = useState<string>(ab.refill ?? "");
+  const [requires, setRequires] = useState(ab.requires?.skill ?? "");
+  const [requiresAt, setRequiresAt] = useState(
+    ab.requires?.atLeast ? String(ab.requires.atLeast) : "",
+  );
   const diceValid = !dice.trim() || looksLikeDice(dice);
 
   const capacityLabel =
@@ -401,6 +453,14 @@ function AbilityEditor({
                   dice: dice.trim(),
                   ...(trigger ? { trigger: trigger as ReactionTrigger } : { trigger: undefined }),
                   ...(refill ? { refill: refill as RefillCadence } : { refill: undefined }),
+                  requires: requires.trim()
+                    ? {
+                        skill: requires.trim(),
+                        ...(parseInt(requiresAt, 10) > 0
+                          ? { atLeast: parseInt(requiresAt, 10) }
+                          : { atMax: true }),
+                      }
+                    : undefined,
                 },
               });
               onClose();
@@ -428,6 +488,31 @@ function AbilityEditor({
             <option value="allyDown">An ally goes down</option>
             <option value="selfDown">This unit reaches 0 HP</option>
           </select>
+        </>
+      )}
+
+      <label className="field__label" htmlFor="ab-requires">
+        Requires
+      </label>
+      <input
+        id="ab-requires"
+        value={requires}
+        placeholder="Another skill's name — blank for none"
+        onChange={(e) => setRequires(e.target.value)}
+      />
+      {requires.trim() && (
+        <>
+          <label className="field__label" htmlFor="ab-requires-at">
+            Satisfied at
+          </label>
+          <input
+            id="ab-requires-at"
+            type="number"
+            min={0}
+            value={requiresAt}
+            placeholder="Blank = at its maximum"
+            onChange={(e) => setRequiresAt(e.target.value)}
+          />
         </>
       )}
 
@@ -621,6 +706,8 @@ export interface RosterEntry {
 export interface CardProps {
   c: Combatant;
   roster: RosterEntry[];
+  /** Current phase index, so ability waits can be counted in phases. */
+  phase: number;
   /** Reports a hit or a knockout so armed reactions can be raised. */
   onEvent?: (e: CombatEvent) => void;
   playerPhaseCount: number;
@@ -634,6 +721,7 @@ export interface CardProps {
 
 export const CombatantCard = memo(function CombatantCard({
   c,
+  phase,
   playerPhaseCount,
   enemyPhaseCount,
   compact,
@@ -853,7 +941,7 @@ export const CombatantCard = memo(function CombatantCard({
             otherwise the rank mark. Standing is carried by the frame keyline
             either way, so a boss stays distinguishable from a mook in greyscale
             and at a glance. */}
-        <Portrait c={c} size={34} className="card__emblem" />
+        <Portrait c={c} size={46} className="card__emblem" />
 
         <div className="card__identity">
           {renaming ? (
@@ -1141,6 +1229,8 @@ export const CombatantCard = memo(function CombatantCard({
                 <AbilityChip
                   key={ab.id}
                   ab={ab}
+                  siblings={c.abilities}
+                  phase={phase}
                   combatantId={c.id}
                   playerPhaseCount={playerPhaseCount}
                   enemyPhaseCount={enemyPhaseCount}

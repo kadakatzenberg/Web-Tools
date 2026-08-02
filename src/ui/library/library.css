@@ -308,3 +308,28 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* ── Portraits ── */
+
+.charblock__face {
+  vertical-align: middle;
+  margin-right: var(--s2);
+}
+
+/* The heading is a flex row so the face sits on the baseline of the name
+   rather than dangling below it. */
+.charblock__title,
+.charblock h2 {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.sheet__ident {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--metal-800);
+}

@@ -85,7 +85,7 @@ const Unit = memo(function Unit({
         aria-current={focused ? "true" : undefined}
       >
         {/* The face when there is one, the rank mark when there is not. */}
-        <Portrait c={c} size={26} className="unit__mark" />
+        <Portrait c={c} size={36} className="unit__mark" />
 
         <span className="unit__body">
           <span className="unit__top">

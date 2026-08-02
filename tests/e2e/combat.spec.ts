@@ -235,13 +235,20 @@ test("drives a cooldown ability through use and recovery", async ({ page }) => {
   await expect(ability.locator(".ability__state")).toHaveText("Ready");
 
   await ability.getByRole("button", { name: "Use", exact: true }).click();
-  await expect(ability.locator(".ability__state")).toHaveText("2 left");
+  // Readiness is reported in Next Phase presses, not rounds. A 2-round
+  // cooldown started at the top of a round is six presses away, and the count
+  // has to move on every one of them or the control looks broken.
+  await expect(ability.locator(".ability__state")).toHaveText("Ready in 6 phases");
   await expect(c.locator(".badge", { hasText: "Acted" })).toBeVisible();
 
   const next = page.getByRole("button", { name: "Next phase" });
-  for (let i = 0; i < 3; i++) await next.click();
-  await expect(ability.locator(".ability__state")).toHaveText("1 left");
-  for (let i = 0; i < 3; i++) await next.click();
+  await next.click();
+  await expect(ability.locator(".ability__state")).toHaveText("Ready in 5 phases");
+  for (let i = 0; i < 2; i++) await next.click();
+  await expect(ability.locator(".ability__state")).toHaveText("Ready in 3 phases");
+  for (let i = 0; i < 2; i++) await next.click();
+  await expect(ability.locator(".ability__state")).toHaveText("Ready next phase");
+  await next.click();
   await expect(ability.locator(".ability__state")).toHaveText("Ready");
 });
 
@@ -273,9 +280,13 @@ test("drives ammo and charge abilities", async ({ page }) => {
 
   const focus = c.locator(".ability").filter({ hasText: "Focus" });
   await focus.getByRole("button", { name: "Charge", exact: true }).click();
+  // A charge announces when it lands rather than sitting on a counter that
+  // does not move until the round turns over.
+  await expect(focus.locator(".ability__state")).toHaveText("Ready in 6 phases");
+
   const next = page.getByRole("button", { name: "Next phase" });
   for (let i = 0; i < 3; i++) await next.click();
-  await expect(focus.locator(".ability__state")).toHaveText("1/2");
+  await expect(focus.locator(".ability__state")).toHaveText("Ready in 3 phases");
   for (let i = 0; i < 3; i++) await next.click();
   await expect(focus.locator(".ability__state")).toHaveText("2/2");
   await expect(focus.getByRole("button", { name: "Fire", exact: true })).toBeEnabled();

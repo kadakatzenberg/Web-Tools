@@ -680,6 +680,7 @@ function Group({
   tone,
   roster,
   onEvent,
+  phase,
 }: {
   title: string;
   members: Combatant[];
@@ -692,6 +693,7 @@ function Group({
   tone: string;
   roster: RosterEntry[];
   onEvent: (e: CombatEvent) => void;
+  phase: number;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   if (!members.length) return null;
@@ -739,6 +741,7 @@ function Group({
                 onFocus={onFocus}
                 roster={roster}
                 onEvent={onEvent}
+                phase={phase}
               />
             );
           })}
@@ -903,6 +906,7 @@ export function TrackerTab({ session }: { session: SessionApi; logOpen?: boolean
                   tone={g.tone}
                   roster={roster}
                   onEvent={recordEvent}
+                  phase={present.phase}
                 />
               ))
             )}

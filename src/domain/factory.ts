@@ -8,6 +8,7 @@
  */
 
 import type {
+  AbilityRequirement,
   Ability,
   Combatant,
   CombatSheet,
@@ -98,6 +99,38 @@ const SHEET_SKILL_KEYS = ["s1", "s2", "ult"] as const;
  * Default capacity depends on mode: cooldown and reaction default to 2,
  * everything else to 1. Ammo abilities enter play fully loaded.
  */
+/**
+ * Read a prerequisite out of a sheet's free-text cooldown field.
+ *
+ * Sheets already say things like "Requires Sangre Lanza at max (+4 STR)" in
+ * prose, because there was nowhere structured to put it. Parsing that is what
+ * makes the gate appear on existing characters without anyone re-entering
+ * their sheet — the alternative is a feature nobody's data uses.
+ *
+ * Deliberately narrow: only the "requires <skill> at max" and
+ * "requires <skill> at <n>" shapes, anchored on the word "requires". Anything
+ * cleverer would start inventing gates out of ordinary sentences.
+ */
+export function requirementFromText(text: string | undefined): AbilityRequirement | null {
+  if (!text) return null;
+  const atMax = /requires?\s+(.+?)\s+at\s+(?:max|maximum|full)\b/i.exec(text);
+  if (atMax?.[1]) return { skill: cleanSkillName(atMax[1]), atMax: true };
+
+  const atLeast = /requires?\s+(.+?)\s+at\s+(\d+)/i.exec(text);
+  if (atLeast?.[1] && atLeast[2]) {
+    return { skill: cleanSkillName(atLeast[1]), atLeast: parseInt(atLeast[2], 10) };
+  }
+  return null;
+}
+
+/** Trim the trailing punctuation and parentheticals a sentence leaves behind. */
+function cleanSkillName(raw: string): string {
+  return raw
+    .replace(/\(.*?\)/g, "")
+    .replace(/[.,;:]+$/, "")
+    .trim();
+}
+
 export function abilityFromSheetSkill(
   key: (typeof SHEET_SKILL_KEYS)[number],
   sk: SheetSkill,
@@ -120,6 +153,10 @@ export function abilityFromSheetSkill(
     effectText: sk.effect ?? "",
     ...(sk.dice?.trim() ? { dice: sk.dice.trim() } : {}),
   };
+
+  // The gate is written in prose on the sheet; lift it into structure.
+  const requires = requirementFromText(sk.cooldown) ?? requirementFromText(sk.effect);
+  if (requires) ability.requires = requires;
   if (phaseLock) {
     ability.phaseLock = phaseLock;
     ability.phaseLockType = sk.phaseLockType ?? "player";

@@ -71,6 +71,19 @@ const abilitySchema = z
       .optional()
       .catch(undefined),
     refill: z.enum(["round", "combat"]).optional().catch(undefined),
+    requires: z
+      .unknown()
+      .transform((v) => {
+        const o = v as { skill?: unknown; atMax?: unknown; atLeast?: unknown } | null;
+        if (!o || typeof o.skill !== "string" || !o.skill.trim()) return undefined;
+        const atLeast = typeof o.atLeast === "number" && o.atLeast > 0 ? Math.trunc(o.atLeast) : undefined;
+        return {
+          skill: o.skill.trim(),
+          ...(o.atMax === true ? { atMax: true } : {}),
+          ...(atLeast ? { atLeast } : {}),
+        };
+      })
+      .optional(),
     charging: z.coerce.boolean().catch(false).optional(),
     phaseLock: z.coerce.number().nullish().transform((v) => (v ? Number(v) : undefined)),
     phaseLockType: z.enum(["player", "enemy"]).catch("player").optional(),
