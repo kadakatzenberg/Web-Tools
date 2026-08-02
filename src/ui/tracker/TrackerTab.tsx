@@ -17,9 +17,12 @@ import { useStore, useStoreApi } from "@/state/store";
 import type { SessionApi } from "@/persistence/useSession";
 import { announce, useCopy, useMediaQuery } from "../hooks";
 import { Badge, Button, ConfirmDialog, Disclosure, EmptyState, IconButton, NumberInput, useToast } from "../primitives";
-import { CombatantCard } from "./CombatantCard";
+import { CombatantCard, type RosterEntry } from "./CombatantCard";
 import { OrderRail } from "./OrderRail";
 import { RoundHerald } from "./RoundHerald";
+import { ReactionPrompt } from "./ReactionPrompt";
+import type { CombatEvent } from "@/domain/rules";
+import { resolveRedirect } from "@/domain/rules";
 import { EventLogPanel } from "../EventLog";
 import { IconAdvance, IconRedo, IconUndo } from "../icons";
 import { EnemyPhasePanel, PostControls } from "./DiscordTools";
@@ -675,6 +678,8 @@ function Group({
   playerPhaseCount,
   enemyPhaseCount,
   tone,
+  roster,
+  onEvent,
 }: {
   title: string;
   members: Combatant[];
@@ -685,6 +690,8 @@ function Group({
   playerPhaseCount: number;
   enemyPhaseCount: number;
   tone: string;
+  roster: RosterEntry[];
+  onEvent: (e: CombatEvent) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   if (!members.length) return null;
@@ -730,6 +737,8 @@ function Group({
               isLast={idx === side.length - 1}
               focused={focusedId === c.id}
                 onFocus={onFocus}
+                roster={roster}
+                onEvent={onEvent}
               />
             );
           })}
@@ -748,6 +757,39 @@ export function TrackerTab({ session }: { session: SessionApi; logOpen?: boolean
   const [focusMode, setFocusMode] = useState(false);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(true);
+  /**
+   * The last thing that happened, kept only so armed reactions can be raised
+   * against it. Deliberately outside the encounter: it is a prompt, not state,
+   * and it must not be persisted, undone, or shared into a session.
+   */
+  const [lastEvent, setLastEvent] = useState<CombatEvent | null>(null);
+
+  /**
+   * A card reports the combatant it was aimed at; the redirect is resolved
+   * here, because the card cannot see the rest of the roster and the chain may
+   * be more than one hop. Without this, covering someone meant their guardian's
+   * "when I am hit" reaction never came up — the reaction was matched against
+   * whoever the attack was *meant* for rather than whoever took it.
+   */
+  const recordEvent = useCallback(
+    (e: CombatEvent) => {
+      const targetId = resolveRedirect(present.combatants, e.targetId);
+      setLastEvent({ ...e, targetId });
+    },
+    [present.combatants],
+  );
+
+  /**
+   * Identity only, and memoised on a string key: cards need a target list for
+   * lifesteal and cover, and handing them the full combatant array would
+   * re-render every card on every point of damage.
+   */
+  const rosterKey = present.combatants.map((c) => `${c.id}:${c.name}:${c.role}`).join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const roster = useMemo<RosterEntry[]>(
+    () => present.combatants.map((c) => ({ id: c.id, name: c.name, role: c.role })),
+    [rosterKey],
+  );
 
   const players = useMemo(() => present.combatants.filter((c) => c.role === "Player"), [present.combatants]);
   const enemies = useMemo(() => present.combatants.filter((c) => c.role === "Enemy"), [present.combatants]);
@@ -813,6 +855,8 @@ export function TrackerTab({ session }: { session: SessionApi; logOpen?: boolean
         <div className="workspace__main">
           <PhaseBar focusMode={focusMode} onToggleFocus={() => setFocusMode((v) => !v)} />
 
+          <ReactionPrompt event={lastEvent} onDismiss={() => setLastEvent(null)} />
+
           <div className="tracker__body">
             {!present.locked && <InitiativeRoller />}
 
@@ -857,6 +901,8 @@ export function TrackerTab({ session }: { session: SessionApi; logOpen?: boolean
                   playerPhaseCount={present.playerPhaseCount}
                   enemyPhaseCount={present.enemyPhaseCount}
                   tone={g.tone}
+                  roster={roster}
+                  onEvent={recordEvent}
                 />
               ))
             )}

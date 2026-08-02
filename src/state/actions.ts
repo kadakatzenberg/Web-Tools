@@ -64,6 +64,9 @@ export type Command =
   /* stacks inflicted on a combatant */
   | { type: "STACK_ADJUSTED"; id: string; name: string; delta: number; max?: number; perStackDamage?: number }
   | { type: "STACK_CLEARED"; id: string; stackId: string }
+  /* redirection */
+  | { type: "REDIRECT_SET"; id: string; toId: string; duration: number }
+  | { type: "REDIRECT_CLEARED"; id: string }
   /* abilities */
   | { type: "ABILITY_ADDED"; id: string; ability: Ability }
   | { type: "ABILITY_UPDATED"; id: string; ability: Ability }
@@ -125,6 +128,10 @@ export function commandLabel(cmd: Command): string {
       return cmd.delta >= 0 ? `add ${cmd.name} stack` : `remove ${cmd.name} stack`;
     case "STACK_CLEARED":
       return "clear stacks";
+    case "REDIRECT_SET":
+      return "redirect attacks";
+    case "REDIRECT_CLEARED":
+      return "clear redirect";
     case "FULL_HEAL_APPLIED":
       return "full heal";
     case "SHIELD_ADJUSTED":

@@ -66,6 +66,11 @@ const abilitySchema = z
     effectText: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
     dcStat: z.enum(["STR", "DEX", "INT", "WIS", "AGI", "CON"]).optional().catch(undefined),
     dcValue: z.unknown().transform((v) => (typeof v === "number" && v > 0 ? v : undefined)).optional(),
+    trigger: z
+      .enum(["hit", "physicalHit", "magicHit", "allyHit", "allyDown", "selfDown"])
+      .optional()
+      .catch(undefined),
+    refill: z.enum(["round", "combat"]).optional().catch(undefined),
     charging: z.coerce.boolean().catch(false).optional(),
     phaseLock: z.coerce.number().nullish().transform((v) => (v ? Number(v) : undefined)),
     phaseLockType: z.enum(["player", "enemy"]).catch("player").optional(),
@@ -157,6 +162,15 @@ export const combatantSchema = z
     tempMods: lenientArray(tempModSchema),
     /** Additive: encounters saved before stacks existed parse unchanged. */
     stacks: lenientArray(stackSchema).optional(),
+    redirect: z
+      .unknown()
+      .transform((v) => {
+        const o = v as { toId?: unknown; duration?: unknown } | null;
+        if (!o || typeof o.toId !== "string" || !o.toId) return undefined;
+        const duration = typeof o.duration === "number" ? Math.trunc(o.duration) : 0;
+        return duration > 0 ? { toId: o.toId, duration } : undefined;
+      })
+      .optional(),
     position: positionSchema,
     notes: z.unknown().transform((v) => (typeof v === "string" ? v : "")),
     sheetSkills: z.unknown().transform((v) => (looseJson(v) ?? {}) as object),

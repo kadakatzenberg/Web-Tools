@@ -7,7 +7,7 @@
  */
 
 import type { Combatant, EncounterState } from "@/domain/types";
-import { applyDamage, applyHealing, clamp } from "@/domain/rules";
+import { applyDamage, applyHealing, clamp, resolveRedirect } from "@/domain/rules";
 import { advancePhase, lockInitiative, resetInitiative } from "@/domain/phase";
 import { duplicateCombatant, gid } from "@/domain/factory";
 import type { Command } from "./actions";
@@ -222,10 +222,37 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
 
     /* ── health ── */
 
+    /**
+     * Damage resolves redirects first, so Aggro Transfer and Ally Hit
+     * Intercept work on every path that deals damage rather than only where
+     * the UI remembered to ask.
+     */
     case "DAMAGE_APPLIED": {
       if (!cmd.amount || !cmd.ids.length) return { state, log: [] };
-      const ids = new Set(cmd.ids);
       const log: LogEntry[] = [];
+
+      // Redirects are resolved before anything is applied, and de-duplicated:
+      // two targets both covered by the same guardian must not hit that
+      // guardian twice for one attack — but two separate attacks in the same
+      // dispatch still both land.
+      const ids = new Set<string>();
+      for (const wanted of cmd.ids) {
+        const actual = resolveRedirect(state.combatants, wanted);
+        if (actual !== wanted) {
+          const from = state.combatants.find((c) => c.id === wanted);
+          const to = state.combatants.find((c) => c.id === actual);
+          if (from && to) {
+            log.push(
+              entry(state, "damage", `${to.name} intercepts the hit meant for ${from.name}`, [
+                to.id,
+                from.id,
+              ]),
+            );
+          }
+        }
+        ids.add(actual);
+      }
+
       const combatants = state.combatants.map((c) => {
         if (!ids.has(c.id)) return c;
         const res = applyDamage(c, cmd.amount, cmd.damageType);
@@ -324,6 +351,49 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
         return { ...c, stacks };
       });
       return { state: { ...state, combatants }, log };
+    }
+
+    /**
+     * Point attacks aimed at one combatant at another. Refuses to point a
+     * combatant at itself, which would be a silent no-op that still reads as
+     * protection on the card.
+     */
+    case "REDIRECT_SET": {
+      if (cmd.id === cmd.toId || cmd.duration <= 0) return { state, log: [] };
+      const guard = state.combatants.find((c) => c.id === cmd.toId);
+      const ward = state.combatants.find((c) => c.id === cmd.id);
+      if (!guard || !ward) return { state, log: [] };
+      return {
+        state: {
+          ...state,
+          combatants: mapOne(state, cmd.id, (c) => ({
+            ...c,
+            redirect: { toId: cmd.toId, duration: cmd.duration },
+          })),
+        },
+        log: [
+          entry(
+            state,
+            "status",
+            `${guard.name} covers ${ward.name} for ${cmd.duration} round${cmd.duration === 1 ? "" : "s"}`,
+            [cmd.id, cmd.toId],
+          ),
+        ],
+      };
+    }
+
+    case "REDIRECT_CLEARED": {
+      return {
+        state: {
+          ...state,
+          combatants: mapOne(state, cmd.id, (c) => {
+            const next = { ...c };
+            delete next.redirect;
+            return next;
+          }),
+        },
+        log: [],
+      };
     }
 
     case "STACK_CLEARED": {

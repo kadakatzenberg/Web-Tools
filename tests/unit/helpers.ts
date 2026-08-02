@@ -34,6 +34,7 @@ export function makeCombatant(partial: Partial<Combatant> = {}): Combatant {
     // that enumerates every key does not silently drop new ones.
     ...(partial.stacks ? { stacks: partial.stacks } : {}),
     ...(partial.portrait ? { portrait: partial.portrait } : {}),
+    ...(partial.redirect ? { redirect: partial.redirect } : {}),
   };
 }
 

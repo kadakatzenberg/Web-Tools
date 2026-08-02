@@ -1741,3 +1741,75 @@
   color: var(--faint);
   margin-bottom: var(--s2);
 }
+
+/* ── Cover: whose body the hit lands on ── */
+
+.card__cover {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+  padding: var(--s1) var(--s2);
+  border-radius: var(--r-sm);
+  background: var(--inlay);
+  box-shadow: inset 0 0 0 1px var(--metal-800);
+}
+
+.card__cover-label {
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.card__cover select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A combatant covered by someone else is the exception, so it is marked. */
+.card:has(.card__cover select:not([value=""])) .card__cover {
+  box-shadow: inset 0 0 0 1px var(--moonlit-dim);
+}
+
+.card__cover-dur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--moonlit);
+}
+
+/* ── Lifesteal ── */
+
+.card__drain {
+  max-width: 9rem;
+}
+
+.card__drain-half {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+
+/* ── Reaction triggers ── */
+
+.ability__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: var(--s1);
+  font-size: var(--fs-2xs);
+  color: var(--cinnabar-bright);
+}
+
+.ability__trigger-mark {
+  display: grid;
+  place-items: center;
+  color: var(--cinnabar-dim);
+}
+
+/* An armed reaction is not merely "ready" — it is waiting. */
+.ability[data-ready="1"] .ability__state {
+  font-weight: 600;
+}

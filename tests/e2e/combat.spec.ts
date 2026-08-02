@@ -1129,3 +1129,67 @@ test("a stat check is built with the combatant's own modifier", async ({ page })
   await c.getByRole("button", { name: "Check", exact: true }).click();
   await expect(page.getByText(/CON DC 12 copied/)).toBeVisible();
 });
+
+test("a covered combatant's hits land on whoever is covering", async ({ page }) => {
+  await addCombatant(page, "Guardian", { hp: 30 });
+  await addCombatant(page, "Protected", { hp: 30 });
+
+  await card(page, "Protected").getByLabel("Hits land on").selectOption({ label: "Guardian" });
+
+  await card(page, "Protected").getByLabel("Damage to Protected").fill("6");
+  await card(page, "Protected").getByLabel("Damage type", { exact: true }).selectOption("raw");
+  await card(page, "Protected").getByRole("button", { name: "Strike", exact: true }).click();
+
+  expect(await hpOf(page, "Protected")).toBe("30/30");
+  expect(await hpOf(page, "Guardian")).toBe("24/30");
+});
+
+test("an armed reaction is raised when its trigger fires", async ({ page }) => {
+  await addCombatant(page, "Countering", { role: "Enemy", hp: 30 });
+  const c = card(page, "Countering");
+
+  await c.getByRole("button", { name: "Skills" }).click();
+  await c.getByRole("button", { name: "+ Ability" }).click();
+  await c.getByLabel("Ability name").fill("Counter Hit");
+  await c.getByLabel("Ability mode").selectOption("reaction");
+  await c.locator(".add-ability").getByRole("button", { name: "Add", exact: true }).click();
+
+  await c.getByRole("button", { name: /Edit Counter Hit/ }).click();
+  await page.getByLabel("Fires when").selectOption("hit");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  // Nothing armed until something happens.
+  await expect(page.locator(".reaction")).toHaveCount(0);
+
+  await c.getByLabel("Damage to Countering").fill("4");
+  await c.getByLabel("Damage type", { exact: true }).selectOption("raw");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+
+  const strip = page.locator(".reaction");
+  await expect(strip).toBeVisible();
+  await expect(strip.getByText("Counter Hit")).toBeVisible();
+
+  // Firing it spends the reaction, so it stops being armed.
+  await strip.getByRole("button", { name: "Fire" }).click();
+  await expect(page.locator(".reaction")).toHaveCount(0);
+});
+
+test("lifesteal heals the drain target for the damage that landed", async ({ page }) => {
+  await addCombatant(page, "Drinker", { hp: 30 });
+  await addCombatant(page, "Victim", { role: "Enemy", hp: 30 });
+
+  // Hurt the drinker so the heal has somewhere to go.
+  await card(page, "Drinker").getByLabel("Damage to Drinker").fill("10");
+  await card(page, "Drinker").getByLabel("Damage type", { exact: true }).selectOption("raw");
+  await card(page, "Drinker").getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Drinker")).toBe("20/30");
+
+  const v = card(page, "Victim");
+  await v.getByLabel("Drain damage from Victim to").selectOption({ label: "⤺ Drinker" });
+  await v.getByLabel("Damage to Victim").fill("8");
+  await v.getByLabel("Damage type", { exact: true }).selectOption("raw");
+  await v.getByRole("button", { name: "Strike", exact: true }).click();
+
+  expect(await hpOf(page, "Victim")).toBe("22/30");
+  expect(await hpOf(page, "Drinker")).toBe("28/30");
+});

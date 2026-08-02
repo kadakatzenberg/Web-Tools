@@ -43,6 +43,24 @@ export type AbilityMode =
 
 export type PhaseLockType = "player" | "enemy";
 
+/**
+ * What makes a reaction fire.
+ *
+ * Reactions used to be modelled as cooldowns, which says when they are
+ * *available* but nothing about when they go off — and every one of the
+ * fourteen reaction skills is defined by its trigger, not its timer.
+ */
+export type ReactionTrigger =
+  | "hit"
+  | "physicalHit"
+  | "magicHit"
+  | "allyHit"
+  | "allyDown"
+  | "selfDown";
+
+/** When a limited-use skill gets its uses back. */
+export type RefillCadence = "round" | "combat";
+
 export interface Ability {
   id: string;
   name: string;
@@ -60,6 +78,14 @@ export interface Ability {
    */
   dcStat?: StatKey;
   dcValue?: number;
+  /** For reactions: the event that arms this against firing. */
+  trigger?: ReactionTrigger;
+  /**
+   * For skills with a budget rather than a cooldown. "Once per round" and
+   * "once per combat" cannot be said with `gainPerPhase`, which refills per
+   * phase — three times as fast as a round.
+   */
+  refill?: RefillCadence;
   charging?: boolean;
   phaseLock?: number;
   phaseLockType?: PhaseLockType;
@@ -170,6 +196,12 @@ export interface Combatant {
   tempMods: TempMod[];
   /** Counters inflicted on this combatant. Optional and additive. */
   stacks?: StackMark[];
+  /**
+   * Attacks aimed at this combatant land on someone else instead — the model
+   * behind Aggro Transfer and Ally Hit Intercept. Ticks down with everything
+   * else on the round boundary.
+   */
+  redirect?: { toId: string; duration: number };
   position: Position;
   notes: string;
   sheetSkills: SheetSkills;

@@ -11,6 +11,8 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type {
   Ability,
   AbilityMode,
+  ReactionTrigger,
+  RefillCadence,
   Combatant,
   DamageType,
   ModTarget,
@@ -32,10 +34,11 @@ import {
 import { POSITIONS, SKILL_MODES, SKILL_MODE_LABELS, STACK_PRESETS, STAT_KEYS, STATUS_OPTIONS } from "@/domain/constants";
 import { gid } from "@/domain/factory";
 import { checkRoll, d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
+import type { CombatEvent } from "@/domain/rules";
 import { useStoreApi } from "@/state/store";
 import { announce, useCopy, useId } from "../hooks";
 import { Badge, Button, DetailTabs, IconButton, Meter, Modal, NumberInput, useToast } from "../primitives";
-import { IconCheck, IconClose, IconDice, IconDuplicate, IconMinus, IconPlus, IconTarget, IconWard, statusMark } from "../icons";
+import { IconAdvance, IconCheck, IconClose, IconDice, IconDuplicate, IconMinus, IconPlus, IconTarget, IconWard, statusMark } from "../icons";
 import { Portrait } from "../Portrait";
 import { FloatingMarks, useFeedback, useImpact } from "@/fx/feedback";
 import { playCue } from "@/fx/sound";
@@ -61,6 +64,16 @@ const BAND_LABEL: Record<string, string> = {
   wounded: "Wounded",
   critical: "Critical",
   unconscious: "Unconscious",
+};
+
+/** What each reaction trigger reads as on a card. */
+const TRIGGER_LABELS: Record<string, string> = {
+  hit: "Fires when this unit is hit",
+  physicalHit: "Fires on a physical hit",
+  magicHit: "Fires on a magical hit",
+  allyHit: "Fires when an ally is hit",
+  allyDown: "Fires when an ally goes down",
+  selfDown: "Fires on reaching 0 HP",
 };
 
 const MODE_TONE: Record<AbilityMode, string> = {
@@ -133,13 +146,21 @@ const AbilityChip = memo(function AbilityChip({
   // State word carries the meaning; colour only reinforces it.
   const stateWord = locked
     ? "Locked"
-    : ab.mode === "cooldown" || ab.mode === "reaction"
+    : ab.mode === "reaction"
       ? ab.cur === 0
-        ? "Ready"
+        ? ab.trigger
+          ? "Armed"
+          : "Ready"
         : `${ab.cur} left`
-      : ab.mode === "passive"
-        ? "Passive"
-        : `${ab.cur}/${ab.max}`;
+      : ab.mode === "cooldown"
+        ? ab.cur === 0
+          ? "Ready"
+          : `${ab.cur} left`
+        : ab.mode === "passive"
+          ? ab.refill
+            ? `${ab.cur}/${ab.max} this ${ab.refill}`
+            : "Passive"
+          : `${ab.cur}/${ab.max}`;
 
   return (
     <div
@@ -171,6 +192,18 @@ const AbilityChip = memo(function AbilityChip({
       </div>
 
       {ab.effectText && <p className="ability__effect">{ab.effectText}</p>}
+
+      {/* What arms a reaction. A reaction is defined by its trigger, not its
+          timer, and this is what lets the tracker raise it when the moment
+          actually comes. */}
+      {ab.mode === "reaction" && ab.trigger ? (
+        <p className="ability__trigger">
+          <span className="ability__trigger-mark" aria-hidden="true">
+            <IconAdvance size={11} />
+          </span>
+          {TRIGGER_LABELS[ab.trigger]}
+        </p>
+      ) : null}
 
       {/* The saving throw this skill forces, shown on the caster's chip so the
           GM can read it off while casting and set it on the target's card. */}
@@ -238,6 +271,19 @@ const AbilityChip = memo(function AbilityChip({
           {ab.mode === "cooldown" && (
             <Button size="sm" tone="heal" disabled={!ready} onClick={() => patch({ cur: ab.max }, true)}>
               Use
+            </Button>
+          )}
+
+          {/* "Once per round" and "once per combat" are budgets, not cooldowns.
+              gainPerPhase refills three times a round, so it cannot say either. */}
+          {ab.mode === "passive" && ab.refill && (
+            <Button
+              size="sm"
+              tone="phase"
+              disabled={ab.cur <= 0}
+              onClick={() => patch({ cur: Math.max(0, ab.cur - 1) })}
+            >
+              Spend
             </Button>
           )}
 
@@ -323,6 +369,8 @@ function AbilityEditor({
   const [max, setMax] = useState(String(ab.max));
   const [gain, setGain] = useState(String(ab.gainPerPhase ?? 1));
   const [dice, setDice] = useState(ab.dice ?? "");
+  const [trigger, setTrigger] = useState<string>(ab.trigger ?? "");
+  const [refill, setRefill] = useState<string>(ab.refill ?? "");
   const diceValid = !dice.trim() || looksLikeDice(dice);
 
   const capacityLabel =
@@ -351,6 +399,8 @@ function AbilityEditor({
                   max: Math.max(0, parseInt(max, 10) || 0),
                   gainPerPhase: Math.max(1, parseInt(gain, 10) || 1),
                   dice: dice.trim(),
+                  ...(trigger ? { trigger: trigger as ReactionTrigger } : { trigger: undefined }),
+                  ...(refill ? { refill: refill as RefillCadence } : { refill: undefined }),
                 },
               });
               onClose();
@@ -363,6 +413,32 @@ function AbilityEditor({
     >
       <label className="field__label" htmlFor="ab-name">Name</label>
       <input id="ab-name" value={name} onChange={(e) => setName(e.target.value)} />
+
+      {ab.mode === "reaction" && (
+        <>
+          <label className="field__label" htmlFor="ab-trigger">
+            Fires when
+          </label>
+          <select id="ab-trigger" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
+            <option value="">Not set — never raised automatically</option>
+            <option value="hit">This unit is hit</option>
+            <option value="physicalHit">This unit is hit physically</option>
+            <option value="magicHit">This unit is hit magically</option>
+            <option value="allyHit">An ally is hit</option>
+            <option value="allyDown">An ally goes down</option>
+            <option value="selfDown">This unit reaches 0 HP</option>
+          </select>
+        </>
+      )}
+
+      <label className="field__label" htmlFor="ab-refill">
+        Budget
+      </label>
+      <select id="ab-refill" value={refill} onChange={(e) => setRefill(e.target.value)}>
+        <option value="">Normal — follows its mode</option>
+        <option value="round">Uses refill each round</option>
+        <option value="combat">Uses never refill (once per combat)</option>
+      </select>
 
       {ab.mode !== "passive" && (
         <>
@@ -535,8 +611,18 @@ function AddAbility({ combatantId }: { combatantId: string }) {
 
 /* ── Card ── */
 
+/** Identity only — enough to populate a target picker without dragging state. */
+export interface RosterEntry {
+  id: string;
+  name: string;
+  role: Combatant["role"];
+}
+
 export interface CardProps {
   c: Combatant;
+  roster: RosterEntry[];
+  /** Reports a hit or a knockout so armed reactions can be raised. */
+  onEvent?: (e: CombatEvent) => void;
   playerPhaseCount: number;
   enemyPhaseCount: number;
   compact: boolean;
@@ -555,6 +641,8 @@ export const CombatantCard = memo(function CombatantCard({
   isLast,
   focused,
   onFocus,
+  roster,
+  onEvent,
 }: CardProps) {
   const { dispatch } = useStoreApi();
   const { mark, hitstop } = useFeedback();
@@ -567,6 +655,8 @@ export const CombatantCard = memo(function CombatantCard({
   const [ward, setWard] = useState(true);
   const [checkStat, setCheckStat] = useState<StatKey>("CON");
   const [checkDc, setCheckDc] = useState("");
+  const [drainTo, setDrainTo] = useState("");
+  const [drainHalf, setDrainHalf] = useState(false);
   const [editing, setEditing] = useState<Ability | null>(null);
   const [statusName, setStatusName] = useState<string>("Prone");
   const [statusCustom, setStatusCustom] = useState("");
@@ -603,6 +693,14 @@ export const CombatantCard = memo(function CombatantCard({
   }, [focused, cardRef]);
 
   const applyDmg = () => {
+    // Feedback follows the cover. The reducer owns the authoritative chain;
+    // this is the single hop the card can see, which is enough to stop a
+    // floating number landing on someone who took nothing.
+    const coveredBy = c.redirect?.toId
+      ? roster.find((o) => o.id === c.redirect!.toId)
+      : undefined;
+    const hitId = coveredBy?.id ?? c.id;
+
     const amount = parseInt(dmg, 10);
     // Never swallow a click. Before, an empty or zero field made Strike a
     // no-op with no explanation, which reads exactly like the app is broken.
@@ -614,24 +712,48 @@ export const CombatantCard = memo(function CombatantCard({
     const b = preview.breakdown;
 
     if (b.toHp > 0) {
-      mark(c.id, `−${b.toHp}`, dmgType === "magical" ? "magical" : dmgType === "physical" ? "physical" : "true");
+      mark(hitId, `−${b.toHp}`, dmgType === "magical" ? "magical" : dmgType === "physical" ? "physical" : "true");
       hitstop(b.toHp >= c.maxHp * 0.25 ? 70 : 45);
       playCue("damage");
     }
-    if (b.resisted > 0) mark(c.id, `${b.resisted} resisted`, "resist");
-    if (b.amplified > 0) mark(c.id, `+${b.amplified} exposed`, "true");
+    if (b.resisted > 0) mark(hitId, `${b.resisted} resisted`, "resist");
+    if (b.amplified > 0) mark(hitId, `+${b.amplified} exposed`, "true");
     if (b.absorbedByTemp + b.absorbedByShield > 0) {
-      mark(c.id, `◈ ${b.absorbedByTemp + b.absorbedByShield}`, "shield");
+      mark(hitId, `◈ ${b.absorbedByTemp + b.absorbedByShield}`, "shield");
       playCue(b.brokeShield ? "shieldBreak" : "shieldHit");
     }
-    if (b.brokeShield || b.brokeTempShieldIds.length) mark(c.id, "SHIELD BROKEN", "shieldBreak");
+    if (b.brokeShield || b.brokeTempShieldIds.length) mark(hitId, "SHIELD BROKEN", "shieldBreak");
 
     dispatch({ type: "DAMAGE_APPLIED", ids: [c.id], amount, damageType: dmgType });
 
-    const died = c.hp > 0 && preview.hp <= 0;
+    // Lifesteal, applied in the same beat as the hit. Four skills drain, and
+    // the heal is the half everyone forgets — it lands after the damage, so it
+    // is the damage that actually reached HP that gets drained, not the raw
+    // number typed in.
+    if (drainTo) {
+      const drained = drainHalf ? Math.floor(b.toHp / 2) : b.toHp;
+      if (drained > 0) {
+        dispatch({ type: "HEAL_APPLIED", ids: [drainTo], amount: drained, overheal: ward });
+        mark(drainTo, `+${drained}`, "heal");
+      }
+    }
+
+    // A covered combatant cannot be the one who goes down from this hit.
+    const died = !coveredBy && c.hp > 0 && preview.hp <= 0;
     if (died) playCue("defeated");
+
+    // Raise anything armed against this. A knockout supersedes the hit that
+    // caused it — "when an ally goes down" is the more consequential trigger,
+    // and showing both would just be noise.
+    onEvent?.({
+      kind: died ? "down" : "hit",
+      targetId: c.id,
+      damageType: dmgType,
+    });
     announce(
-      `${c.name} took ${amount} ${dmgType} damage. ${preview.hp} of ${c.maxHp} hit points remaining.${died ? " Unconscious." : ""}`,
+      coveredBy
+        ? `${coveredBy.name} intercepts the hit meant for ${c.name}.`
+        : `${c.name} took ${amount} ${dmgType} damage. ${preview.hp} of ${c.maxHp} hit points remaining.${died ? " Unconscious." : ""}`,
     );
     setDmg("");
   };
@@ -882,6 +1004,31 @@ export const CombatantCard = memo(function CombatantCard({
               <Button tone="danger" onClick={applyDmg}>
                 Strike
               </Button>
+              <select
+                className="card__drain"
+                value={drainTo}
+                aria-label={`Drain damage from ${c.name} to`}
+                title="Lifesteal: heal another combatant for the damage this hit deals"
+                onChange={(e) => setDrainTo(e.target.value)}
+              >
+                <option value="">No drain</option>
+                {roster
+                  .filter((o) => o.id !== c.id)
+                  .map((o) => (
+                    <option key={o.id} value={o.id}>
+                      ⤺ {o.name}
+                    </option>
+                  ))}
+              </select>
+              {drainTo && (
+                <IconButton
+                  label={drainHalf ? "Drains half the damage" : "Drains all the damage"}
+                  aria-pressed={drainHalf}
+                  onClick={() => setDrainHalf((v) => !v)}
+                >
+                  <span className="card__drain-half">{drainHalf ? "½" : "1"}</span>
+                </IconButton>
+              )}
             </div>
 
             <div className="action-group">
@@ -1002,6 +1149,42 @@ export const CombatantCard = memo(function CombatantCard({
               ))}
             </div>
           )}
+
+          {/* ── Cover ── */}
+          <div className="card__cover">
+            <label className="card__cover-label" htmlFor={`${headingId}-cover`}>
+              Hits land on
+            </label>
+            <select
+              id={`${headingId}-cover`}
+              value={c.redirect?.toId ?? ""}
+              onChange={(e) => {
+                const toId = e.target.value;
+                if (!toId) dispatch({ type: "REDIRECT_CLEARED", id: c.id });
+                else dispatch({ type: "REDIRECT_SET", id: c.id, toId, duration: 1 });
+              }}
+            >
+              <option value="">{c.name}</option>
+              {roster
+                .filter((o) => o.id !== c.id)
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+            </select>
+            {c.redirect && (
+              <>
+                <span className="card__cover-dur tnum">{c.redirect.duration}r</span>
+                <IconButton
+                  label={`Stop redirecting hits on ${c.name}`}
+                  onClick={() => dispatch({ type: "REDIRECT_CLEARED", id: c.id })}
+                >
+                  <IconClose size={11} />
+                </IconButton>
+              </>
+            )}
+          </div>
 
           {/* ── Stacks ── */}
           {(c.stacks?.length ?? 0) > 0 && (

@@ -179,3 +179,74 @@ combatant's saving throw with their own effective modifier and any
 Advantage/Disadvantage already applied.
 
 The tracker still never rolls. It writes notation.
+
+### Reactions have a trigger, not just a timer
+
+**Before:** `reaction` mode was a cooldown. That says when a reaction is
+*available* and nothing about when it goes off.
+
+**Now:** a reaction carries a trigger — this unit is hit, hit physically, hit
+magically, an ally is hit, an ally goes down, this unit reaches 0 HP. After a
+hit or a knockout the tracker raises every armed reaction whose trigger the
+event satisfies, and offers to spend it.
+
+**Why:** all fourteen reaction skills are defined by their trigger. A timer
+alone cannot say "when hit by a magical attack, negate the damage".
+
+**Derived, never stored.** The prompt is recomputed from the encounter and the
+last event, so it cannot go stale, survive an undo, or point at a combatant who
+has since been removed. A reaction with no trigger set is never raised — a
+default of "answers everything" would cry wolf on every hit.
+
+### Per-round and per-combat budgets
+
+**Before:** `gainPerPhase` was the only refill, and it fires three times a
+round.
+
+**Now:** an ability can carry `refill: "round"` (restores its whole budget on
+the round boundary) or `refill: "combat"` (never restores). A passive with a
+budget gets a Spend control and shows "1/1 this round".
+
+**Why:** "Once per round, negate one hit entirely" and "survive with 1 HP once
+per combat" were both unsayable.
+
+### Attacks can be redirected
+
+**Before:** nothing. Aggro Transfer and Ally Hit Intercept lived in the GM's
+memory.
+
+**Now:** a combatant can be covered by another. Redirects resolve inside
+`DAMAGE_APPLIED`, so every path that deals damage honours them rather than only
+the ones the UI remembered to ask about. They tick down with everything else on
+the round boundary.
+
+**Edge cases, decided rather than left open:**
+
+- A chain is followed to its end, because an interceptor can itself be
+  intercepted.
+- A **circular** cover resolves back to the original target. A protecting B
+  while B protects A cancels out — nobody is in front. Returning the original
+  is the only answer that does not depend on where the walk started, which
+  matters once a longer chain feeds into a loop.
+- A redirect to a **downed** combatant is ignored. A body cannot cover anyone.
+- Two wards sharing one guardian strike that guardian **once** per attack, not
+  twice.
+
+### Lifesteal is applied with the hit
+
+**Before:** "heal self for all damage dealt" was arithmetic plus a second
+action the table routinely forgot.
+
+**Now:** the strike row carries an optional drain target and a full/half
+toggle. The heal lands in the same beat as the hit, and drains the damage that
+**actually reached HP** — not the raw number typed in, which would ignore
+resistance and shields.
+
+### Deliberately not built
+
+- **Formula damage** — "damage equals max HP minus current HP, capped at 10"
+  (HP Threshold Charge) and "damage is calculated using the target's highest
+  stat" (Stat Mirror Strike). One skill each, both trivial mental arithmetic,
+  and a UI for them would cost more attention than it saves.
+- **Per-skill overheal caps** — `applyHealing` accepts a `wardCap`, but no
+  control sets it. Heal for less, or trim the ward chip.

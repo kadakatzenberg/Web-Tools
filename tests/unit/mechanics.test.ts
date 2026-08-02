@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { applyDamage, applyHealing, damageTakenBonus } from "@/domain/rules";
+import {
+  applyDamage,
+  applyHealing,
+  armedReactions,
+  damageTakenBonus,
+  resolveRedirect,
+  tickAbility,
+  tickCombatant,
+} from "@/domain/rules";
 import { reduce } from "@/state/reducer";
 import { parseEncounterState } from "@/domain/schema";
 import { makeCombatant, stats } from "./helpers";
@@ -178,5 +186,155 @@ describe("stacks carried by the target", () => {
       count: 2,
       perStackDamage: 1,
     });
+  });
+});
+
+/* ── Reactions ── */
+
+const reaction = (over: Record<string, unknown> = {}) => ({
+  id: "r1",
+  name: "Counter Hit",
+  mode: "reaction" as const,
+  max: 3,
+  cur: 0,
+  trigger: "hit" as const,
+  ...over,
+});
+
+describe("armed reactions", () => {
+  it("raises a reaction whose trigger the event satisfies", () => {
+    const guard = makeCombatant({ id: "g", name: "Guard", role: "Player", abilities: [reaction()] });
+    const armed = armedReactions([guard], { kind: "hit", targetId: "g", damageType: "physical" });
+    expect(armed).toHaveLength(1);
+    expect(armed[0]!.ability.name).toBe("Counter Hit");
+  });
+
+  it("does not raise one that is still on cooldown", () => {
+    const guard = makeCombatant({ id: "g", role: "Player", abilities: [reaction({ cur: 2 })] });
+    expect(armedReactions([guard], { kind: "hit", targetId: "g" })).toHaveLength(0);
+  });
+
+  it("never raises a reaction with no trigger set", () => {
+    // Guessing here would cry wolf on every single hit.
+    const guard = makeCombatant({ id: "g", role: "Player", abilities: [reaction({ trigger: undefined })] });
+    expect(armedReactions([guard], { kind: "hit", targetId: "g" })).toHaveLength(0);
+  });
+
+  it("distinguishes an ally being hit from itself being hit", () => {
+    const guard = makeCombatant({
+      id: "g",
+      role: "Player",
+      abilities: [reaction({ id: "r2", name: "Intercept", trigger: "allyHit" })],
+    });
+    const friend = makeCombatant({ id: "f", role: "Player" });
+    const foe = makeCombatant({ id: "e", role: "Enemy" });
+
+    expect(armedReactions([guard, friend, foe], { kind: "hit", targetId: "f" })).toHaveLength(1);
+    // Its own hit is not an ally's hit.
+    expect(armedReactions([guard, friend, foe], { kind: "hit", targetId: "g" })).toHaveLength(0);
+    // Nor is an enemy's.
+    expect(armedReactions([guard, friend, foe], { kind: "hit", targetId: "e" })).toHaveLength(0);
+  });
+
+  it("matches on damage type where the trigger names one", () => {
+    const guard = makeCombatant({
+      id: "g",
+      role: "Player",
+      abilities: [reaction({ trigger: "magicHit" })],
+    });
+    expect(armedReactions([guard], { kind: "hit", targetId: "g", damageType: "magical" })).toHaveLength(1);
+    expect(armedReactions([guard], { kind: "hit", targetId: "g", damageType: "physical" })).toHaveLength(0);
+  });
+
+  it("does not raise a reaction on an unconscious combatant", () => {
+    const guard = makeCombatant({ id: "g", role: "Player", hp: 0, abilities: [reaction()] });
+    expect(armedReactions([guard], { kind: "hit", targetId: "g" })).toHaveLength(0);
+  });
+});
+
+/* ── Budgets ── */
+
+describe("per-round and per-combat budgets", () => {
+  it("refills a per-round budget on the round boundary", () => {
+    // "Once per round, negate one hit entirely."
+    const spent = { ...reaction({ mode: "passive" as const, max: 1, cur: 0, refill: "round" as const }) };
+    expect(tickAbility(spent).cur).toBe(1);
+  });
+
+  it("never refills a per-combat budget", () => {
+    // "Survive with 1 HP once per combat."
+    const spent = { ...reaction({ mode: "passive" as const, max: 1, cur: 0, refill: "combat" as const }) };
+    expect(tickAbility(spent).cur).toBe(0);
+  });
+
+  it("leaves an ordinary cooldown ticking as before", () => {
+    expect(tickAbility(reaction({ cur: 2 })).cur).toBe(1);
+  });
+});
+
+/* ── Redirection ── */
+
+describe("redirected hits", () => {
+  const guard = () => makeCombatant({ id: "g", name: "Guard", role: "Player", hp: 30, maxHp: 30, stats: stats({}) });
+  const ward = (over = {}) =>
+    makeCombatant({ id: "w", name: "Ward", role: "Player", hp: 20, maxHp: 20, stats: stats({}), ...over });
+
+  it("lands the hit on whoever is covering", () => {
+    const state = encounter([guard(), ward({ redirect: { toId: "g", duration: 1 } })]);
+    const out = reduce(state, { type: "DAMAGE_APPLIED", ids: ["w"], amount: 5, damageType: "raw" });
+    expect(out.state.combatants.find((c) => c.id === "w")!.hp).toBe(20);
+    expect(out.state.combatants.find((c) => c.id === "g")!.hp).toBe(25);
+    expect(out.log[0]!.text).toMatch(/Guard intercepts the hit meant for Ward/);
+  });
+
+  it("does not send hits to a body", () => {
+    const state = encounter([
+      makeCombatant({ id: "g", name: "Guard", role: "Player", hp: 0, maxHp: 30, stats: stats({}) }),
+      ward({ redirect: { toId: "g", duration: 1 } }),
+    ]);
+    const out = reduce(state, { type: "DAMAGE_APPLIED", ids: ["w"], amount: 5, damageType: "raw" });
+    expect(out.state.combatants.find((c) => c.id === "w")!.hp).toBe(15);
+  });
+
+  it("cancels a circular cover back to the original target", () => {
+    // A covering B while B covers A is easy to set up by accident. It must not
+    // hang, and the answer must not depend on where the walk started.
+    const a = makeCombatant({ id: "a", role: "Player", stats: stats({}), redirect: { toId: "b", duration: 1 } });
+    const b = makeCombatant({ id: "b", role: "Player", stats: stats({}), redirect: { toId: "a", duration: 1 } });
+    expect(resolveRedirect([a, b], "a")).toBe("a");
+    expect(resolveRedirect([a, b], "b")).toBe("b");
+
+    // A chain feeding into a cycle resolves to its own origin, not to an
+    // arbitrary member of the loop.
+    const x = makeCombatant({ id: "x", role: "Player", stats: stats({}), redirect: { toId: "a", duration: 1 } });
+    expect(resolveRedirect([x, a, b], "x")).toBe("x");
+  });
+
+  it("follows a chain of covers to the end", () => {
+    const a = makeCombatant({ id: "a", role: "Player", stats: stats({}), redirect: { toId: "b", duration: 1 } });
+    const b = makeCombatant({ id: "b", role: "Player", stats: stats({}), redirect: { toId: "c", duration: 1 } });
+    const c = makeCombatant({ id: "c", role: "Player", stats: stats({}) });
+    expect(resolveRedirect([a, b, c], "a")).toBe("c");
+  });
+
+  it("expires on the round boundary", () => {
+    const c = makeCombatant({ id: "w", stats: stats({}), redirect: { toId: "g", duration: 1 } });
+    expect(tickCombatant(c).next.redirect).toBeUndefined();
+  });
+
+  it("only strikes the guardian once when two wards share one", () => {
+    const state = encounter([
+      guard(),
+      ward({ redirect: { toId: "g", duration: 2 } }),
+      makeCombatant({ id: "w2", name: "Ward2", role: "Player", hp: 20, maxHp: 20, stats: stats({}), redirect: { toId: "g", duration: 2 } }),
+    ]);
+    const out = reduce(state, { type: "DAMAGE_APPLIED", ids: ["w", "w2"], amount: 5, damageType: "raw" });
+    expect(out.state.combatants.find((c) => c.id === "g")!.hp).toBe(25);
+  });
+
+  it("refuses to point a combatant at itself", () => {
+    const state = encounter([guard()]);
+    const out = reduce(state, { type: "REDIRECT_SET", id: "g", toId: "g", duration: 2 });
+    expect(out.state.combatants[0]!.redirect).toBeUndefined();
   });
 });

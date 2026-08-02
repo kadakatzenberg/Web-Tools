@@ -14,6 +14,7 @@ import type {
   Dot,
   HealthBand,
   ModTarget,
+  ReactionTrigger,
   Regen,
   Stats,
   TempMod,
@@ -337,8 +338,14 @@ export function abilityFillPercent(ab: Ability): number {
 /**
  * Advance one ability across a round boundary.
  * Charge accrues only while charging; cooldown and reaction tick down.
+ *
+ * A skill with `refill: "round"` restores its whole budget instead — that is
+ * how "once per round" is said. `refill: "combat"` never restores, so a
+ * once-per-combat skill stays spent until the encounter is reset.
  */
 export function tickAbility(ab: Ability): Ability {
+  if (ab.refill === "round") return { ...ab, cur: ab.max };
+  if (ab.refill === "combat") return { ...ab };
   if (ab.mode === "charge") {
     return ab.charging
       ? { ...ab, cur: clamp(ab.cur + (ab.gainPerPhase || 1), 0, ab.max) }
@@ -348,6 +355,119 @@ export function tickAbility(ab: Ability): Ability {
     return { ...ab, cur: clamp(ab.cur - 1, 0, ab.max) };
   }
   return { ...ab };
+}
+
+/* ── Reactions ── */
+
+/** Something that just happened, which a reaction might answer. */
+export interface CombatEvent {
+  kind: "hit" | "down";
+  /** Who it happened to. */
+  targetId: string;
+  damageType?: DamageType;
+}
+
+function triggerMatches(
+  trigger: ReactionTrigger,
+  event: CombatEvent,
+  self: Combatant,
+  subject: Combatant,
+): boolean {
+  const isSelf = self.id === subject.id;
+  // "Ally" means the same side, and never the reacting unit itself.
+  const isAlly = !isSelf && self.role === subject.role;
+  const physical = event.damageType === "physical";
+  const magical = event.damageType === "magical";
+
+  switch (trigger) {
+    case "hit":
+      return event.kind === "hit" && isSelf;
+    case "physicalHit":
+      return event.kind === "hit" && isSelf && physical;
+    case "magicHit":
+      return event.kind === "hit" && isSelf && magical;
+    case "allyHit":
+      return event.kind === "hit" && isAlly;
+    case "allyDown":
+      return event.kind === "down" && isAlly;
+    case "selfDown":
+      return event.kind === "down" && isSelf;
+  }
+}
+
+export interface ArmedReaction {
+  combatant: Combatant;
+  ability: Ability;
+}
+
+/**
+ * Reactions that are ready and whose trigger this event satisfies.
+ *
+ * Pure and derived: nothing is stored, so a reaction prompt can never go stale
+ * or survive an undo. A reaction with no trigger set is skipped rather than
+ * assumed to answer everything — guessing here would cry wolf on every hit.
+ */
+export function armedReactions(
+  combatants: Combatant[],
+  event: CombatEvent,
+  playerPhaseCount = 0,
+  enemyPhaseCount = 0,
+): ArmedReaction[] {
+  const subject = combatants.find((c) => c.id === event.targetId);
+  if (!subject) return [];
+
+  const out: ArmedReaction[] = [];
+  for (const c of combatants) {
+    if (c.hp <= 0) continue; // the unconscious do not answer
+    for (const ab of c.abilities ?? []) {
+      if (ab.mode !== "reaction" || !ab.trigger) continue;
+      if (!isAbilityReady(ab)) continue;
+      if (isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount)) continue;
+      if (triggerMatches(ab.trigger, event, c, subject)) out.push({ combatant: c, ability: ab });
+    }
+  }
+  return out;
+}
+
+/* ── Redirection ── */
+
+/**
+ * Who actually takes a hit aimed at `id`.
+ *
+ * Follows a chain of redirects, because an intercept can itself be intercepted.
+ * Redirects to a downed combatant are ignored — a body cannot cover anyone.
+ *
+ * A circular arrangement resolves back to the original target. A protecting B
+ * while B protects A is an easy thing for a table to set up by accident, and
+ * the cover cancels out: nobody can be said to be in front. Returning the
+ * original is the one answer that does not depend on where the walk happened
+ * to start or stop, which matters because a longer chain feeding into a cycle
+ * would otherwise land on an arbitrary member of it.
+ */
+export function resolveRedirect(combatants: Combatant[], id: string): string {
+  const byId = new Map(combatants.map((c) => [c.id, c]));
+  const seen = new Set<string>();
+  let current = id;
+
+  while (true) {
+    if (seen.has(current)) return id;
+    seen.add(current);
+    const c = byId.get(current);
+    const to = c?.redirect;
+    if (!to || to.duration <= 0) return current;
+    const next = byId.get(to.toId);
+    if (!next || next.hp <= 0) return current;
+    current = to.toId;
+  }
+}
+
+/** Redirects lose a round, and expire. */
+export function tickRedirect(
+  redirect: Combatant["redirect"],
+): Combatant["redirect"] {
+  if (!redirect) return undefined;
+  const duration = redirect.duration - 1;
+  return duration > 0 ? { ...redirect, duration } : undefined;
 }
 
 /* ── Duration bookkeeping ── */
@@ -432,6 +552,7 @@ export function tickCombatant(c: Combatant): { next: Combatant; event: RoundTick
 
   const nextStatuses = tickDurations(c.statuses);
   const nextMods = tickDurations(c.tempMods);
+  const nextRedirect = tickRedirect(c.redirect);
   const nextShields = tickDurations(ts);
   const nextDots = tickDots(c.dots);
 
@@ -461,6 +582,11 @@ export function tickCombatant(c: Combatant): { next: Combatant; event: RoundTick
     tempMods: nextMods,
     tempShields: nextShields,
   };
+
+  // Left off the object literal above so an expired redirect is deleted rather
+  // than persisted as `undefined` through a JSON round trip.
+  if (nextRedirect) next.redirect = nextRedirect;
+  else delete next.redirect;
 
   return {
     next,
