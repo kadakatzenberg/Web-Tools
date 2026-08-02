@@ -19,7 +19,10 @@ export type SoundCue =
   | "heal"
   | "abilityReady"
   | "chargeComplete"
-  | "defeated";
+  | "defeated"
+  | "cursor"
+  | "confirm"
+  | "cancel";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -159,6 +162,17 @@ export function playCue(cue: SoundCue): void {
       break;
     case "defeated":
       tone({ freq: 130, toFreq: 48, type: "sine", duration: 0.9, gain: 0.42 });
+      break;
+    // The command window's three notes, kept deliberately small. A menu that
+    // announces itself as loudly as a hit stops being furniture.
+    case "cursor":
+      tone({ freq: 880, type: "square", duration: 0.04, gain: 0.07 });
+      break;
+    case "confirm":
+      tone({ freq: 660, toFreq: 990, type: "square", duration: 0.08, gain: 0.09 });
+      break;
+    case "cancel":
+      tone({ freq: 440, toFreq: 294, type: "square", duration: 0.09, gain: 0.08 });
       break;
   }
 }

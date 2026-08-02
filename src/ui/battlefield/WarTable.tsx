@@ -15,13 +15,21 @@
  *
  * Combatants can be dragged between bands, or moved by click/keyboard for
  * anyone not using a pointer. Drag never becomes the only route to an action.
+ *
+ * Clicking a token opens the command window (see `CommandFlow`), which is where
+ * a whole action is given and resolved. This module owns the parts of that flow
+ * the table itself has to draw: which token is acting, which may be aimed at,
+ * and the line running between them.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Combatant, Position, Role } from "@/domain/types";
-import { healthBand, healthPercent } from "@/domain/rules";
+import { healthBand, healthPercent, type CombatEvent } from "@/domain/rules";
 import { useStore, useStoreApi } from "@/state/store";
+import { FloatingMarks } from "@/fx/feedback";
+import { playCue } from "@/fx/sound";
 import { announce } from "../hooks";
+import { CommandFlow, isLegalTarget, type Flow } from "./CommandFlow";
 import "./battlefield.css";
 
 const BAND_TONE: Record<string, string> = {
@@ -71,16 +79,21 @@ function summarise(c: Combatant): string {
     .join(", ");
 }
 
+/** What this token is to the command currently being given. */
+type AimRole = "actor" | "legal" | "illegal" | null;
+
 function Token({
   c,
   selected,
   dragging,
+  aim,
   onSelect,
   onDragStart,
 }: {
   c: Combatant;
   selected: boolean;
   dragging: boolean;
+  aim: AimRole;
   onSelect: () => void;
   onDragStart: (e: React.PointerEvent, c: Combatant) => void;
 }) {
@@ -92,14 +105,22 @@ function Token({
     <button
       type="button"
       className="tok"
+      data-token={c.id}
       data-side={c.role === "Player" ? "player" : "enemy"}
       data-band={band}
       data-done={c.done ? "1" : undefined}
       data-selected={selected ? "1" : undefined}
       data-dragging={dragging ? "1" : undefined}
+      data-aim={aim ?? undefined}
       aria-pressed={selected}
-      aria-label={summarise(c)}
-      title={`${summarise(c)}. Drag to reposition.`}
+      aria-label={
+        aim === "legal" ? `Target ${summarise(c)}` : aim === "actor" ? `Acting: ${summarise(c)}` : summarise(c)
+      }
+      title={
+        aim === "legal"
+          ? `Aim at ${c.name}`
+          : `${summarise(c)}. Click for commands, drag to reposition.`
+      }
       onPointerDown={(e) => onDragStart(e, c)}
       onClick={onSelect}
     >
@@ -139,6 +160,10 @@ function Token({
           )}
         </span>
       </span>
+
+      {/* Damage lands where the eye already is. Resolving from the table and
+          then having to look elsewhere for the number defeats the point. */}
+      <FloatingMarks targetId={c.id} as="span" />
     </button>
   );
 }
@@ -149,6 +174,7 @@ function Band({
   members,
   selected,
   drag,
+  aimOf,
   onSelect,
   onDragStart,
   onMoveHere,
@@ -159,6 +185,7 @@ function Band({
   members: Combatant[];
   selected: Combatant | null;
   drag: DragState | null;
+  aimOf: (c: Combatant) => AimRole;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, c: Combatant) => void;
   onMoveHere: () => void;
@@ -187,6 +214,7 @@ function Band({
             c={c}
             selected={selected?.id === c.id}
             dragging={drag?.id === c.id}
+            aim={aimOf(c)}
             onSelect={() => onSelect(c.id)}
             onDragStart={onDragStart}
           />
@@ -206,9 +234,12 @@ function Band({
 export function WarTable({
   focusedId,
   onSelect,
+  onEvent,
 }: {
   focusedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Raised when a command lands, so armed reactions can be offered. */
+  onEvent?: (e: CombatEvent) => void;
 }) {
   const { present } = useStore();
   const { dispatch } = useStoreApi();
@@ -216,6 +247,9 @@ export function WarTable({
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches,
   );
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [flow, setFlow] = useState<Flow>(null);
+  const [aim, setAim] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const wtRef = useRef<HTMLDivElement>(null);
 
   const dragRef = useRef<DragState | null>(null);
   dragRef.current = drag;
@@ -356,7 +390,9 @@ export function WarTable({
       setDrag(null);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key !== "Escape") return;
+      onCancel();
+      setFlow(null);
     };
 
     window.addEventListener("pointermove", onMove, { passive: false });
@@ -371,13 +407,110 @@ export function WarTable({
     };
   }, [finish]);
 
+  /* ── Giving a command ── */
+
+  const actor = flow ? present.combatants.find((c) => c.id === flow.actorId) ?? null : null;
+  /** Aiming is the only mode that changes what a click on a token means. */
+  const aiming = flow?.stage === "target" && flow.verb !== "move" ? flow : null;
+
+  const aimOf = useCallback(
+    (c: Combatant): AimRole => {
+      if (!flow) return null;
+      if (c.id === flow.actorId) return "actor";
+      if (!aiming || !actor) return null;
+      return isLegalTarget(aiming.verb, actor, c) ? "legal" : "illegal";
+    },
+    [flow, aiming, actor],
+  );
+
+  const onTokenClick = useCallback(
+    (id: string) => {
+      // Mid-aim, a token is a target and nothing else. Clicking an illegal one
+      // must not quietly become "start a new command with this fighter".
+      if (aiming && actor) {
+        const t = present.combatants.find((c) => c.id === id);
+        if (!t || !isLegalTarget(aiming.verb, actor, t)) return;
+        playCue("confirm");
+        setFlow({
+          stage: "resolve",
+          actorId: aiming.actorId,
+          targetId: id,
+          verb: aiming.verb,
+          abilityId: aiming.abilityId,
+        });
+        return;
+      }
+
+      // Clicking the fighter whose window is already open puts it away.
+      if (flow?.stage === "command" && flow.actorId === id) {
+        playCue("cancel");
+        setFlow(null);
+        onSelect(null);
+        return;
+      }
+
+      onSelect(id);
+      setFlow({ stage: "command", actorId: id });
+    },
+    [aiming, actor, flow, present.combatants, onSelect],
+  );
+
+  /**
+   * The line. Both ends are measured against the table itself, so it survives
+   * the page scrolling underneath it, and both are re-read on every move rather
+   * than captured once — the window below the grid changes height as the
+   * command narrows, and a captured origin would drift away from its token.
+   */
+  useEffect(() => {
+    if (!flow || collapsed) {
+      setAim(null);
+      return;
+    }
+
+    const anchor = (id: string) => {
+      const box = wtRef.current;
+      const el = box?.querySelector<HTMLElement>(`[data-token="${CSS.escape(id)}"]`);
+      if (!box || !el) return null;
+      const r = el.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      return { x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2 };
+    };
+
+    if (flow.stage === "resolve") {
+      const from = anchor(flow.actorId);
+      const to = anchor(flow.targetId);
+      setAim(from && to ? { x1: from.x, y1: from.y, x2: to.x, y2: to.y } : null);
+      return;
+    }
+
+    if (!aiming) {
+      setAim(null);
+      return;
+    }
+
+    const from = anchor(flow.actorId);
+    setAim(from ? { x1: from.x, y1: from.y, x2: from.x, y2: from.y } : null);
+
+    const onMove = (e: PointerEvent) => {
+      const box = wtRef.current;
+      const start = anchor(flow.actorId);
+      if (!box || !start) return;
+      const b = box.getBoundingClientRect();
+      setAim({ x1: start.x, y1: start.y, x2: e.clientX - b.left, y2: e.clientY - b.top });
+    };
+
+    window.addEventListener("pointermove", onMove);
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [flow, aiming, collapsed, present.combatants]);
+
   const membersOf = (side: Role, position: Position) =>
     present.combatants.filter((c) => c.role === side && c.position === position);
 
   const bandProps = {
     selected,
     drag,
-    onSelect: (id: string) => onSelect(id === focusedId ? null : id),
+    aimOf,
+    onSelect: onTokenClick,
     onDragStart,
   };
 
@@ -386,6 +519,8 @@ export function WarTable({
       className="wartable panel"
       aria-label="Battlefield overview"
       data-dragging={drag ? "1" : undefined}
+      data-aiming={aiming ? "1" : undefined}
+      data-moving={flow?.stage === "target" && flow.verb === "move" ? "1" : undefined}
     >
       <header className="wartable__head">
         <h2 className="wartable__title display">War table</h2>
@@ -416,7 +551,7 @@ export function WarTable({
 
       {!collapsed && (
         <>
-          <div className="wt">
+          <div className="wt" ref={wtRef}>
             {ROWS.map((r) => (
               <Band
                 key={`${r.side}-${r.position}`}
@@ -456,11 +591,39 @@ export function WarTable({
             <span className="wt__flank wt__flank--player display" aria-hidden="true">
               Players
             </span>
+
+            {/* The line of intent. Drawn over the bands but never over the
+                tokens' own text, and never interactive — it is a statement
+                about what is about to happen, not a control. */}
+            {aim && (
+              <svg className="wt__aim" aria-hidden="true">
+                <line
+                  className="wt__aimline"
+                  x1={aim.x1}
+                  y1={aim.y1}
+                  x2={aim.x2}
+                  y2={aim.y2}
+                />
+                <circle className="wt__aimhead" cx={aim.x2} cy={aim.y2} r={5} />
+              </svg>
+            )}
           </div>
 
+          <CommandFlow
+            flow={flow}
+            setFlow={setFlow}
+            combatants={present.combatants}
+            playerPhaseCount={present.playerPhaseCount}
+            enemyPhaseCount={present.enemyPhaseCount}
+            onEvent={onEvent}
+          />
+
           <p className="wartable__hint">
-            Drag a combatant to reposition, or select one and choose a band. Front and
-            Back are measured from the centre line.
+            {aiming
+              ? "Pick a target on the table, then answer hit or miss."
+              : flow
+                ? "Escape closes the command window."
+                : "Click a combatant for commands, or drag them to another band. Front and Back are measured from the centre line."}
           </p>
         </>
       )}

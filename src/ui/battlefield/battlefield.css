@@ -262,6 +262,12 @@
   opacity: 1;
 }
 
+/* Move, chosen from the command window: the bands stop waiting to be
+   discovered on hover and simply offer themselves. */
+.wartable[data-moving="1"] .band__move {
+  opacity: 1;
+}
+
 @media (pointer: coarse) {
   .band__move {
     opacity: 1;
@@ -272,6 +278,7 @@
 /* ── Token ── */
 
 .tok {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s2);
@@ -317,6 +324,89 @@
 
 .tok[data-dragging="1"] {
   opacity: 0.35;
+}
+
+/* ── Under command ──
+   While a command is being aimed, the table sorts itself into three states so
+   the answer to "where can this go" needs no reading: the one acting, the ones
+   that can be picked, and everyone else. The illegal are dimmed rather than
+   hidden — a fight you can only half see is worse than one with dead ends. */
+
+.tok[data-aim="actor"] {
+  border-color: var(--candle);
+  box-shadow: inset 2px 0 0 var(--candle), 0 0 18px var(--candle-glow);
+}
+
+.wartable[data-aiming="1"] .tok[data-aim="legal"] {
+  border-color: var(--cinnabar);
+  cursor: crosshair;
+  animation: tok-beckon 1.6s var(--ease-out) infinite;
+}
+
+.wartable[data-aiming="1"] .tok[data-aim="illegal"] {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+@keyframes tok-beckon {
+  0%,
+  100% {
+    box-shadow: inset 2px 0 0 var(--cinnabar), 0 0 0 rgba(230, 88, 74, 0);
+  }
+  50% {
+    box-shadow: inset 2px 0 0 var(--cinnabar), 0 0 14px var(--cinnabar-glow);
+  }
+}
+
+[data-motion="reduced"] .tok[data-aim="legal"] {
+  animation: none;
+  box-shadow: inset 2px 0 0 var(--cinnabar), 0 0 14px var(--cinnabar-glow);
+}
+
+/* Floating numbers ride just above the token they belong to, clear of the
+   name and the hit-point readout underneath. */
+.tok .floats {
+  right: 6px;
+  top: -8px;
+  z-index: 6;
+}
+
+/* ── The line of intent ── */
+
+.wt__aim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+  overflow: visible;
+}
+
+.wt__aimline {
+  stroke: var(--cinnabar);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+  animation: aim-travel 0.6s linear infinite;
+  filter: drop-shadow(0 0 4px var(--cinnabar-glow));
+}
+
+.wt__aimhead {
+  fill: var(--cinnabar);
+  filter: drop-shadow(0 0 5px var(--cinnabar-glow));
+}
+
+@keyframes aim-travel {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+[data-motion="reduced"] .wt__aimline {
+  animation: none;
+  stroke-dasharray: none;
 }
 
 /* Health as volume: a vessel filling from the bottom. */

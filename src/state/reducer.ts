@@ -266,7 +266,9 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
           entry(
             state,
             "damage",
-            `${c.name} took ${cmd.amount} ${cmd.damageType} (${bits.join(", ")})`,
+            cmd.source
+              ? `${cmd.source} hit ${c.name} for ${cmd.amount} ${cmd.damageType} (${bits.join(", ")})`
+              : `${c.name} took ${cmd.amount} ${cmd.damageType} (${bits.join(", ")})`,
             [c.id],
           ),
         );
@@ -289,7 +291,16 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
           wardCap: cmd.wardCap,
         });
         if (r.healed > 0) {
-          log.push(entry(state, "heal", `${c.name} healed ${r.healed}`, [c.id]));
+          log.push(
+            entry(
+              state,
+              "heal",
+              cmd.source
+                ? `${cmd.source} mended ${c.name} for ${r.healed}`
+                : `${c.name} healed ${r.healed}`,
+              [c.id],
+            ),
+          );
         }
         if (r.warded > 0) {
           // Logged separately: a ward is a different thing from a heal, and a
@@ -301,6 +312,25 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
         return { ...c, hp: r.hp, tempShields: r.tempShields };
       });
       return { state: { ...state, combatants }, log };
+    }
+
+    case "ACTION_MISSED": {
+      const actor = state.combatants.find((c) => c.id === cmd.actorId);
+      const target = state.combatants.find((c) => c.id === cmd.targetId);
+      if (!actor || !target) return { state, log: [] };
+      return {
+        state,
+        log: [
+          entry(
+            state,
+            "damage",
+            cmd.label
+              ? `${actor.name}'s ${cmd.label} missed ${target.name}`
+              : `${actor.name} missed ${target.name}`,
+            [actor.id, target.id],
+          ),
+        ],
+      };
     }
 
     /* ── stacks inflicted on a combatant ── */

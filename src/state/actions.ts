@@ -35,7 +35,18 @@ export type Command =
   | { type: "COMBATANT_MAXHP_SET"; id: string; maxHp: number }
   | { type: "COMBATANT_PORTRAIT_SET"; id: string; portrait: string }
   /* health */
-  | { type: "DAMAGE_APPLIED"; ids: string[]; amount: number; damageType: DamageType }
+  | {
+      type: "DAMAGE_APPLIED";
+      ids: string[];
+      amount: number;
+      damageType: DamageType;
+      /**
+       * Who dealt it, for the log only. Damage typed into a card has no author
+       * the tool can know about; damage resolved from the war table does, and a
+       * log that reads "Kada hit Grunt" beats one that reads "Grunt took 6".
+       */
+      source?: string;
+    }
   | {
       type: "HEAL_APPLIED";
       ids: string[];
@@ -44,7 +55,15 @@ export type Command =
       overheal?: boolean;
       /** Bound that conversion, for the skills that cap it. */
       wardCap?: number;
+      /** Who healed it, for the log only. */
+      source?: string;
     }
+  /**
+   * A recorded miss. Changes nothing — the cost of a missed action is spent by
+   * the commands beside it — but a combat log with the misses cut out is not a
+   * record of the fight.
+   */
+  | { type: "ACTION_MISSED"; actorId: string; targetId: string; label?: string }
   | { type: "FULL_HEAL_APPLIED"; ids: string[] }
   /* shields */
   | { type: "SHIELD_ADJUSTED"; id: string; delta: number }
@@ -89,6 +108,9 @@ export type Command =
 /** Commands that must not create an undo entry. */
 export const NON_UNDOABLE: ReadonlySet<Command["type"]> = new Set([
   "ENCOUNTER_LOADED",
+  // Nothing to put back, so an undo entry for it would only ever be a wasted
+  // press between the user and the change they actually meant to reverse.
+  "ACTION_MISSED",
 ]);
 
 /** Human-readable label for the undo affordance. */
@@ -124,6 +146,8 @@ export function commandLabel(cmd: Command): string {
       return `${cmd.amount} ${cmd.damageType} damage`;
     case "HEAL_APPLIED":
       return `heal ${cmd.amount}`;
+    case "ACTION_MISSED":
+      return "record a miss";
     case "STACK_ADJUSTED":
       return cmd.delta >= 0 ? `add ${cmd.name} stack` : `remove ${cmd.name} stack`;
     case "STACK_CLEARED":

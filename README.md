@@ -4,6 +4,12 @@ A tactical war table for running live Hei Mao roleplay encounters — phase and 
 tracking, health and shields, conditions, abilities, a character library, an enemy
 generator, and resumable sessions.
 
+Combat is run from the table itself: click a combatant, pick a verb, drag the line
+onto a target, and answer hit or miss. Damage is derived from the attacker's stats
+and pushed through the target's resistance and shielding, itemised so it can be
+checked. Skills that carry dice ask for the total rolled in Discord rather than
+inventing one. The cards below stay authoritative for anything that needs correcting.
+
 ## Requirements
 
 - Node 22+

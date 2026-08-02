@@ -96,13 +96,25 @@ export function useFeedback(): FeedbackApi {
   return v;
 }
 
-/** Renders the floating marks currently anchored to one combatant. */
-export function FloatingMarks({ targetId }: { targetId: string }) {
+/**
+ * Renders the floating marks currently anchored to one combatant.
+ *
+ * `as` exists for one reason: the war table's tokens are buttons, and a button
+ * may only contain phrasing content. Rendering a div inside one produces markup
+ * browsers silently re-parent, which moves the marks somewhere else entirely.
+ */
+export function FloatingMarks({
+  targetId,
+  as: Tag = "div",
+}: {
+  targetId: string;
+  as?: "div" | "span";
+}) {
   const { marksFor } = useFeedback();
   const marks = marksFor(targetId);
   if (!marks.length) return null;
   return (
-    <div className="floats" aria-hidden="true">
+    <Tag className="floats" aria-hidden="true">
       {marks.map((m, i) => (
         <span
           key={m.id}
@@ -112,7 +124,7 @@ export function FloatingMarks({ targetId }: { targetId: string }) {
           {m.text}
         </span>
       ))}
-    </div>
+    </Tag>
   );
 }
 

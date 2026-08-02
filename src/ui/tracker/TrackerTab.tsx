@@ -864,7 +864,7 @@ export function TrackerTab({ session }: { session: SessionApi; logOpen?: boolean
             {!present.locked && <InitiativeRoller />}
 
             {populated && showTable && (
-              <WarTable focusedId={focusedId} onSelect={setFocusedId} />
+              <WarTable focusedId={focusedId} onSelect={setFocusedId} onEvent={recordEvent} />
             )}
 
             <div className="tracker__toolbar">

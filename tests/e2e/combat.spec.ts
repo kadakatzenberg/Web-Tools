@@ -1298,3 +1298,175 @@ test("a gated skill explains itself and readies when satisfied", async ({ page }
   await expect(ult.locator(".ability__state")).toHaveText("Ready");
   await expect(ult.getByRole("button", { name: "Fire", exact: true })).toBeEnabled();
 });
+
+/* ── The command window ── */
+
+/** Open the war table and hand back a locator for one combatant's token. */
+async function warTable(page: Page) {
+  const table = page.locator(".wartable");
+  const expand = table.getByRole("button", { name: "Expand" });
+  if (await expand.isVisible()) await expand.click();
+  return table;
+}
+
+function token(table: ReturnType<Page["locator"]>, name: string) {
+  return table.locator("[data-token]").filter({ hasText: name }).first();
+}
+
+test("resolves an attack from the war table without asking for a number", async ({ page }) => {
+  await addCombatant(page, "Kada", { stats: { STR: 4 } });
+  await addCombatant(page, "Grunt", { role: "Enemy", hp: 12, stats: { CON: 1 } });
+
+  const table = await warTable(page);
+  await token(table, "Kada").click();
+
+  const win = page.locator(".cmdwin");
+  await expect(win).toBeVisible();
+
+  // The damage is stated up front, derived rather than requested.
+  await win.locator(".cmdi", { hasText: "Attack" }).click();
+  await expect(table).toHaveAttribute("data-aiming", "1");
+  await expect(token(table, "Grunt")).toHaveAttribute("data-aim", "legal");
+  await expect(token(table, "Kada")).toHaveAttribute("data-aim", "actor");
+
+  // The line is anchored on the actor and reaches wherever the pointer is, so
+  // it only has length once the pointer has gone somewhere.
+  const box = (await token(table, "Grunt").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator(".wt__aimline")).toBeVisible();
+
+  await token(table, "Grunt").click();
+
+  // 2 + STR 4 = 6, one turned aside by CON 1, five reaching hit points.
+  await expect(win.locator(".cmdrow", { hasText: "Damage" })).toContainText("6");
+  await expect(win.locator(".cmdrow", { hasText: "Reaches hit points" })).toContainText("5");
+  await expect(win.locator(".cmdrow", { hasText: "Grunt ends on" })).toContainText("7/12");
+
+  await win.getByRole("button", { name: "Hit", exact: true }).click();
+
+  await expect(win).toHaveCount(0);
+  await expect(card(page, "Grunt").locator(".card__hp").first()).toHaveText("7/12");
+  await expect(card(page, "Kada").locator(".badge", { hasText: "Acted" })).toBeVisible();
+});
+
+test("records a miss without moving anyone's hit points", async ({ page }) => {
+  await addCombatant(page, "Swinger", { stats: { STR: 3 } });
+  await addCombatant(page, "Dodger", { role: "Enemy", hp: 10 });
+
+  const table = await warTable(page);
+  await token(table, "Swinger").click();
+  await page.locator(".cmdi", { hasText: "Attack" }).click();
+  await token(table, "Dodger").click();
+  await page.getByRole("button", { name: "Miss", exact: true }).click();
+
+  await expect(card(page, "Dodger").locator(".card__hp").first()).toHaveText("10/10");
+  await expect(card(page, "Swinger").locator(".badge", { hasText: "Acted" })).toBeVisible();
+});
+
+test("refuses to aim an attack at the combatant giving it", async ({ page }) => {
+  await addCombatant(page, "Alone");
+
+  const table = await warTable(page);
+  await token(table, "Alone").click();
+  await page.locator(".cmdi", { hasText: "Attack" }).click();
+
+  await expect(page.locator(".cmdwin__prompt")).toContainText("Nothing on the table");
+  await expect(token(table, "Alone")).toHaveAttribute("data-aim", "actor");
+});
+
+test("mends an ally for the caster's own magical figure", async ({ page }) => {
+  await addCombatant(page, "Medic", { stats: { INT: 3 } });
+  await addCombatant(page, "Hurt", { hp: 20 });
+
+  // Wound the ally first, through the card, so there is room to heal.
+  const hurt = card(page, "Hurt");
+  await hurt.getByLabel(/^Untaxed damage to/).fill("8");
+  await hurt.getByRole("button", { name: "Strike", exact: true }).click();
+  await expect(hurt.locator(".card__hp").first()).toHaveText("12/20");
+
+  const table = await warTable(page);
+  await token(table, "Medic").click();
+  await page.locator(".cmdi", { hasText: "Mend" }).click();
+  await token(table, "Hurt").click();
+
+  // 2 + INT 3.
+  await expect(page.locator(".cmdrow", { hasText: "Mends for" })).toContainText("5");
+  await page.locator(".cmdwin").getByRole("button", { name: "Mend", exact: true }).click();
+
+  await expect(hurt.locator(".card__hp").first()).toHaveText("17/20");
+});
+
+test("asks for the rolled total only when the skill carries dice", async ({ page }) => {
+  await addCombatant(page, "Archer", { stats: { STR: 2 } });
+  await addCombatant(page, "Mark", { role: "Enemy", hp: 20 });
+
+  const c = card(page, "Archer");
+  await c.getByRole("button", { name: "Skills" }).click();
+  await c.getByRole("button", { name: "+ Ability" }).click();
+  await c.getByLabel("Ability name").fill("Volley");
+  await c.getByLabel("Ability mode").selectOption("cooldown");
+  await c.getByLabel("Capacity or cooldown").fill("2");
+  await c.getByLabel("Dice notation").fill("2d6");
+  await c.locator(".add-ability").getByRole("button", { name: "Add", exact: true }).click();
+
+  const table = await warTable(page);
+  await token(table, "Archer").click();
+  await page.locator(".cmdi", { hasText: "Skill" }).click();
+  await page.locator(".cmdi", { hasText: "Volley" }).click();
+  await token(table, "Mark").click();
+
+  // Nothing is invented: the window waits on the number rolled in Discord.
+  const hit = page.getByRole("button", { name: "Hit", exact: true });
+  await expect(hit).toBeDisabled();
+  await page.getByPlaceholder("Rolled").fill("9");
+  await expect(hit).toBeEnabled();
+  await hit.click();
+
+  await expect(card(page, "Mark").locator(".card__hp").first()).toHaveText("11/20");
+  // The skill was spent by casting it from the table.
+  await expect(
+    card(page, "Archer").locator(".ability", { hasText: "Volley" }).locator(".ability__state"),
+  ).toHaveText("Ready in 2 player phases");
+});
+
+test("closes the command window on Escape", async ({ page }) => {
+  await addCombatant(page, "Twitchy");
+  const table = await warTable(page);
+  await token(table, "Twitchy").click();
+  await expect(page.locator(".cmdwin")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".cmdwin")).toHaveCount(0);
+});
+
+test("drives the command window with the arrow keys", async ({ page }) => {
+  await addCombatant(page, "Runner");
+  await addCombatant(page, "Quarry", { role: "Enemy" });
+
+  const table = await warTable(page);
+  await token(table, "Runner").click();
+
+  // Focus the first verb, then walk the menu without a pointer. Skill is
+  // stepped over rather than landed on: Runner has no skills to offer.
+  await page.locator(".cmdi").first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator(".cmdi:focus")).toHaveText(/Mend/);
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".cmdi:focus")).toHaveText(/Attack/);
+  await page.keyboard.press("End");
+  await expect(page.locator(".cmdi:focus")).toHaveText(/Cancel/);
+});
+
+test("puts the answer under the cursor as soon as a target is locked", async ({ page }) => {
+  await addCombatant(page, "Quick", { stats: { STR: 2 } });
+  await addCombatant(page, "Slow", { role: "Enemy" });
+
+  const table = await warTable(page);
+  await token(table, "Quick").click();
+  await page.locator(".cmdi", { hasText: "Attack" }).click();
+  await token(table, "Slow").click();
+
+  // Hit is focused, so Enter resolves without reaching for the mouse.
+  await expect(page.locator(".verdict--hit")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(card(page, "Slow").locator(".card__hp").first()).toHaveText("6/10");
+});

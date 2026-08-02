@@ -147,6 +147,37 @@ way that twenty numbers are not.
 It complements the cards rather than replacing them: the table answers "who is
 where and how hurt", the cards answer "what can this combatant actually do".
 
+## The command window
+
+Clicking a token opens a small box of verbs beside the table — Attack, Skill,
+Mend, Move — the shape old turn-based console RPGs used, and for the same
+reason: with a fixed set of things a fighter can do, a menu beats a form.
+Choosing a verb puts a line out from the token that follows the pointer; legal
+targets brighten and everything else dims. Dropping the line on a target opens
+the ledger and asks one question.
+
+That question is **hit or miss**, and it is the only input the tool takes,
+because it is the only part of the exchange it cannot work out. Damage is
+derived from the attacker's own stats — `2 + STR` or `2 + INT`, whichever is
+higher, stated on the verb before it is chosen — and pushed through the target's
+resistance and shielding. Every step is itemised in the ledger, so the number
+that lands can be checked rather than trusted.
+
+Two deliberate exceptions:
+
+- **A skill carrying dice notation asks for the rolled total.** Dice are rolled
+  in Discord, by the people at the table, and that does not change. The tool
+  refuses to invent a number it has no business knowing.
+- **Mending has no verdict.** There is nothing to miss with, so it lands.
+
+The cards stay exactly as they were, underneath. Anything the window gets wrong
+is corrected there, which is what lets the window be fast instead of exhaustive.
+Casting a skill from the window sends the same patch the card's own button
+sends, so the two routes cannot drift apart.
+
+Everything in the window is reachable by keyboard: arrows step through the
+verbs, and focus lands on the verdict the moment a target is locked.
+
 ## Motion budget
 
 The strongest motion in the application is spent on exactly one event: the round
