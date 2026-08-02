@@ -146,6 +146,28 @@ export class LabelLayer {
       // A dimmed node is deliberately quiet; naming it fights the selection.
       if (dimmed && !isSelected && !isHovered) continue;
 
+      /**
+       * Who is *eligible* to be named, before anything is placed.
+       *
+       * Collision culling alone was not enough, and the screenshots showed why:
+       * greedy placement fills whatever space exists, so at the fit zoom it
+       * printed about a hundred and fifty names and the map disappeared under
+       * its own labels. v1 printed six. The difference is not the placement
+       * algorithm, it is that v1 gated on zoom first — only well-connected hubs
+       * are named from far away, everyone is named up close.
+       *
+       * That gate is what makes zooming feel like it reveals something, rather
+       * than just magnifying a wall of text. Placement still runs afterwards,
+       * so crowded regions thin out instead of overprinting the way v1's did.
+       */
+      const eligible =
+        isSelected ||
+        isHovered ||
+        scale > 1.2 ||
+        (scale > 0.6 && node.degree >= 8) ||
+        node.degree >= 12;
+      if (!eligible) continue;
+
       const { x, y } = projectToScreen(node, camera, this.width, this.height);
       if (x < -180 || x > this.width + 180 || y < -70 || y > this.height + 70) continue;
 

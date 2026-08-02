@@ -199,6 +199,7 @@ layout(location = 2) in vec2 a_to;
 layout(location = 3) in vec3 a_colour;
 layout(location = 4) in float a_alpha;
 layout(location = 5) in float a_width;   // device pixels
+layout(location = 6) in vec2  a_dash;    // x: period in device px (0 = solid), y: duty 0..1
 
 uniform vec2  u_resolution;
 uniform vec2  u_translate;
@@ -207,11 +208,14 @@ uniform float u_scale;
 out vec3  v_colour;
 out float v_alpha;
 out float v_across;
+out float v_along;
+out vec2  v_dash;
 
 void main() {
   v_colour = a_colour;
   v_alpha = a_alpha;
   v_across = a_corner.y;
+  v_dash = a_dash;
 
   vec2 from = a_from * u_scale + u_translate;
   vec2 to   = a_to   * u_scale + u_translate;
@@ -220,6 +224,11 @@ void main() {
   float span = length(along);
   vec2 unit = span > 0.0001 ? along / span : vec2(1.0, 0.0);
   vec2 normal = vec2(-unit.y, unit.x);
+
+  // Distance travelled along the line in device pixels, so the dash pattern
+  // keeps a constant on-screen rhythm at every zoom — the same thing v1 got
+  // by dividing its dash array by ZOOM.
+  v_along = a_corner.x * span;
 
   // Half a pixel of bleed on each side so the smoothstep below has somewhere
   // to land; without it a one-pixel line antialiases itself out of existence.
@@ -237,9 +246,16 @@ precision highp float;
 in vec3  v_colour;
 in float v_alpha;
 in float v_across;
+in float v_along;
+in vec2  v_dash;
 out vec4 fragColour;
 
 void main() {
+  // Dashes carry meaning here, they are not decoration: v1 drew ties within an
+  // era solid and everything looser broken, which is what lets the eye read the
+  // constellations and skip the incidental links crossing the map.
+  if (v_dash.x > 0.0 && fract(v_along / v_dash.x) > v_dash.y) discard;
+
   // Source-over, not additive. Additive over a lit nebula is what made these
   // vanish: a line at alpha 0.5 adds half its colour to a background that is
   // already bright, which is no contrast at all. v1 drew them source-over on
@@ -571,8 +587,8 @@ export interface RenderState {
 
 const MAX_DPR = 2;
 
-/** Floats per edge instance: from(2) to(2) colour(3) alpha(1) width(1). */
-const EDGE_STRIDE = 9;
+/** Floats per edge instance: from(2) to(2) colour(3) alpha(1) width(1) dash(2). */
+const EDGE_STRIDE = 11;
 
 /** Floats per star instance: centre(2) radius(1) colour(3) flags(1) phase(1) tile(1). */
 const STAR_STRIDE = 9;
@@ -769,7 +785,7 @@ export class StarMapRenderer {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.edgeBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, this.edgeData.byteLength, gl.DYNAMIC_DRAW);
 
-      // from(2) to(2) colour(3) alpha(1) width(1) = 9 floats.
+      // from(2) to(2) colour(3) alpha(1) width(1) dash(2) = 11 floats.
       const stride = EDGE_STRIDE * 4;
       const attributes: Array<[number, number, number]> = [
         [1, 2, 0], // from
@@ -777,6 +793,7 @@ export class StarMapRenderer {
         [3, 3, 16], // colour
         [4, 1, 28], // alpha
         [5, 1, 32], // width
+        [6, 2, 36], // dash: period, duty
       ];
       for (const [location, size, offset] of attributes) {
         gl.enableVertexAttribArray(location);
@@ -885,52 +902,84 @@ export class StarMapRenderer {
       // CSS pixels. Multiplied by the device ratio at pack time, so a line is
       // the same thickness to the eye on every screen.
       let width: number;
+      // Dash period in CSS pixels and duty cycle; 0 means solid.
+      let dash = 0;
+      let duty = 1;
 
       /**
-       * Edge weights.
+       * Edge weights, back to v1's exactly.
        *
-       * These were roughly v1's canvas alphas carried across unchanged, and
-       * that was wrong: v1 composited them with `source-over` onto a flat
-       * dark canvas, where 0.24 is a clearly visible line. Here they are
-       * additive, over a lit nebula, and then run through a bloom threshold
-       * that discards anything under 0.42 — so the same numbers produced
-       * threads that were technically present and effectively invisible.
-       * Roughly doubled, which lands them back where v1 read.
+       * These had been roughly doubled to compensate for two things that were
+       * true at the time: the pass was additive over a lit nebula, and it was
+       * run through a bloom threshold that discarded anything faint. Neither
+       * is true any more — edges now composite source-over after the bloom, on
+       * a dark ground, which is precisely v1's situation — so the compensation
+       * became pure over-inking and nothing removed it.
+       *
+       * The cost was not that lines were too bright. It was that the *ratios*
+       * collapsed. v1 separates a tie within an era (0.28) from a link merely
+       * sharing a world (0.13) from an accident of the archive (0.06) by more
+       * than four to one, and draws the looser two broken. Flattened to
+       * 0.55/0.38/0.30 solid, eleven hundred edges stop being constellations
+       * and become a cross-hatch — every relationship visible, no relationship
+       * legible, which reads to anyone looking at it as no connections at all.
        */
       if (selected) {
         if (active) {
           colour = hexToRgb(a.id === selected ? b.colour : a.colour);
-          alpha = 1.15;
-          width = 2.2;
+          alpha = 0.85;
+          width = 1.6;
         } else {
-          colour = [0.4, 0.38, 0.34];
-          alpha = 0.06;
-          width = 1;
+          colour = [0.47, 0.43, 0.35];
+          alpha = 0.04;
+          width = 0.5;
+          if (!edge.sameCluster) {
+            dash = 4;
+            duty = 0.34;
+          }
         }
       } else if (edge.voidbound) {
         // The Void's threads are the one relationship the archive treats as
         // different in kind, so they are the one thing drawn in a colour
         // that belongs to no era.
-        colour = [0.92, 0.45, 0.72];
-        alpha = 0.8;
-        width = 1.8;
+        colour = [0.86, 0.47, 0.71];
+        alpha = 0.75;
+        width = 1.4;
       } else if (edge.sameCluster) {
         colour = hexToRgb(a.colour);
-        alpha = 0.55;
-        width = 1.5;
+        alpha = 0.28;
+        width = 0.9;
       } else if (edge.sameWorld) {
         colour = hexToRgb(a.worldColour);
-        alpha = 0.38;
-        width = 1.3;
+        alpha = 0.13;
+        width = 0.6;
+        dash = 5;
+        duty = 0.39;
       } else {
         // Cross-world: a soul that turned up in more than one reflection.
-        colour = [0.78, 0.72, 0.5];
-        alpha = 0.3;
-        width = 1.2;
+        // Deliberately almost subliminal — present if looked for, silent
+        // otherwise.
+        colour = [0.63, 0.59, 0.47];
+        alpha = 0.06;
+        width = 0.5;
+        dash = 3;
+        duty = 0.2;
       }
 
       this.edgeData.set(
-        [a.x, a.y, b.x, b.y, colour[0], colour[1], colour[2], alpha, width * this.dpr],
+        [
+          a.x,
+          a.y,
+          b.x,
+          b.y,
+          colour[0],
+          colour[1],
+          colour[2],
+          alpha,
+          width * this.dpr,
+          dash * this.dpr,
+          duty,
+        ],
         cursor,
       );
       cursor += EDGE_STRIDE;

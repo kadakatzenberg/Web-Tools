@@ -403,13 +403,55 @@ soul to the busiest one, and must grow sublinearly.
 
 ### On the missing lines
 
-Rendered against the real archive at dpr 2, at both fit and close zoom, the
-connection web is dense and clearly visible — 1,107 edges over 305 nodes. The
-context is created with `alpha: false`, so there is no premultiplied-alpha
-trap in the final source-over pass, and nothing platform-specific has turned up
-that would drop them.
+The previous entry under this heading said the edges rendered correctly here,
+that nothing platform-specific explained the reports, and that the next step
+was to go looking at the reporter's GPU. All three were wrong, and the way they
+were wrong is the useful part.
 
-They are visible here and reported missing there, which is not something more
-guessing will close. If they are still absent, the useful next step is the
-browser and GPU, and whether `chrome://gpu` reports hardware or software
-rendering — not another blind adjustment.
+The lines were being drawn. Every check confirmed that, which is exactly why
+the checks kept passing: they asked *are edges present* when the complaint was
+*I cannot see the connections*. Those are not the same question, and no amount
+of counting lit pixels distinguishes them.
+
+Loading v1 and this build in the same browser, at the same viewport, against
+the same 304-row archive settled it in one screenshot each. Both drew every
+edge. v1 was legible and this was a hairball.
+
+The cause was a stale compensation. Edge alphas had been roughly doubled to
+survive two conditions that were true when the number was chosen — the pass was
+additive over a lit nebula, and it ran through a bloom threshold that discarded
+anything faint. Moving the edges to composite source-over *after* the bloom, on
+a dark ground, removed both conditions and made this build's situation
+identical to v1's. Nothing removed the compensation.
+
+What that cost was not brightness. It was the ratios:
+
+| link | v1 | here | |
+|---|---|---|---|
+| within an era | .28 / .9px solid | .55 / 1.5px solid | 2× |
+| shared world | .13 / .6px **dashed** | .38 / 1.3px solid | 3×, undashed |
+| cross-world | .06 / .5px **dashed** | .30 / 1.2px solid | **5×**, undashed |
+
+v1 separates a real tie from an incidental one by more than four to one and
+draws the loose ones broken. Flattened to within a factor of two and all solid,
+1,107 edges stop being constellations and become a cross-hatch — every
+relationship visible, no relationship legible. Which is precisely what "no
+lines" means when a reader says it, and why it was never going to be found by
+asserting that edges existed.
+
+Restored to v1's weights, with dash support added to the edge shader (period
+and duty per instance, stepped along the line in device pixels so the rhythm
+holds at any zoom).
+
+The same comparison caught a second thing: at the fit zoom this build printed
+about 150 names where v1 printed 6. Greedy collision placement fills whatever
+space it is given, and space is what a zoomed-out map has. v1 gated on zoom
+*before* placing — only hubs of degree ≥12 are named from far out, everyone at
+`scale > 1.2`. That gate is what makes zooming reveal something instead of
+magnifying a wall of text; it is now the eligibility rule, with collision
+culling kept for placement so crowded regions still thin out.
+
+The method is worth more than either fix: when a rendering complaint and a
+rendering test disagree, put the two builds side by side on identical data
+before trusting the test. The test was measuring the wrong property, and it
+passed all the way through five rounds of this being wrong.
