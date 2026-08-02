@@ -250,3 +250,37 @@ resistance and shields.
   and a UI for them would cost more attention than it saves.
 - **Per-skill overheal caps** — `applyHealing` accepts a `wardCap`, but no
   control sets it. Heal for less, or trim the ward chip.
+
+### Readiness is reported in Next Phase presses
+
+**Before:** a cooldown said "2 left" and a charge sat at "0/1". Both count
+rounds, but abilities only accrue when the round turns over — so a one-round
+charge showed the same thing through three presses of Next Phase.
+
+**Now:** every waiting state answers the same question in the same unit —
+"Ready in 6 phases" → "Ready in 5 phases" → … → "Ready next phase" → "Ready".
+Phase locks do the same: "Opens in 6 phases".
+
+**Timing is unchanged.** The original tool also ticked on the round boundary,
+and the skill pool measures charges in player phases ("if not interrupted by
+end of 3rd player phase"), so once per round is correct. The gap was feedback.
+
+Two further states stopped being ambiguous: an empty ammo clip reads **Spent**
+rather than "0/3", because ammo does not refill in this system; and a stack at
+its ceiling reads **At max 4/4**, because reaching the ceiling is the event
+those skills exist for.
+
+### Skills can require another skill
+
+**Before:** nothing. Dawn's ult reads "Requires Sangre Lanza at max (+4 STR)"
+and the link lived in somebody's memory.
+
+**Now:** an ability can carry a prerequisite on a sibling skill. Unmet, it is
+shown, muted, and explained — "Needs Sangre Lanza at 4/4 — currently 2" — with
+no usable control. Met, it says so and **readies itself**: a gated charge does
+not also need a Charge press the skill text never asked for.
+
+**The gate is read out of the sheet's own prose** at import, so it appears on
+existing characters without anyone re-entering a sheet. Parsing is anchored on
+the word "requires" and nothing else, so an ordinary sentence — "STR resets to
+0 after using Ult" — cannot become a gate by accident.

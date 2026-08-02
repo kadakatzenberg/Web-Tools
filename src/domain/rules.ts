@@ -392,6 +392,26 @@ export function phasesUntilReady(ab: Ability, phase: number): number | null {
   return (rounds - 1) * PHASE_COUNT + phasesUntilRoundTick(phase);
 }
 
+/**
+ * Phases until a phase-locked ability opens, or 0 if it already has.
+ *
+ * A lock counts in that side's own phases, and each side gets one per round —
+ * so the wait in Next Phase presses is that many rounds, less however much of
+ * the current round has already been spent.
+ */
+export function phasesUntilUnlock(
+  ab: Pick<Ability, "phaseLock" | "phaseLockType">,
+  phase: number,
+  playerPhaseCount: number,
+  enemyPhaseCount: number,
+): number {
+  if (!ab.phaseLock) return 0;
+  const have = ab.phaseLockType === "enemy" ? enemyPhaseCount : playerPhaseCount;
+  const rounds = ab.phaseLock - have;
+  if (rounds <= 0) return 0;
+  return (rounds - 1) * PHASE_COUNT + phasesUntilRoundTick(phase);
+}
+
 /* ── Requirements ── */
 
 export interface RequirementState {

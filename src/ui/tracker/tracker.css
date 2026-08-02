@@ -1833,3 +1833,16 @@
 .ability[data-ready="1"] .ability__state {
   font-weight: 600;
 }
+
+/* A stack that has reached its ceiling has arrived at the thing the skill is
+   for, so it stops looking like an ordinary counter. */
+.ability[data-atmax="1"] .ability__state {
+  color: var(--candle-bright);
+  font-weight: 650;
+}
+
+.ability__lock {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+}

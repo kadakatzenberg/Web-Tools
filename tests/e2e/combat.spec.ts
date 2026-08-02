@@ -268,7 +268,8 @@ test("drives ammo and charge abilities", async ({ page }) => {
   await volley.getByRole("button", { name: "Fire", exact: true }).click();
   await expect(volley.locator(".ability__state")).toHaveText("1/2");
   await volley.getByRole("button", { name: "Fire", exact: true }).click();
-  await expect(volley.locator(".ability__state")).toHaveText("0/2");
+  // Ammo does not refill in this system, so an empty clip reads as spent.
+  await expect(volley.locator(".ability__state")).toHaveText("Spent");
   await expect(volley.getByRole("button", { name: "Fire", exact: true })).toBeDisabled();
 
   await c.getByRole("button", { name: "+ Ability" }).click();
@@ -302,7 +303,8 @@ test("honours a phase lock", async ({ page }) => {
   await c.locator(".add-ability").getByRole("button", { name: "Add", exact: true }).click();
 
   const ability = c.locator(".ability").filter({ hasText: "Awakening" });
-  await expect(ability.locator(".ability__state")).toHaveText("Locked");
+  // A lock says when it opens rather than merely that it is shut.
+  await expect(ability.locator(".ability__state")).toHaveText("Opens in 6 phases");
 
   // Lock initiative to seed the player phase counter, then complete a round.
   await page.getByLabel("Number of d20s to roll").fill("1");
@@ -1203,4 +1205,84 @@ test("lifesteal heals the drain target for the damage that landed", async ({ pag
 
   expect(await hpOf(page, "Victim")).toBe("22/30");
   expect(await hpOf(page, "Drinker")).toBe("28/30");
+});
+
+test("every waiting skill says when it will be usable", async ({ page }) => {
+  await page.addInitScript(() => {
+    const mk = (id: string, name: string, abilities: unknown[]) => ({
+      id, name, role: "Player", type: "", hp: 20, maxHp: 20, shield: 0,
+      tempShields: [], dots: [], hpRegens: [],
+      stats: { STR: 1, DEX: 1, INT: 0, WIS: 1, AGI: 1, CON: 1 },
+      statuses: [], abilities, tempMods: [], position: "Front", notes: "", done: false,
+    });
+    window.localStorage.setItem("heimao.encounter.backup.v2", JSON.stringify({
+      state: {
+        combatants: [
+          mk("a", "Spent One", [{ id: "x", name: "Volley", mode: "ammo", max: 3, cur: 0 }]),
+          mk("b", "Maxed One", [{ id: "y", name: "Fury", mode: "stack", max: 4, cur: 4 }]),
+          mk("c", "Waiting One", [
+            { id: "z", name: "Awakening", mode: "cooldown", max: 2, cur: 0,
+              phaseLock: 3, phaseLockType: "player" },
+          ]),
+        ],
+        phase: 0, round: 1, locked: true, playerPhaseCount: 1, enemyPhaseCount: 0,
+      },
+      savedAt: Date.now(), sessionCode: null,
+    }));
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  const state = async (name: string, skill: string) => {
+    const c = card(page, name);
+    await c.getByRole("button", { name: "Skills" }).click();
+    return c.locator(".ability").filter({ hasText: skill }).locator(".ability__state").innerText();
+  };
+
+  // Ammo does not refill in this system, so an empty clip is spent, not low.
+  expect(await state("Spent One", "Volley")).toBe("Spent");
+  // Reaching the ceiling is the event a stack skill exists for.
+  expect(await state("Maxed One", "Fury")).toBe("At max 4/4");
+  // A lock must say when it opens, not merely that it is shut.
+  expect(await state("Waiting One", "Awakening")).toBe("Opens in 6 phases");
+});
+
+test("a gated skill explains itself and readies when satisfied", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("heimao.encounter.backup.v2", JSON.stringify({
+      state: {
+        combatants: [{
+          id: "d", name: "Dawn", role: "Player", type: "", hp: 20, maxHp: 20, shield: 0,
+          tempShields: [], dots: [], hpRegens: [],
+          stats: { STR: 2, DEX: 1, INT: 0, WIS: 1, AGI: 1, CON: 1 },
+          statuses: [], tempMods: [], position: "Front", notes: "", done: false,
+          abilities: [
+            { id: "s1", name: "Sangre Lanza", mode: "stack", max: 4, cur: 2 },
+            { id: "ult", name: "ULT: Sueno Imposible", mode: "charge", max: 1, cur: 0,
+              requires: { skill: "Sangre Lanza", atMax: true } },
+          ],
+        }],
+        phase: 0, round: 1, locked: true, playerPhaseCount: 1, enemyPhaseCount: 0,
+      },
+      savedAt: Date.now(), sessionCode: null,
+    }));
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+
+  const c = card(page, "Dawn");
+  await c.getByRole("button", { name: "Skills" }).click();
+  const ult = c.locator(".ability").filter({ hasText: "Sueno Imposible" });
+
+  await expect(ult.locator(".ability__state")).toHaveText("Gated");
+  await expect(ult.getByText("Needs Sangre Lanza at 4/4 — currently 2")).toBeVisible();
+  await expect(ult.getByRole("button", { name: "Fire", exact: true })).toHaveCount(0);
+
+  // Filling the prerequisite readies it — no separate Charge press.
+  const stack = c.locator(".ability").filter({ hasText: "Sangre Lanza" });
+  await stack.getByLabel(/Increase/).click();
+  await stack.getByLabel(/Increase/).click();
+
+  await expect(ult.locator(".ability__state")).toHaveText("Ready");
+  await expect(ult.getByRole("button", { name: "Fire", exact: true })).toBeEnabled();
 });

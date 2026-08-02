@@ -30,6 +30,7 @@ import {
   isAmmoEmpty,
   isPhaseLocked,
   phasesUntilReady,
+  phasesUntilUnlock,
   requirementState,
   tempShieldDuration,
 } from "@/domain/rules";
@@ -96,6 +97,70 @@ const DMG_TONE: Record<string, string> = {
 
 /* ── Ability ── */
 
+
+/**
+ * The one line that says what an ability is doing.
+ *
+ * Written as early returns rather than a ternary chain: this reached eight
+ * nested levels, at which point adding a case silently edited the wrong branch.
+ * Order matters — a gate outranks a lock outranks a timer, because that is the
+ * order in which the reasons actually block you.
+ */
+function abilityStateWord({
+  ab,
+  gated,
+  gateMet,
+  phaseLocked,
+  unlockPhases,
+  readyIn,
+}: {
+  ab: Ability;
+  gated: boolean;
+  gateMet: boolean;
+  phaseLocked: boolean;
+  unlockPhases: number;
+  readyIn: string;
+}): string {
+  if (gated && !gateMet) return "Gated";
+
+  if (phaseLocked) {
+    if (unlockPhases === 1) return "Opens next phase";
+    if (unlockPhases > 0) return `Opens in ${unlockPhases} phases`;
+    return "Locked";
+  }
+
+  // A met gate *is* the charge — reporting the raw counter here read "0/1"
+  // beside a live Fire button, which says the opposite.
+  if (gated && gateMet && ab.mode === "charge") return "Ready";
+
+  switch (ab.mode) {
+    case "charge":
+      return ab.charging && ab.cur < ab.max ? readyIn : `${ab.cur}/${ab.max}`;
+
+    case "reaction":
+      if (ab.cur > 0) return readyIn;
+      return ab.trigger ? "Armed" : "Ready";
+
+    case "cooldown":
+      return ab.cur === 0 ? "Ready" : readyIn;
+
+    case "passive":
+      return ab.refill ? `${ab.cur}/${ab.max} this ${ab.refill}` : "Passive";
+
+    case "ammo":
+      // Ammo does not come back in this system, so an empty clip is spent
+      // rather than merely low.
+      return ab.cur === 0 ? "Spent" : `${ab.cur}/${ab.max}`;
+
+    case "stack":
+      // Reaching the ceiling is the event these skills exist for.
+      return ab.max > 0 && ab.cur >= ab.max ? `At max ${ab.cur}/${ab.max}` : `${ab.cur}/${ab.max}`;
+
+    default:
+      return `${ab.cur}/${ab.max}`;
+  }
+}
+
 const AbilityChip = memo(function AbilityChip({
   ab,
   siblings,
@@ -117,7 +182,9 @@ const AbilityChip = memo(function AbilityChip({
 }) {
   const { dispatch } = useStoreApi();
   const req = requirementState(ab, siblings);
-  const locked = isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount) || (req.gated && !req.met);
+  const phaseLocked = isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount);
+  const unlockPhases = phasesUntilUnlock(ab, phase, playerPhaseCount, enemyPhaseCount);
+  const locked = phaseLocked || (req.gated && !req.met);
   const ready = isAbilityReadyWith(ab, siblings);
   const empty = isAmmoEmpty(ab);
   const tone = MODE_TONE[ab.mode];
@@ -170,33 +237,14 @@ const AbilityChip = memo(function AbilityChip({
 
   const clampCur = (v: number) => Math.max(0, Math.min(ab.max, v));
 
-  // State word carries the meaning; colour only reinforces it.
-  // Every waiting state answers the same question the same way: when.
-  const stateWord = req.gated && !req.met
-    ? "Gated"
-    : isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount)
-      ? "Locked"
-      : // A met gate *is* the charge. Reporting the raw counter here read
-        // "0/1" next to a live Fire button, which says the opposite.
-        req.gated && req.met && isCharge
-        ? "Ready"
-      : chargeActive
-        ? readyIn
-        : ab.mode === "reaction"
-          ? ab.cur === 0
-            ? ab.trigger
-              ? "Armed"
-              : "Ready"
-            : readyIn
-          : ab.mode === "cooldown"
-            ? ab.cur === 0
-              ? "Ready"
-              : readyIn
-            : ab.mode === "passive"
-              ? ab.refill
-                ? `${ab.cur}/${ab.max} this ${ab.refill}`
-                : "Passive"
-              : `${ab.cur}/${ab.max}`;
+  const stateWord = abilityStateWord({
+    ab,
+    gated: req.gated,
+    gateMet: req.met,
+    phaseLocked,
+    unlockPhases,
+    readyIn,
+  });
 
   return (
     <div
@@ -204,6 +252,7 @@ const AbilityChip = memo(function AbilityChip({
       data-ready={ready && !locked ? "1" : undefined}
       data-locked={locked ? "1" : undefined}
       data-empty={empty ? "1" : undefined}
+      data-atmax={ab.mode === "stack" && ab.max > 0 && ab.cur >= ab.max ? "1" : undefined}
       style={{ ["--tone" as string]: tone }}
     >
       <div className="ability__head">
@@ -280,9 +329,14 @@ const AbilityChip = memo(function AbilityChip({
 
       <div className="ability__status">
         <span className="ability__state tnum">{stateWord}</span>
-        {locked && (
+        {/* A lock says when it opens, in the same unit as everything else.
+            "Locked" on its own left the table guessing. */}
+        {phaseLocked && (
           <span className="ability__lock">
-            🔒 {ab.phaseLockType === "enemy" ? "enemy" : "player"} phase {ab.phaseLock}
+            <IconTarget size={10} />
+            {unlockPhases > 0
+              ? `Opens ${unlockPhases === 1 ? "next phase" : `in ${unlockPhases} phases`}`
+              : `${ab.phaseLockType === "enemy" ? "Enemy" : "Player"} phase ${ab.phaseLock}`}
           </span>
         )}
       </div>
