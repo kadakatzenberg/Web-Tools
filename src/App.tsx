@@ -19,6 +19,7 @@ import { EventLog } from "@/ui/EventLog";
 import { Button, ConfirmDialog, ToastProvider, useToast } from "@/ui/primitives";
 import { announce, useHotkeys, usePrefersReducedMotion } from "@/ui/hooks";
 import { IconLog, IconMuted, IconSearch, IconSound } from "@/ui/icons";
+import { useBrandMark } from "@/ui/useBrandMark";
 import { PHASES } from "@/domain/constants";
 import "@/ui/app.css";
 
@@ -69,6 +70,9 @@ function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [sound, setSound] = useState(false);
+  const [brandFailed, setBrandFailed] = useState(false);
+  const discoveredMark = useBrandMark();
+  const brandMark = brandFailed ? null : discoveredMark;
   const [confirmClear, setConfirmClear] = useState(false);
   /**
    * Read synchronously during the first render. The session hook mirrors state
@@ -155,8 +159,21 @@ function Shell() {
       <header className="topbar">
         <div className="topbar__inner">
           <div className="brand">
-            <span className="brand__seal" aria-hidden="true">
-              黑
+            {/* The house mark from the library, falling back to the carved
+                seal. A logo that fails to load must never leave a broken
+                image where the brand should be. */}
+            <span className="brand__seal" aria-hidden="true" data-image={brandMark ? "1" : undefined}>
+              {brandMark ? (
+                <img
+                  className="brand__logo"
+                  src={brandMark}
+                  alt=""
+                  decoding="async"
+                  onError={() => setBrandFailed(true)}
+                />
+              ) : (
+                "黑"
+              )}
             </span>
             <span className="brand__name">Hei Mao</span>
           </div>

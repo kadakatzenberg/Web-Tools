@@ -29,8 +29,8 @@ import {
   isAbilityReadyWith,
   isAmmoEmpty,
   isPhaseLocked,
-  phasesUntilReady,
-  phasesUntilUnlock,
+  roundsUntilReady,
+  roundsUntilUnlock,
   requirementState,
   tempShieldDuration,
 } from "@/domain/rules";
@@ -111,21 +111,23 @@ function abilityStateWord({
   gated,
   gateMet,
   phaseLocked,
-  unlockPhases,
+  unlockRounds,
+  unlockSide,
   readyIn,
 }: {
   ab: Ability;
   gated: boolean;
   gateMet: boolean;
   phaseLocked: boolean;
-  unlockPhases: number;
+  unlockRounds: number;
+  unlockSide: string;
   readyIn: string;
 }): string {
   if (gated && !gateMet) return "Gated";
 
   if (phaseLocked) {
-    if (unlockPhases === 1) return "Opens next phase";
-    if (unlockPhases > 0) return `Opens in ${unlockPhases} phases`;
+    if (unlockRounds === 1) return `Opens next ${unlockSide}`;
+    if (unlockRounds > 0) return `Opens in ${unlockRounds} ${unlockSide}s`;
     return "Locked";
   }
 
@@ -145,7 +147,10 @@ function abilityStateWord({
       return ab.cur === 0 ? "Ready" : readyIn;
 
     case "passive":
-      return ab.refill ? `${ab.cur}/${ab.max} this ${ab.refill}` : "Passive";
+      if (!ab.refill) return "Passive";
+      if (ab.cur > 0) return `${ab.cur}/${ab.max} this ${ab.refill}`;
+      // Spent. Say when it comes back, not merely that it is gone.
+      return ab.refill === "round" ? "Spent — back next round" : "Spent for this combat";
 
     case "ammo":
       // Ammo does not come back in this system, so an empty clip is spent
@@ -183,7 +188,7 @@ const AbilityChip = memo(function AbilityChip({
   const { dispatch } = useStoreApi();
   const req = requirementState(ab, siblings);
   const phaseLocked = isPhaseLocked(ab, playerPhaseCount, enemyPhaseCount);
-  const unlockPhases = phasesUntilUnlock(ab, phase, playerPhaseCount, enemyPhaseCount);
+  const unlockRounds = roundsUntilUnlock(ab, playerPhaseCount, enemyPhaseCount);
   const locked = phaseLocked || (req.gated && !req.met);
   const ready = isAbilityReadyWith(ab, siblings);
   const empty = isAmmoEmpty(ab);
@@ -202,15 +207,23 @@ const AbilityChip = memo(function AbilityChip({
    * Next Phase with nothing to say it was working. Saying when it lands is the
    * whole fix — a turn-based game has room for the actual number.
    */
-  const waitPhases = phasesUntilReady(ab, phase) ?? 0;
-  /** One phrase, built once. Assembling it at each call site produced
-      "Ready in next phase". */
+  /**
+   * The wait, in the unit the skills themselves use.
+   *
+   * Sheets say "3 Ally Phases CD" and the enemy pool says "by end of 3rd
+   * player phase", so a wait is counted in the owner's own phases. Counting
+   * raw phase presses instead produced "Ready in 9 phases" for a three-round
+   * cooldown — the same fact in a unit nobody's sheet uses. The per-press
+   * movement lives in the meter, which fills across the round.
+   */
+  const waitRounds = roundsUntilReady(ab);
+  const ownPhase = "player phase";
   const readyIn =
-    waitPhases <= 0
+    waitRounds <= 0
       ? "Ready"
-      : waitPhases === 1
-        ? "Ready next phase"
-        : `Ready in ${waitPhases} phases`;
+      : waitRounds === 1
+        ? `Ready next ${ownPhase}`
+        : `Ready in ${waitRounds} ${ownPhase}s`;
 
   const wasReady = useRef(ready);
   useEffect(() => {
@@ -242,7 +255,8 @@ const AbilityChip = memo(function AbilityChip({
     gated: req.gated,
     gateMet: req.met,
     phaseLocked,
-    unlockPhases,
+    unlockRounds,
+    unlockSide: ab.phaseLockType === "enemy" ? "enemy phase" : "player phase",
     readyIn,
   });
 
@@ -334,16 +348,14 @@ const AbilityChip = memo(function AbilityChip({
         {phaseLocked && (
           <span className="ability__lock">
             <IconTarget size={10} />
-            {unlockPhases > 0
-              ? `Opens ${unlockPhases === 1 ? "next phase" : `in ${unlockPhases} phases`}`
-              : `${ab.phaseLockType === "enemy" ? "Enemy" : "Player"} phase ${ab.phaseLock}`}
+            {`${ab.phaseLockType === "enemy" ? "Enemy" : "Player"} phase ${ab.phaseLock}`}
           </span>
         )}
       </div>
 
       {ab.mode !== "passive" && !locked && (
         <Meter
-          value={abilityFillPercent(ab)}
+          value={abilityFillPercent(ab, phase)}
           max={100}
           tone={ready ? tone : "var(--metal-600)"}
           label={`${ab.name} readiness`}
@@ -376,26 +388,17 @@ const AbilityChip = memo(function AbilityChip({
             </Button>
           )}
 
-          {/* "Once per round" and "once per combat" are budgets, not cooldowns.
-              gainPerPhase refills three times a round, so it cannot say either. */}
-          {ab.mode === "passive" && ab.refill && (
-            <Button
-              size="sm"
-              tone="phase"
-              disabled={ab.cur <= 0}
-              onClick={() => patch({ cur: Math.max(0, ab.cur - 1) })}
-            >
-              Spend
-            </Button>
-          )}
+
 
           {ab.mode === "reaction" && (
             <Button
               size="sm"
               tone="danger"
               disabled={!ready}
-              /* Reaction spends max+1 so it misses the current round's tick. */
-              onClick={() => patch({ cur: ab.max + 1 })}
+              /* Spends exactly its cooldown, the same as a cooldown skill. It
+                 used to spend max+1 to "miss the current round's tick", which
+                 made a 3-round reaction take four rounds and say so. */
+              onClick={() => patch({ cur: ab.max })}
             >
               React
             </Button>
@@ -443,8 +446,17 @@ const AbilityChip = memo(function AbilityChip({
             </>
           )}
 
+          {/* One control. A budgeted passive spends a use when invoked — two
+              buttons doing almost the same thing invited the wrong one. */}
           {ab.mode === "passive" && (
-            <Button size="sm" onClick={() => patch({}, true)}>
+            <Button
+              size="sm"
+              tone={ab.refill ? "phase" : "neutral"}
+              disabled={!!ab.refill && ab.cur <= 0}
+              onClick={() =>
+                patch(ab.refill ? { cur: Math.max(0, ab.cur - 1) } : {}, true)
+              }
+            >
               Invoke
             </Button>
           )}

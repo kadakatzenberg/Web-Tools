@@ -364,3 +364,23 @@
   .topbar__state { display: none; }
   .tool--optional { display: none; }
 }
+
+/* The house mark, when the library supplies one. The chop's inner keyline and
+   gradient are for the carved glyph; an actual logo gets the frame and nothing
+   painted over it. */
+.brand__seal[data-image] {
+  background: var(--inlay);
+  box-shadow: inset 0 0 0 1px var(--metal-700), var(--lift-1);
+  overflow: hidden;
+}
+
+.brand__seal[data-image]::after {
+  display: none;
+}
+
+.brand__logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}

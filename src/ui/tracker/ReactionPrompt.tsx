@@ -79,9 +79,9 @@ export function ReactionPrompt({
                   type: "ABILITY_USED",
                   id: combatant.id,
                   abilityId: ability.id,
-                  // Reaction spends max+1 so it misses the current round's tick,
-                  // matching how the React button on the card already works.
-                  patch: { cur: ability.max + 1 },
+                  // Spends exactly its cooldown, matching the React button on
+                  // the card and every cooldown skill.
+                  patch: { cur: ability.max },
                   marksDone: false,
                 })
               }

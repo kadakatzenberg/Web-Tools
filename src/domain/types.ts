@@ -105,6 +105,12 @@ export interface Ability {
   refill?: RefillCadence;
   /** Gate on a sibling skill. Unmet, this ability is shown but not usable. */
   requires?: AbilityRequirement;
+  /**
+   * Whether using this skill spends the one that gated it. Defaults to true,
+   * because a prerequisite that survives being cashed in leaves the skill lit
+   * and the table zeroing a counter by hand.
+   */
+  consumesRequirement?: boolean;
   charging?: boolean;
   phaseLock?: number;
   phaseLockType?: PhaseLockType;

@@ -638,20 +638,46 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
     case "ABILITY_USED": {
       const c0 = state.combatants.find((c) => c.id === cmd.id);
       const ab = c0?.abilities.find((a) => a.id === cmd.abilityId);
+
+      /**
+       * Using a gated skill spends what gated it.
+       *
+       * Dawn's ult requires Sangre Lanza at four and her sheet ends "STR resets
+       * to 0 after use" — the stack is the cost, not just the key. Leaving it
+       * full after the ult fired meant the ult stayed lit and the table had to
+       * remember to zero a different skill by hand. Opt out per ability with
+       * `consumesRequirement: false`.
+       */
+      const spend =
+        ab?.requires?.skill && ab.consumesRequirement !== false
+          ? ab.requires.skill.trim().toLowerCase()
+          : null;
+
+      const log: LogEntry[] = [];
+      if (ab && c0) log.push(entry(state, "ability", `${c0.name} used ${ab.name}`, [cmd.id]));
+
       return {
         state: {
           ...state,
           combatants: mapOne(state, cmd.id, (c) => ({
             ...c,
             done: cmd.marksDone ? true : c.done,
-            abilities: c.abilities.map((a) =>
-              a.id === cmd.abilityId ? { ...a, ...cmd.patch } : a,
-            ),
+            abilities: c.abilities.map((a) => {
+              if (a.id === cmd.abilityId) return { ...a, ...cmd.patch };
+              if (spend && a.cur > 0) {
+                const name = a.name.trim().toLowerCase();
+                if (name === spend || name.endsWith(spend)) {
+                  log.push(
+                    entry(state, "ability", `${c0!.name}: ${a.name} spent back to 0`, [cmd.id]),
+                  );
+                  return { ...a, cur: 0 };
+                }
+              }
+              return a;
+            }),
           })),
         },
-        log: ab
-          ? [entry(state, "ability", `${c0!.name} used ${ab.name}`, [cmd.id])]
-          : [],
+        log,
       };
     }
 

@@ -323,14 +323,27 @@ export function isAmmoEmpty(ab: Ability): boolean {
   return ab.mode === "ammo" && ab.cur === 0;
 }
 
-/** Fill fraction (0–100) for an ability's progress bar. */
-export function abilityFillPercent(ab: Ability): number {
+/**
+ * Fill fraction (0–100) for an ability's progress bar.
+ *
+ * `phase` lets a waiting skill advance within the round it is waiting through.
+ * Without it the bar held still for two of every three presses of Next Phase,
+ * which is what made a cooldown look stuck.
+ */
+export function abilityFillPercent(ab: Ability, phase = 0): number {
   const max = ab.max || 1;
-  if (ab.mode === "ammo" || ab.mode === "charge" || ab.mode === "stack") {
+  const partial = roundProgress(phase) / max;
+
+  if (ab.mode === "ammo" || ab.mode === "stack") {
     return clamp((ab.cur / max) * 100, 0, 100);
   }
+  if (ab.mode === "charge") {
+    const base = ab.cur / max;
+    return clamp((ab.charging && ab.cur < ab.max ? base + partial : base) * 100, 0, 100);
+  }
   if (ab.mode === "cooldown" || ab.mode === "reaction") {
-    return clamp(((ab.max - ab.cur) / max) * 100, 0, 100);
+    const base = (ab.max - ab.cur) / max;
+    return clamp((ab.cur > 0 ? base + partial : base) * 100, 0, 100);
   }
   return 0;
 }
@@ -374,20 +387,37 @@ export function phasesUntilRoundTick(phase: number): number {
 const PHASE_COUNT = 3;
 
 /**
- * How many phases until an ability is usable, or 0 if it already is.
- * Returns null when the answer is not a wait — a spent ammo clip, a gate that
- * is not satisfied, an idle charge nobody has started.
+ * How many of the owner's own phases until an ability is usable.
+ *
+ * Counted in player phases, because that is the unit the skills are written
+ * in — "3 Ally Phases CD", "by end of 3rd player phase". Counting the raw
+ * phase presses instead produced "Ready in 9 phases" for a three-round
+ * cooldown, which is the same fact stated in a unit nobody's sheet uses.
+ *
+ * Sub-round progress is carried by the meter rather than the number, so the
+ * control still moves on every press without the figure looking inflated.
  */
-export function phasesUntilReady(ab: Ability, phase: number): number | null {
-  const rounds =
-    ab.mode === "charge"
-      ? ab.charging && ab.cur < ab.max
-        ? Math.ceil((ab.max - ab.cur) / (ab.gainPerPhase || 1))
-        : 0
-      : ab.mode === "cooldown" || ab.mode === "reaction"
-        ? ab.cur
-        : 0;
+export function roundsUntilReady(ab: Ability): number {
+  if (ab.mode === "charge") {
+    return ab.charging && ab.cur < ab.max
+      ? Math.ceil((ab.max - ab.cur) / (ab.gainPerPhase || 1))
+      : 0;
+  }
+  if (ab.mode === "cooldown" || ab.mode === "reaction") return Math.max(0, ab.cur);
+  return 0;
+}
 
+/**
+ * How far through the current round we are, 0–1. Feeds the readiness meter so
+ * a wait visibly advances on each phase without the headline number moving.
+ */
+export function roundProgress(phase: number): number {
+  return (phase % PHASE_COUNT) / PHASE_COUNT;
+}
+
+/** Phases until an ability is usable. Kept for the sub-round arithmetic. */
+export function phasesUntilReady(ab: Ability, phase: number): number | null {
+  const rounds = roundsUntilReady(ab);
   if (rounds <= 0) return 0;
   return (rounds - 1) * PHASE_COUNT + phasesUntilRoundTick(phase);
 }
@@ -410,6 +440,17 @@ export function phasesUntilUnlock(
   const rounds = ab.phaseLock - have;
   if (rounds <= 0) return 0;
   return (rounds - 1) * PHASE_COUNT + phasesUntilRoundTick(phase);
+}
+
+/** The same wait in the owner's own phases, which is how locks are written. */
+export function roundsUntilUnlock(
+  ab: Pick<Ability, "phaseLock" | "phaseLockType">,
+  playerPhaseCount: number,
+  enemyPhaseCount: number,
+): number {
+  if (!ab.phaseLock) return 0;
+  const have = ab.phaseLockType === "enemy" ? enemyPhaseCount : playerPhaseCount;
+  return Math.max(0, ab.phaseLock - have);
 }
 
 /* ── Requirements ── */

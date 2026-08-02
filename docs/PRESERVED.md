@@ -284,3 +284,38 @@ not also need a Charge press the skill text never asked for.
 existing characters without anyone re-entering a sheet. Parsing is anchored on
 the word "requires" and nothing else, so an ordinary sentence — "STR resets to
 0 after using Ult" — cannot become a gate by accident.
+
+### Using a gated skill spends what gated it
+
+**Before:** casting Dawn's ult left Sangre Lanza at 4/4, so the ult stayed lit
+and the table zeroed a different skill by hand.
+
+**Now:** using a skill with a prerequisite resets the skill it required, and
+logs it. Opt out per ability with `consumesRequirement: false` — a gate that is
+a key rather than a cost.
+
+### Waits are counted in the owner's own phases
+
+**Before (briefly):** "Ready in 9 phases" for a three-round cooldown. Correct,
+and in a unit nobody's sheet uses.
+
+**Now:** "Ready in 3 player phases", matching how the skills are written —
+"3 Ally Phases CD", "by end of 3rd player phase". The per-press movement moved
+to the meter, which now fills across the round, so a control still visibly
+advances on every press without the figure inflating.
+
+### A reaction spends exactly its stated cooldown
+
+**Before:** using a reaction set its counter to `max + 1`, to "miss the current
+round's tick". A 3-round reaction therefore took four rounds — and once waits
+were reported honestly, said so.
+
+**Now:** it spends `max`, the same as a cooldown skill. A 3-round reaction takes
+three rounds.
+
+### The house mark comes from the library
+
+The brand looks itself up in `entries` rather than carrying a hardcoded URL,
+falling back to the carved 黑 seal if the row is missing, the request fails, or
+the image will not load. The answer is cached in `localStorage` for a week, so
+a table with no signal does not re-ask on every load.
