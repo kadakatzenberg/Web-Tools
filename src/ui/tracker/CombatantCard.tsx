@@ -13,11 +13,13 @@ import type {
   AbilityMode,
   Combatant,
   DamageType,
+  ModTarget,
   StatKey,
 } from "@/domain/types";
 import {
   abilityFillPercent,
   applyDamage,
+  applyHealing as healPreview,
   deriveStats,
   effectiveStats,
   healthBand,
@@ -27,13 +29,13 @@ import {
   isPhaseLocked,
   tempShieldDuration,
 } from "@/domain/rules";
-import { POSITIONS, SKILL_MODES, SKILL_MODE_LABELS, STAT_KEYS, STATUS_OPTIONS } from "@/domain/constants";
+import { POSITIONS, SKILL_MODES, SKILL_MODE_LABELS, STACK_PRESETS, STAT_KEYS, STATUS_OPTIONS } from "@/domain/constants";
 import { gid } from "@/domain/factory";
-import { d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
+import { checkRoll, d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
 import { useStoreApi } from "@/state/store";
 import { announce, useCopy, useId } from "../hooks";
 import { Badge, Button, DetailTabs, IconButton, Meter, Modal, NumberInput, useToast } from "../primitives";
-import { IconCheck, IconClose, IconDuplicate, statusMark } from "../icons";
+import { IconCheck, IconClose, IconDice, IconDuplicate, IconMinus, IconPlus, IconTarget, IconWard, statusMark } from "../icons";
 import { Portrait } from "../Portrait";
 import { FloatingMarks, useFeedback, useImpact } from "@/fx/feedback";
 import { playCue } from "@/fx/sound";
@@ -169,6 +171,17 @@ const AbilityChip = memo(function AbilityChip({
       </div>
 
       {ab.effectText && <p className="ability__effect">{ab.effectText}</p>}
+
+      {/* The saving throw this skill forces, shown on the caster's chip so the
+          GM can read it off while casting and set it on the target's card. */}
+      {ab.dcStat && ab.dcValue ? (
+        <p className="ability__dc">
+          <span className="ability__dc-mark" aria-hidden="true">
+            <IconTarget size={11} />
+          </span>
+          Forces a <strong>{ab.dcStat}</strong> check, DC <strong>{ab.dcValue}</strong>
+        </p>
+      ) : null}
 
       {ab.dice && (
         <button
@@ -551,6 +564,9 @@ export const CombatantCard = memo(function CombatantCard({
   const [dmg, setDmg] = useState("");
   const [dmgType, setDmgType] = useState<DamageType>("physical");
   const [heal, setHeal] = useState("");
+  const [ward, setWard] = useState(true);
+  const [checkStat, setCheckStat] = useState<StatKey>("CON");
+  const [checkDc, setCheckDc] = useState("");
   const [editing, setEditing] = useState<Ability | null>(null);
   const [statusName, setStatusName] = useState<string>("Prone");
   const [statusCustom, setStatusCustom] = useState("");
@@ -620,19 +636,27 @@ export const CombatantCard = memo(function CombatantCard({
     setDmg("");
   };
 
-  const applyHealing = () => {
+  const applyHealingTo = () => {
     const amount = parseInt(heal, 10);
     if (!amount) {
       toast.push("Enter an amount to heal first.", "warn");
       return;
     }
-    const next = Math.min(c.maxHp, c.hp + amount);
-    if (next !== c.hp) {
-      mark(c.id, `+${next - c.hp}`, "heal");
+    const r = healPreview(c, amount, { overheal: ward });
+    if (r.healed > 0) {
+      mark(c.id, `+${r.healed}`, "heal");
       playCue("heal");
     }
-    dispatch({ type: "HEAL_APPLIED", ids: [c.id], amount });
-    announce(`${c.name} healed to ${next} of ${c.maxHp}.`);
+    if (r.warded > 0) {
+      mark(c.id, `◈ ${r.warded}`, "shield");
+      playCue("shieldHit");
+    }
+    dispatch({ type: "HEAL_APPLIED", ids: [c.id], amount, overheal: ward });
+    announce(
+      `${c.name} healed to ${r.hp} of ${c.maxHp}.${
+        r.warded > 0 ? ` ${r.warded} overheal warded.` : ""
+      }`,
+    );
     setHeal("");
   };
 
@@ -867,11 +891,24 @@ export const CombatantCard = memo(function CombatantCard({
                 placeholder="Heal"
                 aria-label={`Heal ${c.name}`}
                 onChange={(e) => setHeal(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyHealing()}
+                onKeyDown={(e) => e.key === "Enter" && applyHealingTo()}
               />
-              <Button tone="heal" onClick={applyHealing}>
+              <Button tone="heal" onClick={applyHealingTo}>
                 Mend
               </Button>
+              {/* Twelve skills in the pool end with "Overheal converts to
+                  temporary shield", so this defaults on — but it stays visible
+                  and switchable, because it is a rule the tracker used to
+                  ignore entirely. */}
+              <IconButton
+                label={ward ? "Overheal becomes a ward (on)" : "Overheal is discarded (off)"}
+                className="card__ward-toggle"
+                aria-pressed={ward}
+                tone={ward ? "shield" : "ghost"}
+                onClick={() => setWard((v) => !v)}
+              >
+                <IconWard size={14} />
+              </IconButton>
               <Button
                 size="sm"
                 onClick={() => {
@@ -896,7 +933,53 @@ export const CombatantCard = memo(function CombatantCard({
                   toast.push(ok ? `${attackRoll} copied` : "Could not copy", ok ? "ok" : "danger");
                 }}
               >
-                🎲 Attack roll
+                <IconDice size={14} /> Attack roll
+              </Button>
+
+              {/* A quarter of the skill pool forces a stat check. Building the
+                  roll here means the DC and the target's own modifier are on
+                  the same line, rather than being reassembled from the sheet
+                  mid-fight. */}
+              <select
+                className="card__check"
+                value={checkStat}
+                aria-label={`Stat check for ${c.name}`}
+                onChange={(e) => setCheckStat(e.target.value as StatKey)}
+              >
+                {STAT_KEYS.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                className="card__dc"
+                value={checkDc}
+                placeholder="DC"
+                aria-label={`Check difficulty for ${c.name}`}
+                onChange={(e) => setCheckDc(e.target.value)}
+              />
+              <Button
+                size="sm"
+                title="Copy this combatant's saving throw, with their modifier and any swing applied"
+                onClick={async () => {
+                  const dc = parseInt(checkDc, 10);
+                  if (!dc) {
+                    toast.push("Set a DC for the check first.", "warn");
+                    return;
+                  }
+                  const text = checkRoll({
+                    stat: checkStat,
+                    dc,
+                    bonus: eff[checkStat] ?? 0,
+                    swing,
+                  });
+                  const ok = await copy(text);
+                  toast.push(ok ? `${checkStat} DC ${dc} copied` : "Could not copy", ok ? "ok" : "danger");
+                }}
+              >
+                Check
               </Button>
             </div>
           </div>
@@ -918,6 +1001,48 @@ export const CombatantCard = memo(function CombatantCard({
                 />
               ))}
             </div>
+          )}
+
+          {/* ── Stacks ── */}
+          {(c.stacks?.length ?? 0) > 0 && (
+            <ul className="chips" aria-label={`${c.name} stacks`}>
+              {c.stacks!.map((st) => (
+                <li key={st.id} className="chip chip--stack">
+                  <span className="chip__lead tnum">
+                    {st.count}
+                    {st.max > 0 && <span className="chip__of">/{st.max}</span>}
+                  </span>
+                  <span>{st.name}</span>
+                  {st.perStackDamage ? (
+                    <span className="chip__meta tnum">+{st.perStackDamage * st.count} taken</span>
+                  ) : null}
+                  <IconButton
+                    label={`Add a ${st.name} stack to ${c.name}`}
+                    onClick={() =>
+                      dispatch({ type: "STACK_ADJUSTED", id: c.id, name: st.name, delta: 1 })
+                    }
+                  >
+                    <IconPlus size={11} />
+                  </IconButton>
+                  <IconButton
+                    label={`Remove a ${st.name} stack from ${c.name}`}
+                    onClick={() =>
+                      dispatch({ type: "STACK_ADJUSTED", id: c.id, name: st.name, delta: -1 })
+                    }
+                  >
+                    <IconMinus size={11} />
+                  </IconButton>
+                  <IconButton
+                    label={`Clear ${st.name} from ${c.name}`}
+                    onClick={() =>
+                      dispatch({ type: "STACK_CLEARED", id: c.id, stackId: st.id })
+                    }
+                  >
+                    <IconClose size={11} />
+                  </IconButton>
+                </li>
+              ))}
+            </ul>
           )}
 
           {/* ── Statuses ── */}
@@ -1231,7 +1356,11 @@ function OngoingEditor({ c }: { c: Combatant }) {
   const [regPerm, setRegPerm] = useState(false);
   const [regDur, setRegDur] = useState("");
 
-  const [modStat, setModStat] = useState<StatKey>("STR");
+  const [stackName, setStackName] = useState("");
+  const [stackMax, setStackMax] = useState("");
+  const [stackDmg, setStackDmg] = useState("");
+
+  const [modStat, setModStat] = useState<ModTarget>("STR");
   const [modVal, setModVal] = useState("");
   const [modDur, setModDur] = useState("");
   const [modLabel, setModLabel] = useState("");
@@ -1318,6 +1447,72 @@ function OngoingEditor({ c }: { c: Combatant }) {
         </div>
       </fieldset>
 
+      {/* ── Stacks ── */}
+      <fieldset className="ongoing__set">
+        <legend className="eyebrow">Stacks</legend>
+        <p className="ongoing__hint">
+          Counters this combatant is carrying. A third of the stack skills read
+          “on hit, <em>target</em> gains 1 stack”, so the count belongs here
+          rather than on the attacker's skill.
+        </p>
+        <div className="ongoing__row">
+          <input
+            value={stackName}
+            placeholder="Name"
+            aria-label="Stack name"
+            list="hm-stack-presets"
+            onChange={(e) => setStackName(e.target.value)}
+          />
+          <datalist id="hm-stack-presets">
+            {STACK_PRESETS.map((s) => (
+              <option key={s.name} value={s.name} />
+            ))}
+          </datalist>
+          <input
+            type="number"
+            min={0}
+            value={stackMax}
+            placeholder="Max"
+            aria-label="Stack ceiling"
+            onChange={(e) => setStackMax(e.target.value)}
+          />
+          <input
+            type="number"
+            min={0}
+            value={stackDmg}
+            placeholder="+dmg each"
+            aria-label="Damage taken per stack"
+            onChange={(e) => setStackDmg(e.target.value)}
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              const name = stackName.trim();
+              if (!name) {
+                toast.push("Name the stack first.", "warn");
+                return;
+              }
+              const preset = STACK_PRESETS.find(
+                (p) => p.name.toLowerCase() === name.toLowerCase(),
+              );
+              dispatch({
+                type: "STACK_ADJUSTED",
+                id: c.id,
+                name,
+                delta: 1,
+                max: parseInt(stackMax, 10) || preset?.max || 0,
+                perStackDamage: parseInt(stackDmg, 10) || preset?.perStackDamage || undefined,
+              });
+              setStackName("");
+              setStackMax("");
+              setStackDmg("");
+            }}
+          >
+            Apply
+          </Button>
+        </div>
+      </fieldset>
+
       <fieldset className="ongoing__set">
         <legend className="eyebrow">Temporary modifiers</legend>
         {c.tempMods.length > 0 && (
@@ -1334,10 +1529,21 @@ function OngoingEditor({ c }: { c: Combatant }) {
           </ul>
         )}
         <div className="ongoing__row">
-          <select value={modStat} aria-label="Modifier stat" onChange={(e) => setModStat(e.target.value as StatKey)}>
+          <select
+            value={modStat}
+            aria-label="Modifier stat"
+            onChange={(e) => setModStat(e.target.value as ModTarget)}
+          >
             {STAT_KEYS.map((k) => (
-              <option key={k}>{k}</option>
+              <option key={k} value={k}>
+                {k}
+              </option>
             ))}
+            {/* Flat damage channels. "Reduce all incoming damage by 1" is not a
+                CON buff, and expressing it as one would quietly change
+                resistance and stat checks too. */}
+            <option value="dmgTaken">Damage taken</option>
+            <option value="dmgDealt">Damage dealt</option>
           </select>
           {/* Signed, so deliberately not type="number": the browser reports a
               lone "-" as an empty string and the minus is lost. A debuff like

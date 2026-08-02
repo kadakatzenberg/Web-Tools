@@ -1670,3 +1670,74 @@
 .multi__check input {
   width: auto;
 }
+
+/* ══ Mechanics added for the skill pool ══ */
+
+/* A stack carried by the combatant it was inflicted on. Violet, because it is
+   neither a condition (which expires on a clock) nor a modifier. */
+.chip--stack {
+  border-color: var(--violet-dim);
+  background: rgba(164, 135, 234, 0.08);
+}
+
+.chip--stack .chip__lead {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--violet);
+}
+
+.chip__of {
+  color: var(--faint);
+  font-size: 0.85em;
+}
+
+/* The overheal toggle sits with the healing controls and reads as a shield. */
+.card__ward-toggle[aria-pressed="true"] {
+  color: var(--shield-temp);
+  background: rgba(127, 208, 232, 0.12);
+}
+
+.card__ward-toggle[aria-pressed="false"] {
+  opacity: 0.45;
+}
+
+/* The stat check pair: a stat and a DC, sized so they read as one control. */
+.card__check {
+  width: 4.6rem;
+  flex-shrink: 0;
+}
+
+.card__dc {
+  width: 3.6rem;
+  flex-shrink: 0;
+}
+
+.ability__dc {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: var(--s1);
+  font-size: var(--fs-2xs);
+  color: var(--candle);
+}
+
+.ability__dc strong {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--candle-bright);
+}
+
+.ability__dc-mark {
+  display: grid;
+  place-items: center;
+  color: var(--candle-dim);
+}
+
+.ongoing__hint {
+  font-family: var(--font-prose);
+  font-size: var(--fs-2xs);
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--faint);
+  margin-bottom: var(--s2);
+}

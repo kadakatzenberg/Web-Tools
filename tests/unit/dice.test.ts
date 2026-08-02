@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkRoll,
   d20Roll,
   d20Term,
   looksLikeDice,
@@ -198,6 +199,33 @@ describe("enemy phase block with dice features", () => {
     });
     expect(formatEnemyPhaseBlock(s, [{ combatantId: "e", target: "everyone" }])).toBe(
       "BLOAT — everyone\n{{1d20}}",
+    );
+  });
+});
+
+describe("stat checks", () => {
+  it("names the stat and the DC beside the roll", () => {
+    expect(checkRoll({ stat: "CON", dc: 12, bonus: 2 })).toBe(
+      "CON check, DC 12 — {{1d20+2}}",
+    );
+  });
+
+  it("carries a negative modifier", () => {
+    expect(checkRoll({ stat: "WIS", dc: 13, bonus: -1 })).toBe(
+      "WIS check, DC 13 — {{1d20-1}}",
+    );
+  });
+
+  it("omits a zero modifier rather than writing +0", () => {
+    expect(checkRoll({ stat: "AGI", dc: 11 })).toBe("AGI check, DC 11 — {{1d20}}");
+  });
+
+  it("honours Advantage and Disadvantage", () => {
+    expect(checkRoll({ stat: "STR", dc: 14, bonus: 1, swing: "advantage" })).toBe(
+      "STR check, DC 14 — {{2d20kh1+1}}",
+    );
+    expect(checkRoll({ stat: "STR", dc: 14, bonus: 1, swing: "disadvantage" })).toBe(
+      "STR check, DC 14 — {{2d20kl1+1}}",
     );
   });
 });

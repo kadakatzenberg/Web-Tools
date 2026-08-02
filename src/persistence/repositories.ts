@@ -134,7 +134,7 @@ export async function updateSheet(id: string, payload: SheetPayload): Promise<vo
 /* ── combat_skills ── */
 
 export async function fetchSkills(signal?: AbortSignal): Promise<CombatSkillRow[]> {
-  const rows = await request<unknown[]>({ path: "combat_skills?order=id.asc", signal });
+  const rows = await request<unknown[]>({ path: "combat_skills?select=*&order=id.asc", signal });
   return parseSkillRows(rows ?? []) as CombatSkillRow[];
 }
 

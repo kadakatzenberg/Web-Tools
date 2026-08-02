@@ -36,7 +36,15 @@ export type Command =
   | { type: "COMBATANT_PORTRAIT_SET"; id: string; portrait: string }
   /* health */
   | { type: "DAMAGE_APPLIED"; ids: string[]; amount: number; damageType: DamageType }
-  | { type: "HEAL_APPLIED"; ids: string[]; amount: number }
+  | {
+      type: "HEAL_APPLIED";
+      ids: string[];
+      amount: number;
+      /** Convert the overflow into a temporary shield. */
+      overheal?: boolean;
+      /** Bound that conversion, for the skills that cap it. */
+      wardCap?: number;
+    }
   | { type: "FULL_HEAL_APPLIED"; ids: string[] }
   /* shields */
   | { type: "SHIELD_ADJUSTED"; id: string; delta: number }
@@ -53,6 +61,9 @@ export type Command =
   | { type: "REGEN_REMOVED"; id: string; regenId: string }
   | { type: "TEMP_MOD_ADDED"; id: string; mod: TempMod }
   | { type: "TEMP_MOD_REMOVED"; id: string; modId: string }
+  /* stacks inflicted on a combatant */
+  | { type: "STACK_ADJUSTED"; id: string; name: string; delta: number; max?: number; perStackDamage?: number }
+  | { type: "STACK_CLEARED"; id: string; stackId: string }
   /* abilities */
   | { type: "ABILITY_ADDED"; id: string; ability: Ability }
   | { type: "ABILITY_UPDATED"; id: string; ability: Ability }
@@ -110,6 +121,10 @@ export function commandLabel(cmd: Command): string {
       return `${cmd.amount} ${cmd.damageType} damage`;
     case "HEAL_APPLIED":
       return `heal ${cmd.amount}`;
+    case "STACK_ADJUSTED":
+      return cmd.delta >= 0 ? `add ${cmd.name} stack` : `remove ${cmd.name} stack`;
+    case "STACK_CLEARED":
+      return "clear stacks";
     case "FULL_HEAL_APPLIED":
       return "full heal";
     case "SHIELD_ADJUSTED":

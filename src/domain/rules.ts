@@ -13,22 +13,42 @@ import type {
   DerivedStats,
   Dot,
   HealthBand,
+  ModTarget,
   Regen,
   Stats,
-  StatKey,
   TempMod,
   TempShield,
 } from "./types";
 import { STAT_KEYS } from "./constants";
+import { gid } from "./factory";
 
 export function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
 /** Sum of temporary modifiers applied to a single stat. */
-export function modifierTotal(mods: TempMod[] | undefined, stat: StatKey): number {
+export function modifierTotal(mods: TempMod[] | undefined, stat: ModTarget): number {
   let total = 0;
   for (const m of mods ?? []) if (m.stat === stat) total += m.val;
+  return total;
+}
+
+/**
+ * Extra damage this combatant takes on every hit, from flat modifiers and from
+ * any stack carrying a per-stack penalty.
+ *
+ * Vulnerability is the reason stacks feed in here: "each stack increases all
+ * damage target receives by 1" is a property of the victim, and applying it by
+ * hand across a stacking debuff is exactly the arithmetic this tool exists to
+ * stop dropping.
+ */
+export function damageTakenBonus(
+  c: Pick<Combatant, "tempMods" | "stacks">,
+): number {
+  let total = modifierTotal(c.tempMods, "dmgTaken");
+  for (const st of c.stacks ?? []) {
+    if (st.perStackDamage) total += st.perStackDamage * st.count;
+  }
   return total;
 }
 
@@ -142,7 +162,11 @@ export function applyDamage(
   const effWIS = (c.stats.WIS ?? 0) + modifierTotal(mods, "WIS");
   const tax = resistanceFor(type, effCON, effWIS);
 
-  let left = Math.max(0, amt - tax);
+  // Order matters: resistance first, then flat vulnerability. Applying the
+  // bonus before resistance would let a target's CON eat a Vulnerability stack,
+  // which is the opposite of what the stack is for.
+  const vuln = damageTakenBonus(c);
+  let left = Math.max(0, amt - tax + vuln);
   const afterResist = left;
 
   let ts = existingTemp;
@@ -178,7 +202,7 @@ export function applyDamage(
     breakdown: {
       incoming: amt,
       resisted: tax > 0 ? Math.min(tax, amt) : 0,
-      amplified: tax < 0 ? -tax : 0,
+      amplified: (tax < 0 ? -tax : 0) + Math.max(0, vuln),
       afterResist,
       absorbedByTemp,
       absorbedByShield,
@@ -193,6 +217,54 @@ export function applyDamage(
 export function applyHeal(c: Pick<Combatant, "hp" | "maxHp">, amount: number): number {
   const amt = Math.max(0, amount || 0);
   return clamp(c.hp + amt, 0, c.maxHp);
+}
+
+export interface HealResult {
+  hp: number;
+  tempShields: TempShield[];
+  /** Hit points actually restored. */
+  healed: number;
+  /** Overflow converted into a temporary shield. */
+  warded: number;
+}
+
+/**
+ * Healing, with the overflow optionally becoming a ward.
+ *
+ * Twelve skills in the pool end with "Overheal converts to temporary shield",
+ * and the tracker used to clamp at max HP and discard the excess — so every one
+ * of them resolved wrong unless the GM caught it by hand. `overheal` defaults
+ * off at this layer so nothing changes for callers that have not opted in; the
+ * healing controls in the UI turn it on.
+ *
+ * `wardCap` covers the skills that bound the conversion ("capped at 3").
+ */
+export function applyHealing(
+  c: Pick<Combatant, "hp" | "maxHp" | "tempShields">,
+  amount: number,
+  opts: { overheal?: boolean; wardCap?: number } = {},
+): HealResult {
+  const amt = Math.max(0, Math.trunc(amount) || 0);
+  const hp = clamp(c.hp + amt, 0, c.maxHp);
+  const healed = hp - Math.max(0, c.hp);
+
+  const tempShields = [...(c.tempShields ?? [])];
+  let warded = 0;
+
+  if (opts.overheal) {
+    const overflow = amt - healed;
+    warded = opts.wardCap != null ? Math.min(overflow, Math.max(0, opts.wardCap)) : overflow;
+    if (warded > 0) {
+      tempShields.push({
+        id: gid(),
+        val: warded,
+        duration: tempShieldDuration(warded),
+        label: "Overheal",
+      });
+    }
+  }
+
+  return { hp, tempShields, healed, warded };
 }
 
 /**

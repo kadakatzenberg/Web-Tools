@@ -7,7 +7,7 @@
  */
 
 import type { Combatant, EncounterState } from "@/domain/types";
-import { applyDamage, applyHeal, clamp } from "@/domain/rules";
+import { applyDamage, applyHealing, clamp } from "@/domain/rules";
 import { advancePhase, lockInitiative, resetInitiative } from "@/domain/phase";
 import { duplicateCombatant, gid } from "@/domain/factory";
 import type { Command } from "./actions";
@@ -257,13 +257,86 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
       const log: LogEntry[] = [];
       const combatants = state.combatants.map((c) => {
         if (!ids.has(c.id)) return c;
-        const hp = applyHeal(c, cmd.amount);
-        if (hp !== c.hp) {
-          log.push(entry(state, "heal", `${c.name} healed ${hp - c.hp}`, [c.id]));
+        const r = applyHealing(c, cmd.amount, {
+          overheal: cmd.overheal,
+          wardCap: cmd.wardCap,
+        });
+        if (r.healed > 0) {
+          log.push(entry(state, "heal", `${c.name} healed ${r.healed}`, [c.id]));
         }
-        return { ...c, hp };
+        if (r.warded > 0) {
+          // Logged separately: a ward is a different thing from a heal, and a
+          // GM reading back the round needs to see where the shield came from.
+          log.push(
+            entry(state, "shield", `${c.name} warded ${r.warded} from overheal`, [c.id]),
+          );
+        }
+        return { ...c, hp: r.hp, tempShields: r.tempShields };
       });
       return { state: { ...state, combatants }, log };
+    }
+
+    /* ── stacks inflicted on a combatant ── */
+
+    /**
+     * Increment, create, or decrement a named stack. Reaching the ceiling
+     * resets it to zero, which is how every "at max stacks" skill in the pool
+     * is written — the trigger itself stays the GM's call, because what happens
+     * at max differs per skill.
+     */
+    case "STACK_ADJUSTED": {
+      const name = cmd.name.trim();
+      if (!name || !cmd.delta) return { state, log: [] };
+      const log: LogEntry[] = [];
+      const combatants = mapOne(state, cmd.id, (c) => {
+        const stacks = [...(c.stacks ?? [])];
+        const i = stacks.findIndex((s) => s.name.toLowerCase() === name.toLowerCase());
+        const existing = i >= 0 ? stacks[i]! : null;
+        const max = cmd.max ?? existing?.max ?? 0;
+        const next = (existing?.count ?? 0) + cmd.delta;
+
+        if (next <= 0) {
+          if (i >= 0) stacks.splice(i, 1);
+          log.push(entry(state, "status", `${c.name} loses ${name}`, [c.id]));
+          return { ...c, stacks };
+        }
+
+        const capped = max > 0 && next >= max;
+        const count = capped ? 0 : next;
+        const mark = {
+          id: existing?.id ?? gid(),
+          name,
+          count,
+          max,
+          ...(cmd.perStackDamage ?? existing?.perStackDamage
+            ? { perStackDamage: cmd.perStackDamage ?? existing?.perStackDamage }
+            : {}),
+        };
+
+        if (capped) {
+          log.push(entry(state, "status", `${c.name}: ${name} reached ${max} and reset`, [c.id]));
+          stacks.splice(i >= 0 ? i : stacks.length, i >= 0 ? 1 : 0);
+        } else {
+          log.push(entry(state, "status", `${c.name}: ${name} ${count}${max ? `/${max}` : ""}`, [c.id]));
+          if (i >= 0) stacks[i] = mark;
+          else stacks.push(mark);
+        }
+        return { ...c, stacks };
+      });
+      return { state: { ...state, combatants }, log };
+    }
+
+    case "STACK_CLEARED": {
+      return {
+        state: {
+          ...state,
+          combatants: mapOne(state, cmd.id, (c) => ({
+            ...c,
+            stacks: (c.stacks ?? []).filter((s) => s.id !== cmd.stackId),
+          })),
+        },
+        log: [],
+      };
     }
 
     case "FULL_HEAL_APPLIED": {

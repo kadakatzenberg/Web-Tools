@@ -174,6 +174,8 @@ export function abilityFromSkillRow(row: CombatSkillRow): Ability {
     cur: row.mode === "ammo" ? max : 0,
     gainPerPhase: row.gain_per_phase || 1,
     effectText: row.effect ?? "",
+    ...(row.dc_stat ? { dcStat: row.dc_stat } : {}),
+    ...(row.dc_value ? { dcValue: row.dc_value } : {}),
   };
 }
 

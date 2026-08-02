@@ -75,6 +75,33 @@ export function d20Roll({ bonus = 0, swing = "normal", flagCrits = false }: D20O
   return `{{${parts.join("")}}}`;
 }
 
+/* ── Saving throws ── */
+
+export interface CheckOptions {
+  stat: string;
+  dc: number;
+  /** The checking combatant's effective modifier for that stat. */
+  bonus?: number;
+  swing?: RollSwing;
+}
+
+/**
+ * A stat check against a difficulty, ready to paste.
+ *
+ * A quarter of the skill pool branches on one of these, and the branch is
+ * always worth more than the number — "fail: DoT 3 for 3 phases, pass: DoT 1
+ * for 1 phase" is two different rounds. Naming the stat and the DC beside the
+ * roll is what stops the table having to look the skill back up mid-fight.
+ *
+ * The tracker still never rolls. It only writes the notation.
+ */
+export function checkRoll({ stat, dc, bonus = 0, swing = "normal" }: CheckOptions): string {
+  const parts = [d20Term(swing)];
+  if (bonus > 0) parts.push(`+${bonus}`);
+  else if (bonus < 0) parts.push(`${bonus}`);
+  return `${stat} check, DC ${dc} — {{${parts.join("")}}}`;
+}
+
 /**
  * A "throws it at nobody in particular" roll: one die, and a legend mapping
  * each face to a combatant. Taken from how the table already handles

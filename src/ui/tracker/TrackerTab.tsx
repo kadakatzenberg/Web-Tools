@@ -305,6 +305,7 @@ function MultiAction({ combatants }: { combatants: Combatant[] }) {
   const [customCondition, setCustomCondition] = useState("");
   const [duration, setDuration] = useState("1");
   const [asDot, setAsDot] = useState(false);
+  const [ward, setWard] = useState(true);
 
   const toggle = (id: string) =>
     setTargets((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
@@ -401,9 +402,13 @@ function MultiAction({ combatants }: { combatants: Combatant[] }) {
       playCue("damage");
       announce(`${amt} ${type} damage applied to ${live.length} combatants.`);
     } else {
-      dispatch({ type: "HEAL_APPLIED", ids: live, amount: amt });
+      dispatch({ type: "HEAL_APPLIED", ids: live, amount: amt, overheal: ward });
       playCue("heal");
-      announce(`${amt} healing applied to ${live.length} combatants.`);
+      announce(
+        `${amt} healing applied to ${live.length} combatants${
+          ward ? ", overheal warded" : ""
+        }.`,
+      );
     }
     close();
   };
@@ -515,6 +520,16 @@ function MultiAction({ combatants }: { combatants: Combatant[] }) {
               onChange={(e) => setAmount(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && apply()}
             />
+            {mode === "heal" && (
+              <label className="multi__check">
+                <input
+                  type="checkbox"
+                  checked={ward}
+                  onChange={(e) => setWard(e.target.checked)}
+                />
+                Overheal wards
+              </label>
+            )}
             {mode === "damage" && (
               <select value={type} aria-label="Damage type to apply" onChange={(e) => setType(e.target.value as DamageType)}>
                 <option value="physical">Physical</option>

@@ -64,6 +64,8 @@ const abilitySchema = z
     cur: num(0),
     gainPerPhase: num(1).optional(),
     effectText: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
+    dcStat: z.enum(["STR", "DEX", "INT", "WIS", "AGI", "CON"]).optional().catch(undefined),
+    dcValue: z.unknown().transform((v) => (typeof v === "number" && v > 0 ? v : undefined)).optional(),
     charging: z.coerce.boolean().catch(false).optional(),
     phaseLock: z.coerce.number().nullish().transform((v) => (v ? Number(v) : undefined)),
     phaseLockType: z.enum(["player", "enemy"]).catch("player").optional(),
@@ -102,10 +104,23 @@ const statusSchema = z.object({
 
 const tempModSchema = z.object({
   id: idSchema,
-  stat: z.enum(["STR", "DEX", "INT", "WIS", "AGI", "CON"]).catch("STR"),
+  // The two damage channels join the six stats here. A record written before
+  // they existed still parses; an unrecognised target falls back to STR rather
+  // than dropping the whole modifier.
+  stat: z
+    .enum(["STR", "DEX", "INT", "WIS", "AGI", "CON", "dmgTaken", "dmgDealt"])
+    .catch("STR"),
   val: num(0),
   duration: num(1),
   label: z.unknown().transform((v) => (typeof v === "string" ? v : "")),
+});
+
+const stackSchema = z.object({
+  id: idSchema,
+  name: z.unknown().transform((v) => (typeof v === "string" ? v : "")),
+  count: num(0),
+  max: num(0),
+  perStackDamage: z.unknown().transform((v) => (typeof v === "number" ? v : undefined)).optional(),
 });
 
 /** Drop entries that fail validation rather than failing the whole record. */
@@ -140,6 +155,8 @@ export const combatantSchema = z
     statuses: lenientArray(statusSchema),
     abilities: lenientArray(abilitySchema),
     tempMods: lenientArray(tempModSchema),
+    /** Additive: encounters saved before stacks existed parse unchanged. */
+    stacks: lenientArray(stackSchema).optional(),
     position: positionSchema,
     notes: z.unknown().transform((v) => (typeof v === "string" ? v : "")),
     sheetSkills: z.unknown().transform((v) => (looseJson(v) ?? {}) as object),
@@ -263,6 +280,8 @@ export const combatSkillRowSchema = z.object({
   max_val: z.coerce.number().nullish().catch(null),
   gain_per_phase: z.coerce.number().nullish().catch(null),
   effect: z.unknown().transform((v) => (typeof v === "string" ? v : "")).nullish(),
+  dc_stat: z.enum(["STR", "DEX", "INT", "WIS", "AGI", "CON"]).nullish().catch(null),
+  dc_value: z.unknown().transform((v) => (typeof v === "number" && v > 0 ? v : null)).nullish(),
 });
 
 export function parseSkillRows(input: unknown) {

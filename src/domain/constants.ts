@@ -94,3 +94,23 @@ export const GEN_STAT_MIN = -3;
 
 /** Maximum enemies addable from the generator in one batch. */
 export const GEN_MAX_QTY = 20;
+
+/**
+ * Target-side stacks that exist in the skill pool, as presets.
+ *
+ * Every one of these is written "on hit, *target* gains 1 stack", so the
+ * counter belongs to the combatant it was inflicted on. Ceilings and per-stack
+ * damage come straight from the skill text; anything not listed here can still
+ * be typed by hand.
+ */
+export const STACK_PRESETS: { name: string; max: number; perStackDamage?: number }[] = [
+  // "Each stack increases all damage target receives by 1."
+  { name: "Vulnerability", max: 3, perStackDamage: 1 },
+  // "All allies deal +1 damage per stack to that target."
+  { name: "Ally Damage", max: 3, perStackDamage: 1 },
+  // "At max stacks, hit the target once as true damage and stacks reset."
+  { name: "True Damage", max: 3 },
+  // "At max stacks, that player makes a WIS check (DC 11)."
+  { name: "WIS Check", max: 3 },
+  { name: "CON Check", max: 3 },
+];

@@ -30,6 +30,10 @@ export function makeCombatant(partial: Partial<Combatant> = {}): Combatant {
     sheetSkills: partial.sheetSkills ?? {},
     done: partial.done ?? false,
     player: partial.player ?? "",
+    // Optional and additive fields are passed straight through, so a helper
+    // that enumerates every key does not silently drop new ones.
+    ...(partial.stacks ? { stacks: partial.stacks } : {}),
+    ...(partial.portrait ? { portrait: partial.portrait } : {}),
   };
 }
 

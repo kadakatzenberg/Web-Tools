@@ -1051,3 +1051,81 @@ test("a portrait can be set and cleared by hand", async ({ page }) => {
   await expect(c.locator(".card__emblem img")).toHaveCount(0);
   await expect(c.locator(".card__emblem svg")).toBeVisible();
 });
+
+/* ── Mechanics the skill pool needs ── */
+
+test("overheal becomes a ward instead of being discarded", async ({ page }) => {
+  await addCombatant(page, "Mender", { hp: 20 });
+  const c = card(page, "Mender");
+
+  await c.getByLabel("Damage to Mender").fill("2");
+  await c.getByLabel("Damage type").selectOption("raw");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Mender")).toBe("18/20");
+
+  // 6 healing into 2 missing HP: 2 restored, 4 converted.
+  await c.getByLabel("Heal Mender").fill("6");
+  await c.getByRole("button", { name: "Mend", exact: true }).click();
+  expect(await hpOf(page, "Mender")).toBe("20/20");
+  await expect(c.locator(".chip--temp").getByText("◈ 4")).toBeVisible();
+});
+
+test("the overheal conversion can be switched off", async ({ page }) => {
+  await addCombatant(page, "Plain", { hp: 20 });
+  const c = card(page, "Plain");
+
+  await c.getByLabel("Damage to Plain").fill("2");
+  await c.getByLabel("Damage type").selectOption("raw");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+
+  await c.getByRole("button", { name: /Overheal/ }).click();
+  await c.getByLabel("Heal Plain").fill("6");
+  await c.getByRole("button", { name: "Mend", exact: true }).click();
+  expect(await hpOf(page, "Plain")).toBe("20/20");
+  await expect(c.locator(".chip--temp")).toHaveCount(0);
+});
+
+test("a vulnerability stack raises the damage its carrier takes", async ({ page }) => {
+  await addCombatant(page, "Exposed", { role: "Enemy", hp: 30 });
+  const c = card(page, "Exposed");
+
+  await c.getByRole("button", { name: "Effects" }).click();
+  await c.getByLabel("Stack name").fill("Vulnerability");
+  await c.getByLabel("Stack ceiling").fill("4");
+  await c.getByLabel("Damage taken per stack").fill("1");
+  await c.locator(".ongoing__set").filter({ hasText: "Stacks" }).getByRole("button", { name: "Apply" }).click();
+  await c.getByRole("button", { name: /Add a Vulnerability stack/ }).click();
+
+  await expect(c.getByText("Vulnerability")).toBeVisible();
+
+  // 5 raw with two stacks at +1 each = 7.
+  await c.getByLabel("Damage to Exposed").fill("5");
+  await c.getByLabel("Damage type", { exact: true }).selectOption("raw");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Exposed")).toBe("23/30");
+});
+
+test("a flat damage-taken modifier is separate from CON", async ({ page }) => {
+  await addCombatant(page, "Guarded", { role: "Enemy", hp: 30 });
+  const c = card(page, "Guarded");
+
+  await c.getByRole("button", { name: "Effects" }).click();
+  await c.getByLabel("Modifier stat").selectOption("dmgTaken");
+  await c.getByLabel("Modifier value").fill("-1");
+  await c.getByLabel("Modifier duration").fill("2");
+  await c.locator(".ongoing__set").filter({ hasText: "Temporary modifiers" }).getByRole("button", { name: "Add" }).click();
+
+  await c.getByLabel("Damage to Guarded").fill("6");
+  await c.getByLabel("Damage type", { exact: true }).selectOption("raw");
+  await c.getByRole("button", { name: "Strike", exact: true }).click();
+  expect(await hpOf(page, "Guarded")).toBe("25/30");
+});
+
+test("a stat check is built with the combatant's own modifier", async ({ page }) => {
+  await addCombatant(page, "Saver", { stats: { CON: 3 } });
+  const c = card(page, "Saver");
+
+  await c.getByLabel("Check difficulty for Saver").fill("12");
+  await c.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.getByText(/CON DC 12 copied/)).toBeVisible();
+});

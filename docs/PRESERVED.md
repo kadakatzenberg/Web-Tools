@@ -114,3 +114,68 @@ All six modes preserved with their exact semantics:
 - Front / Back / Out positions. **[E]**
 - Per-combatant acted state; add, remove, rename, reorder. **[E]**
 - Copy encounter status to the clipboard. **[E]**
+
+## Rules changes made deliberately
+
+Every entry here changes what the tracker computes. Each was made because the
+skill pool in `combat_skills` already assumes it and the tracker did not
+implement it — not to simplify the interface.
+
+### Overheal converts to a temporary shield (new, default on)
+
+**Before:** healing clamped at max HP and the excess was discarded.
+
+**Now:** the overflow becomes a temporary shield labelled "Overheal", whose
+duration follows the existing magnitude rule (1–2 → 3 rounds, 3–4 → 2, 5+ → 1).
+
+**Why:** twelve skills in the pool end with the sentence "Overheal converts to
+temporary shield" — every heal skill that exists. The tracker was resolving all
+of them wrong unless the GM caught it by hand.
+
+**Escape hatch:** a shield toggle beside Mend, and an "Overheal wards" checkbox
+on Multi-mend. Both default on. Turn either off for plain healing. The domain
+function defaults the behaviour *off*, so any caller that has not opted in is
+unaffected.
+
+**Not implemented:** per-skill caps ("capped at 3") are supported by
+`applyHealing`'s `wardCap`, but no UI sets it yet — cap it by healing for less,
+or trim the ward chip afterwards.
+
+### Flat damage channels on temporary modifiers
+
+**Before:** a temporary modifier could only move one of the six stats.
+
+**Now:** it can also move `dmgTaken` or `dmgDealt`.
+
+**Why:** "Reduce all incoming damage by 1" is not a CON buff. Expressing it as
+one would also change resistance ordering and every CON check that combatant
+makes. The channels are separate so the skill means only what it says.
+
+**Order:** damage resolves as resistance → flat damage-taken → temporary
+shields → shield → HP. The flat bonus lands *after* resistance deliberately: if
+it came first, a target's CON could eat a Vulnerability stack, which is the
+opposite of what the stack is for.
+
+### Stacks carried by the target
+
+**Before:** the only stack counter lived on an ability, which lives on the unit
+that owns the skill.
+
+**Now:** a combatant carries its own `stacks`, each with a name, a count, an
+optional ceiling, and an optional per-stack damage-taken bonus.
+
+**Why:** five skills read "on hit, *target* gains 1 stack" — Vulnerability, Hit
+Stack True Damage, Ally Damage Stack, WIS Check Stack, True Damage Stack. The
+counter belongs to the victim, and those five were previously unrepresentable.
+
+**Behaviour:** reaching the ceiling resets the stack to zero and logs it. What
+*happens* at the ceiling stays the GM's call, because it differs per skill.
+
+### Stat checks are built, not recited
+
+Abilities carry `dcStat` and `dcValue`, populated from `combat_skills`. A skill
+that forces a save shows it on its chip, and any card can produce that
+combatant's saving throw with their own effective modifier and any
+Advantage/Disadvantage already applied.
+
+The tracker still never rolls. It writes notation.

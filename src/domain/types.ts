@@ -9,6 +9,16 @@
 
 export type StatKey = "STR" | "DEX" | "INT" | "WIS" | "AGI" | "CON";
 
+/**
+ * What a temporary modifier can move.
+ *
+ * The six stats, plus two flat damage channels the skill pool needs and the
+ * stats cannot express. "Reduce all incoming damage by 1" is not a CON buff —
+ * CON also drives resistance ordering and stat checks — so overloading CON for
+ * it would silently change three other things.
+ */
+export type ModTarget = StatKey | "dmgTaken" | "dmgDealt";
+
 export type Stats = Record<StatKey, number>;
 
 /**
@@ -43,6 +53,13 @@ export interface Ability {
   cur: number;
   gainPerPhase?: number;
   effectText?: string;
+  /**
+   * The saving throw this skill forces, when it forces one. A quarter of the
+   * skill pool branches on a stat check; carrying the stat and the DC lets the
+   * tracker build the roll instead of the GM reciting it from the sheet.
+   */
+  dcStat?: StatKey;
+  dcValue?: number;
   charging?: boolean;
   phaseLock?: number;
   phaseLockType?: PhaseLockType;
@@ -84,10 +101,33 @@ export interface StatusEffect {
 
 export interface TempMod {
   id: string;
-  stat: StatKey;
+  /** A stat, or one of the flat damage channels. */
+  stat: ModTarget;
   val: number;
   duration: number;
   label: string;
+}
+
+/**
+ * A counter carried by the combatant it was inflicted on.
+ *
+ * Distinct from an ability in stack mode, which counts on the unit that owns
+ * the skill. A third of the stack skills in the pool read "On hit, *target*
+ * gains 1 stack" — Vulnerability, Hit Stack True Damage, Ally Damage Stack,
+ * WIS Check Stack, True Damage Stack — so the counter has to live on the
+ * victim. Those five were previously unrepresentable.
+ *
+ * Stacks do not expire on a timer; they reset when they hit their ceiling, or
+ * when something clears them.
+ */
+export interface StackMark {
+  id: string;
+  name: string;
+  count: number;
+  /** Ceiling at which the stack triggers and resets. 0 = no ceiling. */
+  max: number;
+  /** Optional flat bonus to damage this combatant takes, per stack. */
+  perStackDamage?: number;
 }
 
 export interface SheetSkill {
@@ -128,6 +168,8 @@ export interface Combatant {
   statuses: StatusEffect[];
   abilities: Ability[];
   tempMods: TempMod[];
+  /** Counters inflicted on this combatant. Optional and additive. */
+  stacks?: StackMark[];
   position: Position;
   notes: string;
   sheetSkills: SheetSkills;
@@ -190,6 +232,9 @@ export interface CombatSkillRow {
   max_val?: number | null;
   gain_per_phase?: number | null;
   effect?: string | null;
+  /** The saving throw this skill forces, where it forces one. */
+  dc_stat?: StatKey | null;
+  dc_value?: number | null;
 }
 
 /* ── Generator ── */
