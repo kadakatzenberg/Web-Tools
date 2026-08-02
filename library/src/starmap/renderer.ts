@@ -296,6 +296,7 @@ out float v_twinkle;
 out float v_disc;        // disc edge, in local units
 out float v_px;          // one device pixel, in local units
 out float v_hasFace;
+out float v_faceStrength;
 out vec2  v_tileOrigin;
 out float v_tileSpan;
 out float v_degree;
@@ -321,11 +322,26 @@ void main() {
   v_tileSpan = 1.0 / u_atlasColumns;
   v_tileOrigin = vec2(column, row) * v_tileSpan;
 
-  // The disc, in device pixels. Faces get a wider floor than bare points do:
-  // below about twenty across, a portrait is a smudge.
-  float floorPx = (v_hasFace > 0.5 ? 11.0 : 3.5) * u_dpr;
+  /**
+   * The disc, in device pixels.
+   *
+   * The floor used to be 11px for anything carrying a face, so that portraits
+   * would not be mush. At dpr 2 that is 22 device pixels — above what most of
+   * the archive ever reaches — so nearly every node clamped to the same value
+   * and the whole degree-to-size encoding disappeared. Souls with forty-five
+   * connections drew the same size as souls with one.
+   *
+   * The floor is now the same 3px for everyone, and the legibility problem it
+   * was solving is handled where it belongs: below, by fading the portrait out
+   * and the procedural disc in when there are too few pixels to show a face.
+   * A small node is allowed to be small.
+   */
+  float floorPx = 3.0 * u_dpr;
   float ceilPx = 78.0 * u_dpr;
   float discPx = clamp(a_radius * u_scale, floorPx, ceilPx);
+
+  // A face needs pixels before it is a face rather than a smear.
+  v_faceStrength = v_hasFace * smoothstep(7.0 * u_dpr, 15.0 * u_dpr, discPx);
 
   float halfPx;
   if (u_pass == 0) {
@@ -364,6 +380,7 @@ in float v_twinkle;
 in float v_disc;
 in float v_px;
 in float v_hasFace;
+in float v_faceStrength;
 in vec2  v_tileOrigin;
 in float v_tileSpan;
 in float v_degree;
@@ -408,20 +425,19 @@ void main() {
   float disc = 1.0 - smoothstep(v_disc - aa, v_disc + aa, d);
   if (disc <= 0.0005 && d < v_disc) discard;
 
-  vec3 body;
-  if (v_hasFace > 0.5) {
+  // v1's procedural disc: a lit shoulder toward the upper left, falling to the
+  // era colour. This is what a node looks like with no portrait, and what every
+  // node falls back to when it is too small to show one.
+  float lit = 1.0 - smoothstep(0.0, v_disc * 1.5, length(v_local - vec2(-0.28, 0.28) * v_disc));
+  vec3 body = mix(v_colour * 0.55, mix(v_colour, vec3(1.0), 0.75), lit) * v_twinkle;
+
+  if (v_faceStrength > 0.001) {
     vec2 local = clamp(v_local / v_disc * 0.5 + 0.5, 0.0, 1.0);
     // The atlas is uploaded top-down, so v is flipped back here.
     vec2 uv = v_tileOrigin + vec2(local.x, 1.0 - local.y) * v_tileSpan;
     // Untouched. No tint, no twinkle, no additive lift — it is a photograph
     // of somebody's character and it should look like one.
-    body = texture(u_atlas, uv).rgb;
-  } else {
-    // v1's procedural disc: a lit shoulder toward the upper left, falling to
-    // the era colour.
-    float lit = 1.0 - smoothstep(0.0, v_disc * 1.5, length(v_local - vec2(-0.28, 0.28) * v_disc));
-    body = mix(v_colour * 0.55, mix(v_colour, vec3(1.0), 0.75), lit);
-    body *= v_twinkle;
+    body = mix(body, texture(u_atlas, uv).rgb, v_faceStrength);
   }
 
   // The ring, in the node's own pigment. This is what separates one era from

@@ -151,10 +151,9 @@ export class LabelLayer {
 
       // Mirrors the vertex shader's disc sizing, so the label sits against the
       // radius the node is actually drawn at.
-      const radius = Math.min(
-        78,
-        Math.max(node.portrait ? 11 : 3.5, radiusOf(node.degree) * scale),
-      );
+      // Must mirror the vertex shader exactly, floor included, or labels
+      // detach from the nodes they belong to as the zoom changes.
+      const radius = Math.min(78, Math.max(3, radiusOf(node.degree) * scale));
 
       const rank = this.rank.get(node.id) ?? Number.MAX_SAFE_INTEGER;
       const priority = isSelected ? 1e9 : isHovered ? 9e8 : isNeighbour ? 8e8 : -rank;
@@ -165,7 +164,7 @@ export class LabelLayer {
         x,
         y,
         radius,
-        size: clamp(radius * 0.62, 11, 18),
+        size: clamp(radius * 0.66, 11, 20),
         alpha:
           (isSelected ? 1 : isHovered ? 0.98 : isNeighbour ? 0.94 : 0.86) * reveal,
         colour: isSelected ? '#ffe98a' : isHovered ? '#fff6dc' : node.colour,

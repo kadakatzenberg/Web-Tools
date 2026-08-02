@@ -367,3 +367,49 @@ tests use it: labels must leave ink between a floor (the scatter-plot failure)
 and a ceiling (the grey-mat failure), and the connection web must cover a
 minimum fraction of the frame. They run at one viewport only — each costs a
 couple of minutes on a software rasteriser.
+
+## Round five — size was carrying no information
+
+Two things reported: still no connection lines, and every star the same size
+regardless of how connected its character is.
+
+The second was real, reproducible, and mine. The archive was exported from the
+live database and rendered locally — 305 souls, 1,107 edges, degrees running
+from 45 down to 0 — and every disc on screen came out identical.
+
+Two causes stacked:
+
+- **The curve saturated too early.** `min(26, max(6, 6 + sqrt(d) * 4.6))` was
+  v1's, and it tops out at degree 19. Everyone from the quiet middle of the
+  cast to the single best-connected character in it drew at exactly the same
+  radius. Widened to `min(36, max(4.5, 4.5 + sqrt(d) * 5.4))`, which is still
+  sublinear — degree is heavy-tailed and a linear map would make the hubs
+  enormous — but keeps separating all the way to 45.
+
+- **A screen-space floor flattened what was left.** An 11px minimum was added
+  so portraits would not render as mush. At dpr 2 that is 22 device pixels,
+  which is above what most of the archive ever reaches at a normal zoom, so
+  almost every node clamped to the same value. The floor is now 3px for
+  everything, and the legibility problem it was solving is handled where it
+  belongs: the portrait fades out and the procedural disc fades in when there
+  are too few pixels to show a face. A small node is allowed to be small.
+
+The label layer mirrors the same sizing, floor included, or names drift away
+from the nodes they belong to as the zoom changes.
+
+`tests/unit/radius.test.ts` now pins the encoding: the curve must keep
+separating across 1 → 8 → 20 → 45, must span more than 5× from an unconnected
+soul to the busiest one, and must grow sublinearly.
+
+### On the missing lines
+
+Rendered against the real archive at dpr 2, at both fit and close zoom, the
+connection web is dense and clearly visible — 1,107 edges over 305 nodes. The
+context is created with `alpha: false`, so there is no premultiplied-alpha
+trap in the final source-over pass, and nothing platform-specific has turned up
+that would drop them.
+
+They are visible here and reported missing there, which is not something more
+guessing will close. If they are still absent, the useful next step is the
+browser and GPU, and whether `chrome://gpu` reports hardware or software
+rendering — not another blind adjustment.

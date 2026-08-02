@@ -263,9 +263,26 @@ export function buildGraph(entries: readonly Entry[]): Graph {
   return { nodes, edges, clusters, neighbours };
 }
 
-/** Node radius from how connected it is. Hubs read as brighter, bigger stars. */
+/**
+ * Node radius from how connected it is.
+ *
+ * How much of the archive a soul is tangled up in is the one thing the map
+ * says that a list cannot, and size is how it says it. The real archive runs
+ * from nought to forty-five connections, so the curve has to still be
+ * separating things at the top of that range.
+ *
+ * The previous curve — `min(26, max(6, 6 + sqrt(d) * 4.6))` — was v1's, and it
+ * saturated at degree 19. Everyone from the quiet middle of the cast to the
+ * best-connected character in it drew at exactly the same size. Combined with
+ * a screen-space floor that clamped the bottom, every node on screen came out
+ * identical and the map lost the one piece of character it had.
+ *
+ * Square root rather than linear, because degree is heavy-tailed and a linear
+ * map would make the hubs enormous and everyone else a speck. Base kept low so
+ * an unconnected soul is genuinely a faint point.
+ */
 export function radiusOf(degree: number): number {
-  return Math.min(26, Math.max(6, 6 + Math.sqrt(degree) * 4.6));
+  return Math.min(36, Math.max(4.5, 4.5 + Math.sqrt(degree) * 5.4));
 }
 
 export function isHub(degree: number): boolean {
