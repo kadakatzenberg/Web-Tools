@@ -392,6 +392,35 @@ export function bigArchive(count = 304): Row[] {
   return rows;
 }
 
+/**
+ * Return only the columns the request actually asked for.
+ *
+ * This mock used to answer every query with whole rows, which made it a
+ * strictly more generous server than PostgREST — and that gap hid a real bug
+ * for five rounds. The star map's `relations` were missing from the list
+ * query's column set, so against the live database every node came back
+ * unconnected: no edges, every star the same size, no portraits. Every test
+ * passed, because the mock handed over relations nobody had asked for.
+ *
+ * A fixture that is more permissive than the real thing cannot catch a request
+ * that asks for too little. This one now refuses what was not requested.
+ */
+function project<T extends Record<string, unknown>>(rows: T[], url: URL): Array<Partial<T>> {
+  const select = url.searchParams.get('select');
+  if (!select || select === '*') return rows;
+  const wanted = select
+    .split(',')
+    .map((column) => column.trim())
+    .filter(Boolean);
+  return rows.map((row) => {
+    const projected: Partial<T> = {};
+    for (const column of wanted) {
+      if (column in row) projected[column as keyof T] = row[column as keyof T];
+    }
+    return projected;
+  });
+}
+
 export interface ArchiveMockOptions {
   /** Fail the list request, to exercise the failure path. */
   failList?: boolean;
@@ -465,7 +494,7 @@ export async function mockArchive(page: Page, options: ArchiveMockOptions = {}):
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(found),
+          body: JSON.stringify(project(found, url)),
         });
         return;
       }
@@ -473,7 +502,7 @@ export async function mockArchive(page: Page, options: ArchiveMockOptions = {}):
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(rows),
+        body: JSON.stringify(project(rows, url)),
       });
       return;
     }

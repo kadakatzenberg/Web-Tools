@@ -455,3 +455,78 @@ The method is worth more than either fix: when a rendering complaint and a
 rendering test disagree, put the two builds side by side on identical data
 before trusting the test. The test was measuring the wrong property, and it
 passed all the way through five rounds of this being wrong.
+
+### The actual root cause: one missing column
+
+Everything above was real, and none of it was the reason the live map looked
+wrong. The reason was this, in `data/entries.ts`:
+
+```
+const SUMMARY_COLUMNS = 'id,name,alias,portrait_url,genre_tags,stats,…';
+```
+
+No `relations`. The grid does not need them, and trimming the list query was a
+good optimisation on its own terms. But the star map builds its graph from that
+same list, so against the live database **every entry arrived with no
+relations**. From there:
+
+- no relations → no edges → **no connecting lines**
+- no edges → every node has degree 0 → `radiusOf(0)` for all → **every star
+  identical**
+- degree 0 clamps to the size floor, which is below the threshold where a face
+  is legible → **no portraits**
+
+Three symptoms that look like three separate rendering bugs, from one column.
+Every one of them was reported, and each was chased in the renderer, which is
+where none of them lived. The graph builder and the shaders were correct
+throughout — they were handed empty relations and did precisely the right thing
+with them.
+
+It survived five rounds because **the test mock answered every request with
+whole rows regardless of `select`**. That made the fixture a strictly more
+generous server than PostgREST, and the column list the one thing no test could
+observe. `project()` in `tests/e2e/fixture.ts` now honours `select`, and
+`starmap.spec.ts` asserts the map's list query asks for `relations` — verified
+by reverting the column list and watching it fail.
+
+The lesson is narrower than "test more". A fixture that is more permissive than
+the real service cannot catch a request that asks for too little, and every
+symptom of that class shows up somewhere far away from the cause.
+
+### On chasing the portraits
+
+Worth recording as a false trail: after the column fix, the stars still looked
+faceless in the verification screenshots, and roughly an hour went into
+instrumenting the atlas — texture units, `getImageData` tainting, tile upload,
+`a_tile` packing, the dirty-flag path. All of it was fine. 297 of 297 tiles
+loaded and packed correctly.
+
+The faces were rendering the whole time. `portraitPng()` in the fixture
+generates a hue gradient with a pale blob where a head goes, which at star size
+is almost exactly what the *procedural* disc looks like. The check that settled
+it took one line — force the face branch to solid red and see whether the discs
+change colour. They did.
+
+When a feature looks broken in a synthetic fixture, confirm the fixture can
+express the difference before debugging the feature.
+
+### Labels: the same absolute-threshold mistake, twice
+
+The zoom-adaptive label gate above was ported from v1 as literal numbers
+(`ZOOM > 1.2`, `ZOOM > 0.6`). `camera.scale` here is not v1's `ZOOM` — it sits
+near 0.4 at fit on any archive — so every threshold failed at once and the map
+went silent instead of quiet, taking two label tests with it. This is the same
+mistake that had already made this layer render zero pixels once, recorded
+earlier in this very document.
+
+Measured rather than guessed the second time: at fit, `scale` is 0.30–0.40 and
+drawn radii run 4–8px, on both the twelve-row fixture and a 150-row one. A
+radius threshold cannot separate those cases, because fit scale barely moves
+with archive size.
+
+What works is a budget measured against the fit scale, which is 1 at fit by
+construction on any archive at any window size: `14 * zoom²`, capped at 160.
+The budget decides how many names the zoom deserves, priority decides who earns
+them, and greedy placement decides where they go. Both failures this document
+describes — the grey mat of overprinting and the wall of 150 names — need both
+halves to be avoided.

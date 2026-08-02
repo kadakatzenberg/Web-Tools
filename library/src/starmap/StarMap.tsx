@@ -35,6 +35,7 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
    * replaces the whole object.
    */
   const dirtyRef = useRef(true);
+  const fitScaleRef = useRef(1);
   const workerRef = useRef<Worker | null>(null);
   const frameRef = useRef(0);
 
@@ -112,6 +113,10 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
     const spanX = Math.max(1, maxX - minX + 260);
     const spanY = Math.max(1, maxY - minY + 260);
     const scale = Math.min(MAX_SCALE, Math.min(width / spanX, height / spanY));
+    // Remembered so the label layer can tell "zoomed in" from "zoomed out"
+    // without an absolute threshold. Fit lands near 0.4 whatever the archive's
+    // size, so the raw scale says nothing on its own.
+    fitScaleRef.current = Math.max(MIN_SCALE, scale);
     camera.current = {
       scale: Math.max(MIN_SCALE, scale),
       x: -((minX + maxX) / 2) * scale,
@@ -254,6 +259,7 @@ export default function StarMap({ entries, loading, onClose, onOpenEntry }: Star
         selected: selectedRef.current,
         hovered: hoveredRef.current,
         reveal: reveal.current,
+        fitScale: fitScaleRef.current,
       });
     };
     frameRef.current = requestAnimationFrame(loop);

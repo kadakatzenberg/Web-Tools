@@ -282,6 +282,39 @@ test.describe('at the archive\'s real size', () => {
     expect(ink).toBeLessThan(0.06);
   });
 
+  test('asks the server for the relations it draws edges from', async ({ page }) => {
+    /**
+     * The narrowest possible statement of a bug that took five rounds to find.
+     *
+     * The star map builds its graph from the same list query the grid uses. That
+     * query was trimmed to the columns a card needs, which dropped `relations`,
+     * and against the live database every node then arrived unconnected. Zero
+     * edges means zero degree, and degree drives node size — so one missing
+     * column showed up as three unrelated-looking faults at once: no connecting
+     * lines, every star the same size, and no portraits.
+     *
+     * Nothing downstream can catch this. The graph builder is correct, the
+     * renderer is correct, and both are handed empty relations and do exactly
+     * what they should with them. The only place the mistake exists is the
+     * request, so that is what this asserts.
+     */
+    const selects: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.pathname.endsWith('/rest/v1/entries') && !url.searchParams.has('id')) {
+        selects.push(url.searchParams.get('select') ?? '');
+      }
+    });
+
+    await page.goto('/map');
+    await expect(page.locator('.starmap__status')).toHaveCount(0, { timeout: 60_000 });
+
+    expect(selects.length).toBeGreaterThan(0);
+    for (const select of selects) {
+      expect(select === '*' || select.split(',').includes('relations')).toBe(true);
+    }
+  });
+
   test('draws a connection web dense enough to read', async ({ page }) => {
     // Desktop only. These are density checks, not layout checks, and each
     // costs a couple of minutes on a software rasteriser — running them at

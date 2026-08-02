@@ -7,12 +7,26 @@ import type { Entry, EntryDraft } from '@/domain/types';
 import { ArchiveError, callFunction, selectRows, uploadObject } from './client';
 
 /**
- * The grid needs seven columns. v1 asked for `select=*` and got the blurb, the
- * quote, every relation, the whole lineage and the password hash for all of
- * them — several hundred kilobytes to render a wall of names and faces.
+ * v1 asked for `select=*` and got the blurb, the quote, the whole lineage and
+ * the password hash for every row — several hundred kilobytes to render a wall
+ * of names and faces. Trimming that was right.
+ *
+ * `relations` must stay, and the reason is worth writing down because dropping
+ * it cost five rounds of the star map being wrong in three different-looking
+ * ways at once. The map builds its graph from this same list, so without this
+ * column every entry arrives with no relations, which means no edges, which
+ * means every node has degree zero — and degree is what drives node size. The
+ * visible result was no connecting lines, every star identical, and no
+ * portraits (a degree-zero node clamps to the size floor, below the threshold
+ * where a face is legible). One missing column, three symptoms, none of which
+ * point back here.
+ *
+ * It survived because the test mock answered every request with whole rows
+ * regardless of `select`, so the column list was the one thing no test could
+ * see. The mock now honours it.
  */
 const SUMMARY_COLUMNS =
-  'id,name,alias,portrait_url,genre_tags,stats,created_at,updated_at';
+  'id,name,alias,portrait_url,genre_tags,stats,relations,lineage,created_at,updated_at';
 
 export async function fetchEntries(signal?: AbortSignal): Promise<Entry[]> {
   const rows = await selectRows(`entries?select=${SUMMARY_COLUMNS}&order=name.asc`, signal);

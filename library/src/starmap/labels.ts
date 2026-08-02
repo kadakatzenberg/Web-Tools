@@ -34,6 +34,32 @@ export interface LabelState {
   selected: string | null;
   hovered: string | null;
   reveal: number;
+  /** The scale at which the whole archive fits, so zoom can be read relatively. */
+  fitScale: number;
+}
+
+/**
+ * How many names to print, given how far in the reader has zoomed.
+ *
+ * Collision culling alone fills whatever space it is given, which at the fit
+ * zoom meant about a hundred and fifty names over a 304-soul archive — the map
+ * disappeared under its own labels. v1 printed six, and the reason it looked
+ * clean is that it decided *how many* before deciding *where*.
+ *
+ * v1 decided with absolute zoom thresholds (`ZOOM > 1.2`, `ZOOM > 0.6`), and
+ * copying those numbers across was wrong: `camera.scale` is not v1's `ZOOM` and
+ * sits near 0.4 at fit whatever the archive's size, so every threshold failed
+ * at once and the map went silent instead of quiet. The same absolute-threshold
+ * mistake had already made this layer render zero pixels once before.
+ *
+ * Zoom measured against the fit scale has no such problem: it is 1 at fit by
+ * construction, on any archive, at any window size. Names are then spent on the
+ * best-connected souls first, which is what makes the map read as an archive of
+ * people rather than a scatter plot with a caption.
+ */
+function labelBudget(scale: number, fitScale: number): number {
+  const zoom = scale / Math.max(0.0001, fitScale);
+  return Math.round(Math.min(MAX_LABELS, Math.max(14, 14 * zoom * zoom)));
 }
 
 /**
@@ -97,7 +123,7 @@ export class LabelLayer {
 
   draw(state: LabelState): void {
     const ctx = this.ctx;
-    const { camera, selected, hovered, reveal } = state;
+    const { camera, selected, hovered, reveal, fitScale } = state;
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.width, this.height);
@@ -112,17 +138,16 @@ export class LabelLayer {
     /**
      * Gather the candidates, then place as many as will fit without touching.
      *
-     * A budget alone does not work at real density. With 304 souls settled into
-     * clusters, the ninety best-connected names all land in the same crowded
-     * middle and overprint each other into a grey mat, while the sparse outer
-     * reaches stay blank — the worst of both. v1 dodged this by naming almost
-     * nobody when zoomed out, which is why its screenshots look clean.
+     * Neither a budget nor collision culling is sufficient alone, and both
+     * failures reached the user. A budget by itself puts the best-connected
+     * names in the same crowded middle, where they overprint into a grey mat
+     * while the sparse outer reaches stay blank. Culling by itself fills every
+     * gap it can find, which at the fit zoom meant a hundred and fifty names
+     * over a 304-soul archive.
      *
-     * Greedy placement in priority order solves it properly and needs no zoom
-     * thresholds at all: important names win the space they need, crowded
-     * regions thin themselves out, empty regions fill in, and zooming in makes
-     * room so more appear. It is the standard cartographic approach and it is
-     * the only one that behaves at both twelve entries and three hundred.
+     * Together they are what a cartographer does: the budget decides how many
+     * names this zoom deserves, priority decides who earns them, and greedy
+     * placement decides where they go without letting any two touch.
      */
     interface Candidate {
       node: Graph['nodes'][number];
@@ -145,28 +170,6 @@ export class LabelLayer {
 
       // A dimmed node is deliberately quiet; naming it fights the selection.
       if (dimmed && !isSelected && !isHovered) continue;
-
-      /**
-       * Who is *eligible* to be named, before anything is placed.
-       *
-       * Collision culling alone was not enough, and the screenshots showed why:
-       * greedy placement fills whatever space exists, so at the fit zoom it
-       * printed about a hundred and fifty names and the map disappeared under
-       * its own labels. v1 printed six. The difference is not the placement
-       * algorithm, it is that v1 gated on zoom first — only well-connected hubs
-       * are named from far away, everyone is named up close.
-       *
-       * That gate is what makes zooming feel like it reveals something, rather
-       * than just magnifying a wall of text. Placement still runs afterwards,
-       * so crowded regions thin out instead of overprinting the way v1's did.
-       */
-      const eligible =
-        isSelected ||
-        isHovered ||
-        scale > 1.2 ||
-        (scale > 0.6 && node.degree >= 8) ||
-        node.degree >= 12;
-      if (!eligible) continue;
 
       const { x, y } = projectToScreen(node, camera, this.width, this.height);
       if (x < -180 || x > this.width + 180 || y < -70 || y > this.height + 70) continue;
@@ -233,9 +236,10 @@ export class LabelLayer {
     };
 
     let placed = 0;
+    const budget = Math.min(MAX_LABELS, labelBudget(scale, fitScale));
 
     for (const item of candidates) {
-      if (placed >= MAX_LABELS) break;
+      if (placed >= budget) break;
 
       ctx.font = `600 ${item.size}px Cinzel, Georgia, serif`;
       const width = ctx.measureText(item.node.name).width;
