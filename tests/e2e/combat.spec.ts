@@ -1287,7 +1287,7 @@ test("a gated skill explains itself and readies when satisfied", async ({ page }
   const ult = c.locator(".ability").filter({ hasText: "Sueno Imposible" });
 
   await expect(ult.locator(".ability__state")).toHaveText("Gated");
-  await expect(ult.getByText("Needs Sangre Lanza at 4/4 — currently 2")).toBeVisible();
+  await expect(ult.getByText("Needs Sangre Lanza at 4/4, currently 2")).toBeVisible();
   await expect(ult.getByRole("button", { name: "Fire", exact: true })).toHaveCount(0);
 
   // Filling the prerequisite readies it — no separate Charge press.

@@ -70,7 +70,7 @@ function LogBody() {
         <EmptyState
           seal="記"
           title="Nothing recorded yet"
-          body="Damage, healing, conditions, and phase changes appear here as the fight unfolds."
+          body="Damage, healing, conditions, and phase changes appear here as they happen."
         />
       ) : (
         <ol className="eventlog__list">

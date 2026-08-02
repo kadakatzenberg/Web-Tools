@@ -150,7 +150,7 @@ function abilityStateWord({
       if (!ab.refill) return "Passive";
       if (ab.cur > 0) return `${ab.cur}/${ab.max} this ${ab.refill}`;
       // Spent. Say when it comes back, not merely that it is gone.
-      return ab.refill === "round" ? "Spent — back next round" : "Spent for this combat";
+      return ab.refill === "round" ? "Spent, back next round" : "Spent for this combat";
 
     case "ammo":
       // Ammo does not come back in this system, so an empty clip is spent
@@ -546,7 +546,7 @@ function AbilityEditor({
             Fires when
           </label>
           <select id="ab-trigger" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
-            <option value="">Not set — never raised automatically</option>
+            <option value="">Not set (never raised automatically)</option>
             <option value="hit">This unit is hit</option>
             <option value="physicalHit">This unit is hit physically</option>
             <option value="magicHit">This unit is hit magically</option>
@@ -563,7 +563,7 @@ function AbilityEditor({
       <input
         id="ab-requires"
         value={requires}
-        placeholder="Another skill's name — blank for none"
+        placeholder="Another skill's name, or blank for none"
         onChange={(e) => setRequires(e.target.value)}
       />
       {requires.trim() && (
@@ -586,7 +586,7 @@ function AbilityEditor({
         Budget
       </label>
       <select id="ab-refill" value={refill} onChange={(e) => setRefill(e.target.value)}>
-        <option value="">Normal — follows its mode</option>
+        <option value="">Normal (follows its mode)</option>
         <option value="round">Uses refill each round</option>
         <option value="combat">Uses never refill (once per combat)</option>
       </select>
@@ -1140,7 +1140,7 @@ export const CombatantCard = memo(function CombatantCard({
                 type="number"
                 value={dmg}
                 placeholder="Untaxed"
-                title="Damage before resistance — the tracker applies CON or WIS for you"
+                title="Damage before resistance. The tracker applies CON or WIS for you."
                 aria-label={`Untaxed damage to ${c.name}`}
                 onChange={(e) => setDmg(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && applyDmg()}
@@ -1228,7 +1228,7 @@ export const CombatantCard = memo(function CombatantCard({
             <div className="action-group">
               <Button
                 size="sm"
-                title={`Copy ${attackRoll} — hit bonus and any Advantage or Disadvantage already applied`}
+                title={`Copy ${attackRoll}. Hit bonus and any swing are already applied.`}
                 onClick={async () => {
                   const ok = await copy(attackRoll);
                   toast.push(ok ? `${attackRoll} copied` : "Could not copy", ok ? "ok" : "danger");
@@ -1519,7 +1519,7 @@ export const CombatantCard = memo(function CombatantCard({
                         type="url"
                         inputMode="url"
                         value={c.portrait ?? ""}
-                        placeholder="Image URL — blank to clear"
+                        placeholder="Image URL, or blank to clear"
                         aria-label={`Portrait URL for ${c.name}`}
                         onChange={(e) =>
                           dispatch({

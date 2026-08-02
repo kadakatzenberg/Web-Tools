@@ -79,7 +79,7 @@ export function useSession(
       if (controller.signal.aborted) return;
       if (isOffline(e)) {
         setStatus("offline");
-        setMessage("Offline — kept locally, will retry on the next change.");
+        setMessage("Offline. Kept locally, and it will retry on the next change.");
       } else {
         setStatus("error");
         setMessage(
@@ -172,7 +172,7 @@ export function useSession(
         setLastSavedAt(Date.now());
         flash(
           found.repaired
-            ? `Session ${c} resumed — some damaged records were repaired`
+            ? `Session ${c} resumed. Some damaged records were repaired.`
             : `Session ${c} resumed`,
         );
         return found.state;

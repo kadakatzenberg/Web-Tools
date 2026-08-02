@@ -300,7 +300,7 @@ function Shell() {
         onConfirm={() => {
           dispatch({ type: "ENCOUNTER_CLEARED" });
           announce("Encounter cleared.");
-          toast.push("Encounter cleared — undo is available", "warn");
+          toast.push("Encounter cleared. Undo is available.", "warn");
         }}
         title="Clear the encounter?"
         confirmLabel="Clear everything"

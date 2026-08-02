@@ -271,7 +271,7 @@ export function GeneratorTab({ onAdded }: { onAdded: () => void }) {
         <EmptyState
           seal="敵"
           title="Nothing rolled yet"
-          body="Choose a tier and an archetype, then generate. Reroll until the shape of the fight feels right."
+          body="Choose a tier and an archetype, then generate. Reroll until you get a pack you like."
         />
       ) : (
         <article className="rolled panel">
@@ -317,7 +317,7 @@ export function GeneratorTab({ onAdded }: { onAdded: () => void }) {
 
           <div className="rolled__slots">
             <p className="eyebrow">
-              Skills — {slotCount} slot{slotCount === 1 ? "" : "s"}
+              Skills · {slotCount} slot{slotCount === 1 ? "" : "s"}
               {loadingSkills && <span className="rolled__loading"> loading…</span>}
             </p>
             {Array.from({ length: slotCount }, (_, i) => (

@@ -182,9 +182,9 @@ function SheetEditor({
     return (
       <Modal open onClose={onClose} title="Editing is guarded" width={440}>
         <p className="editor__guard-note">
-          This passphrase only guards against accidental edits during a session. It is
-          <strong> not </strong> a security control — the check happens in your browser.
-          Access is ultimately governed by the database's row-level policies.
+          This passphrase stops accidental edits during a session. It is checked in
+          your browser, so it will not keep out anyone who wants in. Real access is set
+          by the database's own policies.
         </p>
         <label className="field__label" htmlFor="guard-pw">Passphrase</label>
         <input

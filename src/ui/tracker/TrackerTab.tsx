@@ -49,7 +49,7 @@ function SessionBar({ session }: { session: SessionApi }) {
     idle: "Not saving",
     saving: "Saving…",
     saved: "Saved",
-    offline: "Offline — kept locally",
+    offline: "Offline, kept locally",
     error: "Save failed",
   };
 
@@ -124,7 +124,7 @@ function InitiativeRoller() {
       </h2>
       <p className="initiative__lead">
         Roll for the enemy side, then enter the players' total. Players must
-        <strong> beat </strong> the enemy total to act first — a tie goes to the enemies.
+        <strong> beat </strong> the enemy total to act first. A tie goes to the enemies.
       </p>
 
       <div className="initiative__row">

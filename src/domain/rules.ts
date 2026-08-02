@@ -494,7 +494,7 @@ export function requirementState(
     met,
     label: met
       ? `${other.name} at ${other.cur}/${other.max}`
-      : `Needs ${other.name} at ${threshold}/${other.max} — currently ${other.cur}`,
+      : `Needs ${other.name} at ${threshold}/${other.max}, currently ${other.cur}`,
   };
 }
 

@@ -75,7 +75,7 @@ describe("gated abilities", () => {
     const r = requirementState(ult, [sangre(2), ult]);
     expect(r.gated).toBe(true);
     expect(r.met).toBe(false);
-    expect(r.label).toBe("Needs Sangre Lanza at 4/4 — currently 2");
+    expect(r.label).toBe("Needs Sangre Lanza at 4/4, currently 2");
   });
 
   it("readies the moment the prerequisite is satisfied", () => {

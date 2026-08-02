@@ -99,7 +99,7 @@ function Token({
       data-dragging={dragging ? "1" : undefined}
       aria-pressed={selected}
       aria-label={summarise(c)}
-      title={`${summarise(c)} — drag to reposition`}
+      title={`${summarise(c)}. Drag to reposition.`}
       onPointerDown={(e) => onDragStart(e, c)}
       onClick={onSelect}
     >
