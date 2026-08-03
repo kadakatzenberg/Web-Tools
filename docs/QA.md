@@ -7,13 +7,13 @@ Everything below was executed against the **production build** served by
 
 | Suite | Count | Result |
 | --- | --- | --- |
-| Vitest — combat rules, actions, phases, generator, schema | 223 | pass |
-| Playwright — desktop 1440×900 | 90 | pass |
-| Playwright — mobile 390×844 | 90 | pass |
+| Vitest — combat rules, actions, automation, phases, generator, schema | 256 | pass |
+| Playwright — desktop 1440×900 | 94 | pass |
+| Playwright — mobile 390×844 | 94 | pass |
 
 ```
-npm test        →  Test Files 10 passed (10),  Tests 223 passed (223)
-npm run test:e2e →  180 passed
+npm test        →  Test Files 11 passed (11),  Tests 256 passed (256)
+npm run test:e2e →  188 passed
 npm run build   →  ✓ built, no type errors, no warnings
 ```
 
@@ -53,7 +53,8 @@ phase-locked abilities; advance through several complete rounds and confirm
 expiry timing; undo and redo; remove and restore a combatant; move between
 Front/Back/Out and confirm the war table reflects it; resolve attacks, skills,
 and mends from the command window on the table, including a miss, a covered
-target, and a skill that asks for the total rolled in Discord; command palette; combat
+target, and a skill that asks for the total rolled in Discord; watch a counter
+fill itself on both sides of a hit and feed its owner's damage; command palette; combat
 log; export; reload and recover from the local backup; keyboard-only navigation;
 reduced-motion mode; backend-unreachable degradation.
 

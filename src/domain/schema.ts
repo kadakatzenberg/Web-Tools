@@ -9,7 +9,13 @@
  */
 
 import { z } from "zod";
-import type { Combatant, CombatSheet, EncounterState } from "./types";
+import type {
+  Combatant,
+  CombatSheet,
+  EncounterState,
+  ReactionTrigger,
+  StatKey,
+} from "./types";
 import { EMPTY_STATS, STAT_KEYS } from "./constants";
 import { normaliseStats } from "./factory";
 
@@ -67,7 +73,7 @@ const abilitySchema = z
     dcStat: z.enum(["STR", "DEX", "INT", "WIS", "AGI", "CON"]).optional().catch(undefined),
     dcValue: z.unknown().transform((v) => (typeof v === "number" && v > 0 ? v : undefined)).optional(),
     trigger: z
-      .enum(["hit", "physicalHit", "magicHit", "allyHit", "allyDown", "selfDown"])
+      .enum(["hit", "physicalHit", "magicHit", "allyHit", "allyDown", "selfDown", "hitDealt"])
       .optional()
       .catch(undefined),
     refill: z.enum(["round", "combat"]).optional().catch(undefined),
@@ -88,6 +94,27 @@ const abilitySchema = z
     phaseLock: z.coerce.number().nullish().transform((v) => (v ? Number(v) : undefined)),
     phaseLockType: z.enum(["player", "enemy"]).catch("player").optional(),
     dice: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
+    /** What one point on this counter is worth to its owner's stats. */
+    grants: z
+      .unknown()
+      .transform((v) => {
+        const o = v as { stat?: unknown; perStack?: unknown } | null;
+        const stats = ["STR", "DEX", "INT", "WIS", "AGI", "CON"];
+        if (!o || typeof o.stat !== "string" || !stats.includes(o.stat)) return undefined;
+        const perStack = typeof o.perStack === "number" ? Math.trunc(o.perStack) : 0;
+        return perStack ? { stat: o.stat as StatKey, perStack } : undefined;
+      })
+      .optional(),
+    /** Events that advance this counter without anyone pressing anything. */
+    growsOn: z
+      .unknown()
+      .transform((v) => {
+        if (!Array.isArray(v)) return undefined;
+        const allowed = new Set(["hit", "physicalHit", "magicHit", "allyHit", "allyDown", "selfDown", "hitDealt"]);
+        const out = v.filter((t): t is ReactionTrigger => typeof t === "string" && allowed.has(t));
+        return out.length ? out : undefined;
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -184,6 +211,8 @@ export const combatantSchema = z
         return duration > 0 ? { toId: o.toId, duration } : undefined;
       })
       .optional(),
+    /** Which stat this combatant swings with, when their sheet says. */
+    damageStat: z.enum(["physical", "magical"]).optional().catch(undefined),
     position: positionSchema,
     notes: z.unknown().transform((v) => (typeof v === "string" ? v : "")),
     sheetSkills: z.unknown().transform((v) => (looseJson(v) ?? {}) as object),
@@ -256,6 +285,27 @@ const sheetSkillSchema = z
     maxVal: z.coerce.number().catch(1).optional(),
     gainPerPhase: z.coerce.number().catch(1).optional(),
     dice: z.unknown().transform((v) => (typeof v === "string" ? v : "")).optional(),
+    /** What one point on this counter is worth to its owner's stats. */
+    grants: z
+      .unknown()
+      .transform((v) => {
+        const o = v as { stat?: unknown; perStack?: unknown } | null;
+        const stats = ["STR", "DEX", "INT", "WIS", "AGI", "CON"];
+        if (!o || typeof o.stat !== "string" || !stats.includes(o.stat)) return undefined;
+        const perStack = typeof o.perStack === "number" ? Math.trunc(o.perStack) : 0;
+        return perStack ? { stat: o.stat as StatKey, perStack } : undefined;
+      })
+      .optional(),
+    /** Events that advance this counter without anyone pressing anything. */
+    growsOn: z
+      .unknown()
+      .transform((v) => {
+        if (!Array.isArray(v)) return undefined;
+        const allowed = new Set(["hit", "physicalHit", "magicHit", "allyHit", "allyDown", "selfDown", "hitDealt"]);
+        const out = v.filter((t): t is ReactionTrigger => typeof t === "string" && allowed.has(t));
+        return out.length ? out : undefined;
+      })
+      .optional(),
   })
   .passthrough();
 

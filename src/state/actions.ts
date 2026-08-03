@@ -9,6 +9,7 @@
 import type {
   Ability,
   Combatant,
+  DamageStat,
   DamageType,
   Dot,
   EncounterState,
@@ -34,6 +35,8 @@ export type Command =
   | { type: "COMBATANT_NOTES_SET"; id: string; notes: string }
   | { type: "COMBATANT_MAXHP_SET"; id: string; maxHp: number }
   | { type: "COMBATANT_PORTRAIT_SET"; id: string; portrait: string }
+  /** Which stat this combatant swings with; unset returns to the automatic pick. */
+  | { type: "COMBATANT_DAMAGE_STAT_SET"; id: string; damageStat?: DamageStat }
   /* health */
   | {
       type: "DAMAGE_APPLIED";
@@ -46,6 +49,13 @@ export type Command =
        * log that reads "Kada hit Grunt" beats one that reads "Grunt took 6".
        */
       source?: string;
+      /**
+       * The attacker's id, for the mechanics. Separate from `source` because
+       * that is a label — it may name the skill as well as the caster — while
+       * this has to resolve to a combatant so the skills that accrue on landing
+       * a blow can find their owner.
+       */
+      sourceId?: string;
     }
   | {
       type: "HEAL_APPLIED";
@@ -142,6 +152,8 @@ export function commandLabel(cmd: Command): string {
       return "edit max HP";
     case "COMBATANT_PORTRAIT_SET":
       return cmd.portrait ? "set portrait" : "remove portrait";
+    case "COMBATANT_DAMAGE_STAT_SET":
+      return cmd.damageStat ? `swing with ${cmd.damageStat}` : "swing automatically";
     case "DAMAGE_APPLIED":
       return `${cmd.amount} ${cmd.damageType} damage`;
     case "HEAL_APPLIED":

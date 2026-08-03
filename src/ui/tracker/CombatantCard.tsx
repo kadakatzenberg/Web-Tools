@@ -20,6 +20,7 @@ import type {
 } from "@/domain/types";
 import {
   abilityFillPercent,
+  allMods,
   applyDamage,
   applyHealing as healPreview,
   deriveStats,
@@ -36,6 +37,7 @@ import {
 } from "@/domain/rules";
 import { POSITIONS, SKILL_MODES, SKILL_MODE_LABELS, STACK_PRESETS, STAT_KEYS, STATUS_OPTIONS } from "@/domain/constants";
 import { gid } from "@/domain/factory";
+import { betterStat } from "@/domain/action";
 import { checkRoll, d20Roll, looksLikeDice, swingFor, wrapDice } from "@/domain/dice";
 import type { CombatEvent } from "@/domain/rules";
 import { useStoreApi } from "@/state/store";
@@ -77,7 +79,33 @@ const TRIGGER_LABELS: Record<string, string> = {
   allyHit: "Fires when an ally is hit",
   allyDown: "Fires when an ally goes down",
   selfDown: "Fires on reaching 0 HP",
+  hitDealt: "Fires when this unit lands a hit",
 };
+
+/** The same events, said as accrual rather than as a reaction. */
+const GROWTH_LABELS: Record<string, string> = {
+  hit: "taking a hit",
+  physicalHit: "taking a physical hit",
+  magicHit: "taking a magical hit",
+  allyHit: "an ally being hit",
+  allyDown: "an ally going down",
+  selfDown: "dropping to 0 HP",
+  hitDealt: "landing a hit",
+};
+
+/** The events a counter can be told to build on, in the editor's own words. */
+const GROWTH_CHOICES: [ReactionTrigger, string][] = [
+  ["hitDealt", "Landing a hit"],
+  ["hit", "Taking a hit"],
+  ["allyHit", "An ally being hit"],
+  ["allyDown", "An ally going down"],
+];
+
+/** English for a list, so two triggers do not read as "hit,landing a hit". */
+function joinWords(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} or ${parts[parts.length - 1]}`;
+}
 
 const MODE_TONE: Record<AbilityMode, string> = {
   cooldown: "var(--moonlit)",
@@ -316,6 +344,31 @@ const AbilityChip = memo(function AbilityChip({
         </p>
       ) : null}
 
+      {/* What this counter is worth, and what makes it climb. Both are things
+          the sheet already says in a sentence; saying them here, next to the
+          counter itself, is the difference between a number the table has to
+          remember the meaning of and one that explains itself. */}
+      {ab.grants && ab.cur > 0 && (
+        <p className="ability__grant">
+          <span className="ability__grant-mark" aria-hidden="true">
+            <IconPlus size={11} />
+          </span>
+          Currently giving <strong>
+            {ab.grants.perStack * ab.cur > 0 ? "+" : ""}
+            {ab.grants.perStack * ab.cur} {ab.grants.stat}
+          </strong>
+        </p>
+      )}
+
+      {ab.growsOn?.length ? (
+        <p className="ability__grows">
+          <span className="ability__grows-mark" aria-hidden="true">
+            <IconAdvance size={11} />
+          </span>
+          Builds on {joinWords(ab.growsOn.map((t) => GROWTH_LABELS[t] ?? t))}, automatically
+        </p>
+      ) : null}
+
       {/* The saving throw this skill forces, shown on the caster's chip so the
           GM can read it off while casting and set it on the target's card. */}
       {ab.dcStat && ab.dcValue ? (
@@ -484,6 +537,9 @@ function AbilityEditor({
   const [gain, setGain] = useState(String(ab.gainPerPhase ?? 1));
   const [dice, setDice] = useState(ab.dice ?? "");
   const [trigger, setTrigger] = useState<string>(ab.trigger ?? "");
+  const [grantStat, setGrantStat] = useState<string>(ab.grants?.stat ?? "");
+  const [grantPer, setGrantPer] = useState(String(ab.grants?.perStack ?? 1));
+  const [growth, setGrowth] = useState<ReactionTrigger[]>(ab.growsOn ?? []);
   const [refill, setRefill] = useState<string>(ab.refill ?? "");
   const [requires, setRequires] = useState(ab.requires?.skill ?? "");
   const [requiresAt, setRequiresAt] = useState(
@@ -519,6 +575,11 @@ function AbilityEditor({
                   dice: dice.trim(),
                   ...(trigger ? { trigger: trigger as ReactionTrigger } : { trigger: undefined }),
                   ...(refill ? { refill: refill as RefillCadence } : { refill: undefined }),
+                  grants:
+                    grantStat && parseInt(grantPer, 10)
+                      ? { stat: grantStat as StatKey, perStack: parseInt(grantPer, 10) }
+                      : undefined,
+                  growsOn: growth.length ? growth : undefined,
                   requires: requires.trim()
                     ? {
                         skill: requires.trim(),
@@ -553,7 +614,58 @@ function AbilityEditor({
             <option value="allyHit">An ally is hit</option>
             <option value="allyDown">An ally goes down</option>
             <option value="selfDown">This unit reaches 0 HP</option>
+            <option value="hitDealt">This unit lands a hit</option>
           </select>
+        </>
+      )}
+
+      {/* A counter that is worth something, and a counter that fills itself.
+          Both are written on the sheets already; this is where a skill the
+          importer could not read gets told directly. */}
+      {(ab.mode === "stack" || ab.mode === "charge") && (
+        <>
+          <label className="field__label" htmlFor="ab-grant">
+            Each point is worth
+          </label>
+          <div className="field__pair">
+            <input
+              id="ab-grant"
+              type="number"
+              value={grantPer}
+              aria-label="Bonus per point"
+              onChange={(e) => setGrantPer(e.target.value)}
+            />
+            <select
+              value={grantStat}
+              aria-label="Stat this skill raises"
+              onChange={(e) => setGrantStat(e.target.value)}
+            >
+              <option value="">Nothing</option>
+              {STAT_KEYS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <span className="field__label">Builds automatically on</span>
+          <div className="field__checks">
+            {GROWTH_CHOICES.map(([value, label]) => (
+              <label key={value} className="field__check">
+                <input
+                  type="checkbox"
+                  checked={growth.includes(value)}
+                  onChange={(e) =>
+                    setGrowth((g) =>
+                      e.target.checked ? [...g, value] : g.filter((t) => t !== value),
+                    )
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </div>
         </>
       )}
 
@@ -822,8 +934,12 @@ export const CombatantCard = memo(function CombatantCard({
 
   const band = healthBand(c.hp, c.maxHp);
   const pct = healthPercent(c.hp, c.maxHp);
-  const derived = deriveStats(c.stats, c.tempMods);
-  const eff = effectiveStats(c.stats, c.tempMods);
+  // Everything acting on them, including what their own skills are paying out.
+  // Reading c.tempMods alone here showed Dawn's STR two short of the number
+  // her attacks were actually landing for.
+  const mods = allMods(c);
+  const derived = deriveStats(c.stats, mods);
+  const eff = effectiveStats(c.stats, mods);
   const isPlayer = c.role === "Player";
   const headingId = useId("cbt");
 
@@ -833,18 +949,16 @@ export const CombatantCard = memo(function CombatantCard({
   const swing = swingFor(c);
   const attackRoll = d20Roll({ bonus: derived.hit, swing, flagCrits: true });
 
-  useEffect(() => {
-    if (!focused) return;
-    const el = cardRef.current;
-    if (!el) return;
-    // Only pull the card into view when the selection came from somewhere else
-    // (war table, command palette). If focus is already inside this card the GM
-    // is looking straight at it, and scrolling would move the control out from
-    // under the pointer between mousedown and mouseup — which silently
-    // cancels the click.
-    if (el.contains(document.activeElement)) return;
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [focused, cardRef]);
+  /*
+   * A card no longer drags itself into view when it becomes the selected one.
+   *
+   * That used to be how selecting from the war table reached the card, but the
+   * table is now where an action is actually given: clicking a token opens the
+   * command window beside it, and scrolling the page away from the thing you
+   * just clicked is the opposite of helpful. The two places that genuinely need
+   * to reveal a card — the Order rail and the command palette — scroll to it
+   * themselves, which is where the decision belongs.
+   */
 
   const applyDmg = () => {
     // Feedback follows the cover. The reducer owns the authoritative chain;
@@ -1509,6 +1623,35 @@ export const CombatantCard = memo(function CombatantCard({
                       <div><dt>P.Res</dt><dd className="tnum">{derived.physicalResist}</dd></div>
                       <div><dt>M.Res</dt><dd className="tnum">{derived.magicalResist}</dd></div>
                     </dl>
+
+                    {/* Which stat the war table pays their attacks out of.
+                        Automatic takes whichever is higher, which is right for
+                        most sheets and wrong for anyone whose stat starts low
+                        and climbs — the guess flips mid-fight, so the sheet
+                        gets to settle it. */}
+                    <label className="maxhp">
+                      <span>Swings with</span>
+                      <select
+                        value={c.damageStat ?? ""}
+                        aria-label={`Damage stat for ${c.name}`}
+                        onChange={(e) =>
+                          dispatch({
+                            type: "COMBATANT_DAMAGE_STAT_SET",
+                            id: c.id,
+                            damageStat: (e.target.value || undefined) as
+                              | "physical"
+                              | "magical"
+                              | undefined,
+                          })
+                        }
+                      >
+                        <option value="">
+                          Automatic — {betterStat(c) === "magical" ? "INT" : "STR"} right now
+                        </option>
+                        <option value="physical">STR, always</option>
+                        <option value="magical">INT, always</option>
+                      </select>
+                    </label>
 
                     {/* For anyone the character library does not cover, or to
                         override what it resolved. Clearing the field removes

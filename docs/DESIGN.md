@@ -178,6 +178,67 @@ sends, so the two routes cannot drift apart.
 Everything in the window is reachable by keyboard: arrows step through the
 verbs, and focus lands on the verdict the moment a target is locked.
 
+Clicking a token does not scroll the page to that combatant's card. It used to
+— that was how selecting from the table reached the card — but the table is now
+where an action is given, and scrolling away from the thing you just clicked is
+the opposite of helpful. The Order rail and the command palette still reveal a
+card, because revealing one is what they are for.
+
+## Skills that keep their own books
+
+Two things every sheet already says in a sentence, now read as structure.
+
+**What a counter is worth.** Sangre Lanza says "+4 STR at max". Carried as
+`grants: { stat: "STR", perStack: 1 }`, so three stacks is +3 STR everywhere the
+tracker computes anything — the damage on the Attack verb, the ledger, the card.
+Deliberately *not* mirrored into a temporary modifier: a modifier counts down on
+the round boundary and this must not. It is derived on read from the counter
+itself, so it can never drift from it and never expires behind the table's back.
+
+**What makes it climb.** `growsOn: ["hitDealt", "hit"]` advances the counter
+whenever its owner lands a hit or takes one. This runs in the reducer rather
+than the UI, so it happens by whichever route the damage arrived — the war
+table, a card, a multi-strike — and lands inside the same undo step as the hit
+that caused it. It is not offered as a prompt: a reaction costs something and
+the table decides, but this is bookkeeping, and bookkeeping offered as a prompt
+is bookkeeping that gets dismissed and forgotten.
+
+Both are lifted out of the sheets' own prose at import, alongside three others
+the importer previously dropped on the floor:
+
+| Written on the sheet | Read as |
+| --- | --- |
+| "Requires Sangre Lanza at max (+4 STR)" | a gate, **and** +1 STR per stack |
+| "Gains a stack each time she lands a hit or is hit" | `growsOn: ["hitDealt", "hit"]` |
+| "When an ally is hit, intercept the blow" | `trigger: "allyHit"` |
+| "All enemies make a DC 14 AGI check" | `dcStat: "AGI", dcValue: 14` |
+| "Once per combat" | `refill: "combat"` |
+
+The reaction trigger is the consequential one. Every reaction imported from a
+player sheet was previously inert — the tracker knew how to raise them, but a
+reaction with no trigger is skipped rather than guessed at, so not one of them
+ever came up. Enemy skills out of `combat_skills` get the same reading, for the
+same reason.
+
+Each parser is narrow and anchored on a specific shape, the same discipline the
+gate parser already used: a sentence that merely mentions STR does not become a
+buff, and a skill that says none of this gets none of it. Anything a parser
+misses is set by hand in the ability editor, which now carries controls for all
+five.
+
+## Which stat a combatant swings with
+
+Damage is derived, so something has to choose between `2 + STR` and `2 + INT`.
+Taking whichever is higher is right for most sheets and wrong for the ones built
+around a stat that starts low and climbs: Dawn looks like a caster on the first
+round and a bruiser on the fourth, and the guess flips with her mid-fight.
+
+So the combatant carries the answer. `damageStat` is derived at import from the
+sheet's own words — a kit that pays out STR is a kit built on STR — falls back
+to counting the prose, and abstains on a tie rather than declaring wrongly. The
+card has a control to settle it, showing what the automatic pick would be right
+now so the choice is never made blind.
+
 ## Motion budget
 
 The strongest motion in the application is spent on exactly one event: the round

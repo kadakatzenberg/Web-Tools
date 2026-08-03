@@ -607,6 +607,36 @@
   opacity: 0.75;
 }
 
+/* What a counter is currently paying out, and what feeds it. The first is a
+   live number and reads as one; the second is a standing rule and stays quiet. */
+.ability__grant,
+.ability__grows {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: var(--s1);
+  font-size: var(--fs-2xs);
+}
+
+.ability__grant {
+  color: var(--jade);
+}
+
+.ability__grant strong {
+  color: var(--bone);
+}
+
+.ability__grows {
+  color: var(--faint);
+}
+
+.ability__grant-mark,
+.ability__grows-mark {
+  display: grid;
+  place-items: center;
+  opacity: 0.75;
+}
+
 .card__emblem[data-rank="player"] {
   color: var(--rank-player);
   box-shadow: inset 0 0 0 1px var(--jade-deep);

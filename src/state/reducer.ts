@@ -6,8 +6,15 @@
  * roster consistent.
  */
 
-import type { Combatant, EncounterState } from "@/domain/types";
-import { applyDamage, applyHealing, clamp, resolveRedirect } from "@/domain/rules";
+import type { Ability, Combatant, EncounterState } from "@/domain/types";
+import {
+  applyDamage,
+  applyHealing,
+  clamp,
+  grownAbilities,
+  resolveRedirect,
+  type CombatEvent,
+} from "@/domain/rules";
 import { advancePhase, lockInitiative, resetInitiative } from "@/domain/phase";
 import { duplicateCombatant, gid } from "@/domain/factory";
 import type { Command } from "./actions";
@@ -220,6 +227,25 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
       };
     }
 
+    /**
+     * Which stat this combatant's attacks come out of. Held on the combatant
+     * because it is a fact about the character, not about one action, and the
+     * war table has to know it before an attack is ever aimed.
+     */
+    case "COMBATANT_DAMAGE_STAT_SET":
+      return {
+        state: {
+          ...state,
+          combatants: mapOne(state, cmd.id, (c) => {
+            const next = { ...c };
+            if (cmd.damageStat) next.damageStat = cmd.damageStat;
+            else delete next.damageStat;
+            return next;
+          }),
+        },
+        log: [],
+      };
+
     /* ── health ── */
 
     /**
@@ -253,6 +279,7 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
         ids.add(actual);
       }
 
+      const landed: { id: string; downed: boolean }[] = [];
       const combatants = state.combatants.map((c) => {
         if (!ids.has(c.id)) return c;
         const res = applyDamage(c, cmd.amount, cmd.damageType);
@@ -272,12 +299,59 @@ export function reduce(state: EncounterState, cmd: Command): ReduceResult {
             [c.id],
           ),
         );
-        if (c.hp > 0 && res.hp <= 0) {
+        const downed = c.hp > 0 && res.hp <= 0;
+        if (downed) {
           log.push(entry(state, "damage", `${c.name} is unconscious`, [c.id]));
         }
+        landed.push({ id: c.id, downed });
         return { ...c, hp: res.hp, shield: res.shield, tempShields: res.tempShields };
       });
-      return { state: { ...state, combatants }, log };
+
+      /*
+       * Skills that accrue on their own.
+       *
+       * Run here rather than in the UI so it happens whichever route the damage
+       * came in by — the war table, a card, or a multi-strike — and so it lands
+       * inside the same undo step as the hit that caused it.
+       *
+       * Counted per blow, not per dispatch: a multi-strike across three targets
+       * grows the attacker's counter three times, because the skills that say
+       * "each time she lands a hit" mean each time. Anyone who wants otherwise
+       * has the +/- controls on the chip.
+       */
+      const grown = new Map<string, Ability[]>();
+      const growthLog: string[] = [];
+      for (const hit of landed) {
+        const event: CombatEvent = {
+          kind: hit.downed ? "down" : "hit",
+          targetId: hit.id,
+          sourceId: cmd.sourceId,
+          damageType: cmd.damageType,
+        };
+        const subject = state.combatants.find((c) => c.id === hit.id);
+        for (const c of state.combatants) {
+          const base = grown.get(c.id) ?? c.abilities ?? [];
+          const grows = grownAbilities({ ...c, abilities: base }, event, subject);
+          if (!grows.length) continue;
+          const next = base.map((a) => {
+            const g = grows.find((x) => x.ability.id === a.id);
+            return g ? { ...a, cur: g.to } : a;
+          });
+          grown.set(c.id, next);
+          for (const g of grows) {
+            growthLog.push(
+              `${c.name}: ${g.ability.name} ${g.to}${g.ability.max > 0 ? `/${g.ability.max}` : ""}`,
+            );
+          }
+        }
+      }
+      for (const line of growthLog) log.push(entry(state, "ability", line));
+
+      const withGrowth = grown.size
+        ? combatants.map((c) => (grown.has(c.id) ? { ...c, abilities: grown.get(c.id)! } : c))
+        : combatants;
+
+      return { state: { ...state, combatants: withGrowth }, log };
     }
 
     case "HEAL_APPLIED": {

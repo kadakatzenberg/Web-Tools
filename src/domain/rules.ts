@@ -53,6 +53,44 @@ export function damageTakenBonus(
   return total;
 }
 
+/**
+ * The stat bonuses a combatant's own skills are currently paying out.
+ *
+ * A skill that says "+1 STR per stack" is not a temporary modifier — a modifier
+ * counts down on the round boundary and this must not; it is worth exactly what
+ * the counter says and changes only when the counter does. Expressed as
+ * modifiers anyway so that every existing consumer of `TempMod[]` picks it up
+ * without a second code path to keep in step.
+ */
+export function abilityMods(abilities: Ability[] | undefined): TempMod[] {
+  const out: TempMod[] = [];
+  for (const ab of abilities ?? []) {
+    const g = ab.grants;
+    if (!g || !g.perStack || ab.cur <= 0) continue;
+    out.push({
+      id: `grant:${ab.id}`,
+      stat: g.stat,
+      val: g.perStack * ab.cur,
+      // Never ticked: these are derived on read and never stored.
+      duration: Number.POSITIVE_INFINITY,
+      label: ab.name,
+    });
+  }
+  return out;
+}
+
+/**
+ * Every modifier acting on a combatant: the ones applied to them, and the ones
+ * their own skills are generating. This is what anything computing a stat
+ * should use — reaching for `c.tempMods` alone silently ignores a full stack.
+ */
+export function allMods(
+  c: Partial<Pick<Combatant, "tempMods" | "abilities">>,
+): TempMod[] {
+  const granted = abilityMods(c.abilities);
+  return granted.length ? [...(c.tempMods ?? []), ...granted] : (c.tempMods ?? []);
+}
+
 /** Base stats plus active temporary modifiers. */
 export function effectiveStats(stats: Stats, mods: TempMod[] | undefined): Stats {
   const out = {} as Stats;
@@ -132,6 +170,8 @@ export function applyDamage(
   c: Pick<
     Combatant,
     "hp" | "maxHp" | "shield" | "tempShields" | "stats" | "tempMods"
+  > &
+    Partial<Pick<Combatant, "abilities" | "stacks">
   >,
   amount: number,
   type: DamageType,
@@ -158,7 +198,7 @@ export function applyDamage(
     };
   }
 
-  const mods = c.tempMods ?? [];
+  const mods = allMods(c);
   const effCON = (c.stats.CON ?? 0) + modifierTotal(mods, "CON");
   const effWIS = (c.stats.WIS ?? 0) + modifierTotal(mods, "WIS");
   const tax = resistanceFor(type, effCON, effWIS);
@@ -522,6 +562,12 @@ export interface CombatEvent {
   kind: "hit" | "down";
   /** Who it happened to. */
   targetId: string;
+  /**
+   * Who did it, when that is known. Damage typed into a card has no author;
+   * damage resolved from the war table does, and the skills that key off
+   * landing a blow cannot fire without it.
+   */
+  sourceId?: string;
   damageType?: DamageType;
 }
 
@@ -550,7 +596,38 @@ function triggerMatches(
       return event.kind === "down" && isAlly;
     case "selfDown":
       return event.kind === "down" && isSelf;
+    case "hitDealt":
+      // A killing blow is still a blow landed, so "down" counts here too.
+      return !!event.sourceId && self.id === event.sourceId;
   }
+}
+
+/**
+ * Skills that answer this event by advancing their own counter.
+ *
+ * The difference from a reaction is that nobody chooses this: the skill says
+ * it accrues on a trigger, so it accrues. Reactions are offered because they
+ * cost something and the table decides; growth is bookkeeping, and bookkeeping
+ * offered as a prompt is bookkeeping that gets dismissed and forgotten.
+ */
+export function grownAbilities(
+  c: Combatant,
+  event: CombatEvent,
+  subject: Combatant | undefined,
+): { ability: Ability; from: number; to: number }[] {
+  if (!subject) return [];
+  const out: { ability: Ability; from: number; to: number }[] = [];
+  for (const ab of c.abilities ?? []) {
+    const triggers = ab.growsOn;
+    if (!triggers?.length) continue;
+    if (!triggers.some((t) => triggerMatches(t, event, c, subject))) continue;
+    const step = Math.max(1, ab.gainPerPhase ?? 1);
+    // The ceiling is the skill's own; a counter with no ceiling keeps climbing.
+    const to = ab.max > 0 ? Math.min(ab.max, ab.cur + step) : ab.cur + step;
+    if (to === ab.cur) continue;
+    out.push({ ability: ab, from: ab.cur, to });
+  }
+  return out;
 }
 
 export interface ArmedReaction {

@@ -151,6 +151,37 @@
   min-width: 0;
 }
 
+/* Two controls that answer one question — a number and the stat it applies to
+   — kept on one line so they read as the single value they are. */
+.field__pair {
+  display: flex;
+  gap: var(--s2);
+}
+
+.field__pair input {
+  width: 5rem;
+  flex: 0 0 auto;
+}
+
+.field__pair select {
+  flex: 1;
+  min-width: 0;
+}
+
+.field__checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s1) var(--s3);
+}
+
+.field__check {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--fs-sm);
+  color: var(--ash);
+}
+
 .field__hint {
   font-size: var(--fs-xs);
   color: var(--faint);

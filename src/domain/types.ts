@@ -19,6 +19,14 @@ export type StatKey = "STR" | "DEX" | "INT" | "WIS" | "AGI" | "CON";
  */
 export type ModTarget = StatKey | "dmgTaken" | "dmgDealt";
 
+/**
+ * Which of a combatant's two damage stats an action is paid out of.
+ *
+ * Hei Mao derives damage rather than rolling it: physical is 2 + STR, magical
+ * is 2 + INT.
+ */
+export type DamageStat = "physical" | "magical";
+
 export type Stats = Record<StatKey, number>;
 
 /**
@@ -56,7 +64,9 @@ export type ReactionTrigger =
   | "magicHit"
   | "allyHit"
   | "allyDown"
-  | "selfDown";
+  | "selfDown"
+  /** This combatant landed one, rather than took one. */
+  | "hitDealt";
 
 /** When a limited-use skill gets its uses back. */
 export type RefillCadence = "round" | "combat";
@@ -119,6 +129,24 @@ export interface Ability {
    * Optional and additive; abilities written before this field parse unchanged.
    */
   dice?: string;
+  /**
+   * What each point on this skill's counter is worth to its owner's stats.
+   *
+   * Sangre Lanza reads "+4 STR at max"; carried here as `{ stat: "STR",
+   * perStack: 1 }`, so three stacks is +3 STR everywhere the tracker computes
+   * anything — attack damage, the AC of whoever the skill also raises, the
+   * lot. Held on the ability rather than mirrored into a temporary modifier,
+   * because a modifier ticks down on its own and this must not.
+   */
+  grants?: { stat: StatKey; perStack: number };
+  /**
+   * Events that advance this skill's counter without anyone pressing anything.
+   *
+   * A skill that says "gains a stack whenever she lands or takes a hit" is
+   * bookkeeping the table should never have to do by hand — it is the single
+   * most-forgotten thing in a live fight.
+   */
+  growsOn?: ReactionTrigger[];
 }
 
 export interface TempShield {
@@ -227,6 +255,16 @@ export interface Combatant {
    * else on the round boundary.
    */
   redirect?: { toId: string; duration: number };
+  /**
+   * Which stat this combatant's attacks are paid out of.
+   *
+   * Unset means "whichever is higher", which is right for most sheets and
+   * wrong for the ones built around a stat that starts low and climbs. Dawn
+   * swings with STR even on the round her INT happens to be better, because
+   * that is what her kit is; saying so once beats the tracker guessing again
+   * every time the numbers move.
+   */
+  damageStat?: DamageStat;
   position: Position;
   notes: string;
   sheetSkills: SheetSkills;

@@ -13,20 +13,13 @@
  * genuinely comes off a die, so the tool asks for it instead of inventing one.
  */
 
-import type { Ability, Combatant, DamageType } from "./types";
-import { applyDamage, deriveStats, type DamageResult } from "./rules";
+import type { Ability, Combatant, DamageStat, DamageType } from "./types";
+import { allMods, applyDamage, deriveStats, type DamageResult } from "./rules";
 
 /** What a combatant can do to another on the table. */
 export type ActionKind = "attack" | "skill";
 
-/**
- * Which of a combatant's two damage stats an action uses.
- *
- * Hei Mao derives damage rather than rolling it: physical is 2 + STR, magical
- * is 2 + INT. A basic attack takes whichever of the two is better, because that
- * is what anyone would do, and says which so the choice is never hidden.
- */
-export type DamageStat = "physical" | "magical";
+export type { DamageStat };
 
 export interface ActionPlan {
   actor: Combatant;
@@ -57,14 +50,25 @@ export interface ActionPreview {
   check?: { stat: string; dc: number };
 }
 
-/** Damage a combatant deals with each stat, modifiers included. */
+/**
+ * Damage a combatant deals with each stat, everything currently acting on them
+ * included — temporary modifiers and the bonuses their own skills are paying.
+ */
 export function damageWith(c: Combatant, stat: DamageStat): number {
-  const d = deriveStats(c.stats, c.tempMods);
+  const d = deriveStats(c.stats, allMods(c));
   return stat === "magical" ? d.magicalDamage : d.physicalDamage;
 }
 
-/** Which stat this combatant hits harder with. Ties go to physical. */
+/**
+ * Which stat this combatant swings with.
+ *
+ * A sheet that names its stat is taken at its word. Otherwise it is whichever
+ * is higher right now, ties to physical — a reasonable guess, but only a guess,
+ * and one that flips mid-fight on a character whose stat climbs. That flip is
+ * exactly why the sheet gets to say.
+ */
 export function betterStat(c: Combatant): DamageStat {
+  if (c.damageStat) return c.damageStat;
   return damageWith(c, "magical") > damageWith(c, "physical") ? "magical" : "physical";
 }
 
@@ -142,9 +146,18 @@ export function mendAmount(c: Combatant): number {
   return damageWith(c, "magical");
 }
 
-/** How a derived figure was arrived at, for the readout. */
+/**
+ * How a derived figure was arrived at, for the readout.
+ *
+ * Shows the effective stat, not the one written on the sheet, so a character
+ * whose STR is being lifted by their own skill can see where the number came
+ * from instead of finding it two higher than the arithmetic on screen.
+ */
 export function statSource(c: Combatant, stat: DamageStat): string {
-  return stat === "magical" ? `2 + INT ${c.stats.INT ?? 0}` : `2 + STR ${c.stats.STR ?? 0}`;
+  const e = deriveStats(c.stats, allMods(c));
+  const key = stat === "magical" ? "INT" : "STR";
+  const value = (stat === "magical" ? e.magicalDamage : e.physicalDamage) - 2;
+  return `2 + ${key} ${value}`;
 }
 
 /** Whether an action from this combatant onto that one is legal. */

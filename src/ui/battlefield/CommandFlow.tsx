@@ -540,6 +540,7 @@ export function CommandFlow({
       amount: preview.amount,
       damageType: preview.damageType,
       source: ability ? `${actor.name}'s ${ability.name}` : actor.name,
+      sourceId: actor.id,
     });
     spendSkill();
 

@@ -35,6 +35,7 @@ export function makeCombatant(partial: Partial<Combatant> = {}): Combatant {
     ...(partial.stacks ? { stacks: partial.stacks } : {}),
     ...(partial.portrait ? { portrait: partial.portrait } : {}),
     ...(partial.redirect ? { redirect: partial.redirect } : {}),
+    ...(partial.damageStat ? { damageStat: partial.damageStat } : {}),
   };
 }
 

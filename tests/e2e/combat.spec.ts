@@ -1470,3 +1470,113 @@ test("puts the answer under the cursor as soon as a target is locked", async ({ 
   await page.keyboard.press("Enter");
   await expect(card(page, "Slow").locator(".card__hp").first()).toHaveText("6/10");
 });
+
+/* ── Skills that keep their own books ── */
+
+/** Dawn, whose counter feeds her STR and fills itself. */
+const DAWN = {
+  id: "d", name: "Dawn Khitothe", role: "Player", type: "", hp: 20, maxHp: 20, shield: 0,
+  tempShields: [], dots: [], hpRegens: [],
+  stats: { STR: 1, DEX: 2, INT: 4, WIS: 1, AGI: 1, CON: 1 },
+  statuses: [], tempMods: [], position: "Front", notes: "", done: false,
+  damageStat: "physical",
+  abilities: [
+    { id: "sl", name: "Sangre Lanza", mode: "stack", max: 4, cur: 0,
+      grants: { stat: "STR", perStack: 1 }, growsOn: ["hitDealt", "hit"],
+      effectText: "Gains a stack each time she lands a hit or is hit (+4 STR at max)." },
+  ],
+};
+
+const HUSK = {
+  id: "f", name: "Husk", role: "Enemy", type: "Normal", hp: 30, maxHp: 30, shield: 0,
+  tempShields: [], dots: [], hpRegens: [],
+  stats: { STR: 1, DEX: 1, INT: 0, WIS: 0, AGI: 1, CON: 0 },
+  statuses: [], tempMods: [], position: "Front", notes: "", done: false, abilities: [],
+};
+
+async function seedEncounter(page: Page, combatants: unknown[]) {
+  await page.addInitScript((cs) => {
+    window.localStorage.setItem("heimao.encounter.backup.v2", JSON.stringify({
+      state: { combatants: cs, phase: 0, round: 1, locked: true, playerPhaseCount: 1, enemyPhaseCount: 0 },
+      savedAt: Date.now(), sessionCode: null,
+    }));
+  }, combatants);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Restore it" }).click();
+}
+
+test("clicking a token opens its commands without moving the page", async ({ page }) => {
+  // Enough combatants that the page is scrollable and a jump would be obvious.
+  for (let i = 0; i < 6; i++) await addCombatant(page, `Body ${i}`);
+
+  const table = await warTable(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  await token(table, "Body 0").click();
+  await expect(page.locator(".cmdwin")).toBeVisible();
+  // Give a smooth scroll every chance to have happened.
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test("a counter that feeds a stat fills itself on both sides of a hit", async ({ page }) => {
+  await seedEncounter(page, [DAWN, HUSK]);
+  const table = await warTable(page);
+  const dawn = card(page, "Dawn Khitothe");
+
+  // She swings with STR even though her INT is higher, because her sheet says so.
+  await token(table, "Dawn Khitothe").click();
+  await expect(page.locator(".cmdi", { hasText: "Attack" })).toContainText("3 physical");
+
+  await page.locator(".cmdi", { hasText: "Attack" }).click();
+  await token(table, "Husk").click();
+  await page.getByRole("button", { name: "Hit", exact: true }).click();
+
+  await dawn.getByRole("button", { name: "Skills" }).click();
+  const lanza = dawn.locator(".ability").filter({ hasText: "Sangre Lanza" });
+  await expect(lanza.locator(".ability__state")).toHaveText("1/4");
+  await expect(lanza.locator(".ability__grant")).toContainText("+1 STR");
+
+  // Taking one builds it too, and by whatever route the damage arrived.
+  await dawn.getByLabel(/^Untaxed damage to/).fill("3");
+  await dawn.getByRole("button", { name: "Strike", exact: true }).click();
+  await expect(lanza.locator(".ability__state")).toHaveText("2/4");
+  await expect(lanza.locator(".ability__grant")).toContainText("+2 STR");
+
+  // And the bonus reaches the damage she actually deals: 2 + STR 1 + 2 stacks.
+  await token(table, "Dawn Khitothe").click();
+  await expect(page.locator(".cmdi", { hasText: "Attack" })).toContainText("5 physical");
+});
+
+test("the combat log records a counter filling itself", async ({ page }) => {
+  await seedEncounter(page, [DAWN, HUSK]);
+  const table = await warTable(page);
+
+  await token(table, "Dawn Khitothe").click();
+  await page.locator(".cmdi", { hasText: "Attack" }).click();
+  await token(table, "Husk").click();
+  await page.getByRole("button", { name: "Hit", exact: true }).click();
+
+  // The log is a permanent rail on a wide screen and a drawer below that.
+  if (!(await page.locator(".eventlog--inline").isVisible())) {
+    await page.getByRole("button", { name: "Combat log" }).click();
+  }
+  await expect(page.locator(".eventlog__entry", { hasText: "Sangre Lanza 1/4" })).toBeVisible();
+});
+
+test("the damage stat can be settled by hand when a sheet does not say", async ({ page }) => {
+  await addCombatant(page, "Mixed", { stats: { STR: 1, INT: 4 } });
+  const c = card(page, "Mixed");
+
+  const table = await warTable(page);
+  await token(table, "Mixed").click();
+  // Nothing declared, so it takes the higher of the two.
+  await expect(page.locator(".cmdi", { hasText: "Attack" })).toContainText("6 magical");
+  await page.keyboard.press("Escape");
+
+  await c.getByRole("button", { name: "Stats" }).click();
+  await c.getByLabel("Damage stat for Mixed").selectOption("physical");
+
+  await token(table, "Mixed").click();
+  await expect(page.locator(".cmdi", { hasText: "Attack" })).toContainText("3 physical");
+});
