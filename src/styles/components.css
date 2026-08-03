@@ -474,3 +474,16 @@
     transparent
   );
 }
+
+/* ---------------------------------------------------------------------------
+   The held moment at the climax. The chrome steps back so nothing is on screen
+   but the black frame and the line that follows it. Declared last, and scoped
+   to the body, so it wins over the visibility rules above.
+   --------------------------------------------------------------------------- */
+body.is-hushed .masthead,
+body.is-hushed .dock,
+body.is-hushed .qi-cursor {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 700ms var(--ease-out);
+}

@@ -108,6 +108,7 @@ export function initBloodGoat(narrative: Narrative, reducedMotion: boolean): voi
         document.body.classList.remove('is-cursor-hidden');
         ducked = false;
       }
+      document.body.classList.remove('is-hushed');
       if (veil) veil.style.opacity = '0';
       return;
     }
@@ -136,6 +137,10 @@ export function initBloodGoat(narrative: Narrative, reducedMotion: boolean): voi
     // The black frame.
     const black = smoothstep(0.6, 0.7, p) * (1 - smoothstep(0.82, 0.9, p));
     if (veil) veil.style.opacity = String(black);
+
+    // The page chrome steps back for the whole held moment, so nothing but the
+    // black frame and the line that follows it is on screen.
+    document.body.classList.toggle('is-hushed', p > 0.55 && p < 0.97);
 
     const hold = p > 0.66 && p < 0.8;
     if (hold !== ducked) {

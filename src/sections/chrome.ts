@@ -58,19 +58,33 @@ export function initChrome(): void {
   });
 
   if (hero && dock) {
-    // The dock appears once the hero has been read and steps aside for the
-    // closing frame, which carries its own call to action.
+    // The dock appears once the hero has been read, and steps aside wherever
+    // the page already carries a full call to action of its own.
+    const resolution = document.getElementById('resolution');
+    const yields = [final, resolution].filter(Boolean) as HTMLElement[];
+    const active = new Set<Element>();
+    let pastHero = false;
+
+    const sync = () => {
+      dock.classList.toggle('is-visible', pastHero && active.size === 0);
+    };
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.target === hero) dock.classList.toggle('is-visible', !entry.isIntersecting);
-          if (entry.target === final && entry.isIntersecting) dock.classList.remove('is-visible');
+          if (entry.target === hero) {
+            pastHero = !entry.isIntersecting;
+            continue;
+          }
+          if (entry.isIntersecting) active.add(entry.target);
+          else active.delete(entry.target);
         }
+        sync();
       },
       { rootMargin: '-30% 0px 0px 0px' },
     );
     io.observe(hero);
-    if (final) io.observe(final);
+    yields.forEach((el) => io.observe(el));
   }
 
   const toggle = document.getElementById('sound-toggle');
