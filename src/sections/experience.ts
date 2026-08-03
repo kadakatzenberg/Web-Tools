@@ -1,4 +1,4 @@
-import { cta, eyebrow, plate } from '../ui';
+import { cta, eyebrow, photo, plate } from '../ui';
 import { ticker } from '../core/ticker';
 import { stickyProgress, viewport } from '../core/scroll';
 import { clamp01, lerp } from '../gl/math';
@@ -7,8 +7,11 @@ interface Chapter {
   chapter: string;
   title: string;
   body: string;
-  plate: string;
-  alt: string;
+  /** A photograph role, or a procedural plate when the chapter is mythic. */
+  media: { kind: 'photo'; role: string; crop?: string } | { kind: 'plate'; name: string; alt: string };
+  /** Frame proportion, so no two chapters are the same shape. */
+  shape: 'portrait' | 'landscape' | 'square' | 'tall';
+  treatment?: 'ink' | 'aperture' | 'strip' | 'field' | 'stele';
 }
 
 const CHAPTERS: Chapter[] = [
@@ -16,53 +19,75 @@ const CHAPTERS: Chapter[] = [
     chapter: 'Leaving the modern world',
     title: 'Personally curated by Joey Yap',
     body: 'Joey selects the terrain, timing, and teachings that define the experience. Throughout the excursion, he reads the land in real time and shows how the classical principles appear across the mountains, waterways, and formations before the group.',
-    plate: 'chapter-departure',
-    alt: 'A wide valley floor falling away beneath low cloud, the range ahead barely visible through the haze.',
+    media: { kind: 'photo', role: 'joey-briefing', crop: 'wide' },
+    shape: 'landscape',
+    treatment: 'field',
   },
   {
     chapter: 'First sight of the Dragon',
     title: 'Sacred ground away from the crowds',
     body: 'The experience reaches beyond conventional tourism routes. The exact sacred sites remain private. Each location is selected for what the land can reveal and what may be experienced there.',
-    plate: 'chapter-firstsight',
-    alt: 'A long mountain range emerging through mist, its crest running unbroken across the frame with light gathering along it.',
+    media: {
+      kind: 'plate',
+      name: 'chapter-firstsight',
+      alt: 'A long mountain range emerging through mist, its crest running unbroken across the frame with light gathering along it.',
+    },
+    shape: 'tall',
   },
   {
     chapter: 'Reading the living terrain',
     title: 'Classical Feng Shui made visible',
     body: 'Mountains become Dragons. Valleys become channels of Qi. Water reveals how energy gathers, moves, or escapes. The land becomes the lesson.',
-    plate: 'chapter-reading',
-    alt: 'A valley seen from above, a watercourse tracing the floor between two slopes.',
+    media: { kind: 'photo', role: 'terrain-reading', crop: 'portrait' },
+    shape: 'portrait',
+    treatment: 'strip',
   },
   {
     chapter: 'Entering sacred ground',
     title: 'Meditation and activation',
     body: 'At selected locations and moments, the group pauses. Participants may meditate, set an intention, perform an activation, or experience the environment without distraction.',
-    plate: 'chapter-sacred',
-    alt: 'A sheltered basin held by surrounding peaks, with fine points of light gathering above its centre.',
+    media: { kind: 'photo', role: 'group-temple', crop: 'square' },
+    shape: 'square',
+    treatment: 'ink',
   },
   {
     chapter: 'Reaching the selected moment',
     title: 'A private international circle',
     body: 'The excursion brings together a small group of business owners, professionals, practitioners, and seekers from different parts of the world.',
-    plate: 'chapter-moment',
-    alt: 'A column of fine light rising from the land into the sky above the range.',
+    media: { kind: 'photo', role: 'meditation-stone', crop: 'portrait' },
+    shape: 'portrait',
+    treatment: 'aperture',
   },
   {
     chapter: 'Returning with a changed perspective',
     title: 'Premium care throughout',
     body: 'The experience is handled with the care expected of a premium private programme.',
-    plate: 'chapter-return',
-    alt: 'The range seen from a greater distance, quiet and settled, a thin line of light running through it.',
+    media: {
+      kind: 'plate',
+      name: 'chapter-return',
+      alt: 'The range seen from a greater distance, quiet and settled, a thin line of light running through it.',
+    },
+    shape: 'landscape',
   },
 ];
 
 export function experienceMarkup(): string {
   const panels = CHAPTERS.map(
     (item, index) => `
-    <li class="chapter" data-chapter="${index}">
+    <li class="chapter chapter--${item.shape}" data-chapter="${index}">
       <div class="chapter__media">
         <span class="chapter__aperture" aria-hidden="true"></span>
-        ${plate(item.plate, item.alt, { sizes: '(max-width: 899px) 88vw, 34vw' })}
+        ${
+          item.media.kind === 'photo'
+            ? photo(item.media.role, {
+                crop: item.media.crop,
+                sizes: '(max-width: 899px) 88vw, 34vw',
+                treatment: item.treatment,
+              })
+            : plate(item.media.name, item.media.alt, {
+                sizes: '(max-width: 899px) 88vw, 34vw',
+              })
+        }
       </div>
       <div class="chapter__text">
         <p class="chapter__index"><span class="field-label">Day ${index + 1}</span> ${
@@ -89,6 +114,7 @@ export function experienceMarkup(): string {
 
     <div class="experience__track" id="experience-track">
       <div class="experience__stick">
+        <div class="experience__ground" aria-hidden="true"></div>
         <ol class="chapters" id="chapters">${panels}</ol>
         <div class="experience__progress" aria-hidden="true">
           <span class="experience__progress-fill" id="experience-progress"></span>

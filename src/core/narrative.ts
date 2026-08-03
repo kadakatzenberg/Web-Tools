@@ -31,6 +31,7 @@ const NUMERIC_KEYS = [
   'fracture',
   'goldPath',
   'dawn',
+  'celestial',
   'exposure',
   'bloom',
   'chroma',

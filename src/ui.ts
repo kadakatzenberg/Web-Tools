@@ -1,4 +1,5 @@
 import { CONTACT_LINK_ATTRS, CONTACT_TEAM_URL } from './config';
+import { hasPhoto, photoRole, PHOTO_WIDTHS, type Treatment } from './content/photos';
 
 export interface CtaOptions {
   label: string;
@@ -66,26 +67,100 @@ export function plate(
   </picture>`;
 }
 
+export interface PhotoOptions {
+  crop?: string;
+  sizes?: string;
+  className?: string;
+  eager?: boolean;
+  /** Treatment override; defaults to the one declared on the role. */
+  treatment?: Treatment;
+}
+
+/**
+ * A photograph from the human layer, or the procedural plate standing in for it.
+ *
+ * The two are deliberately interchangeable at the call site: a section asks for
+ * a role and gets whichever exists, wrapped in the same treatment, so the page
+ * is complete whether or not the photography has landed yet.
+ */
+export function photo(id: string, options: PhotoOptions = {}): string {
+  const role = photoRole(id);
+  if (!role) return '';
+  const treatment = options.treatment ?? role.treatment;
+  const sizes = options.sizes ?? '(max-width: 899px) 92vw, 46vw';
+  const wrapper = `photo photo--${treatment} ${options.className ?? ''}`.trim();
+
+  if (!hasPhoto(id)) {
+    if (!role.fallback) return '';
+    return `<div class="${wrapper} is-standin">${plate(role.fallback, role.fallbackAlt, {
+      sizes,
+      eager: options.eager,
+    })}</div>`;
+  }
+
+  const crop = options.crop ?? role.crops[0]?.name ?? 'wide';
+  const srcset = (ext: string) =>
+    PHOTO_WIDTHS.map((w) => `/media/photos/${id}-${crop}-${w}.${ext} ${w}w`).join(', ');
+
+  return `<div class="${wrapper}">
+    <picture class="plate">
+      <source type="image/avif" srcset="${srcset('avif')}" sizes="${sizes}" />
+      <source type="image/webp" srcset="${srcset('webp')}" sizes="${sizes}" />
+      <img
+        src="/media/photos/${id}-${crop}-1024.webp"
+        alt="${role.alt}"
+        loading="${options.eager ? 'eager' : 'lazy'}"
+        decoding="async"
+      />
+    </picture>
+  </div>`;
+}
+
+/** True when a section should compose around a real photograph. */
+export { hasPhoto };
+
 export function eyebrow(text: string, index?: string): string {
   return `<p class="eyebrow" data-reveal="fade">${
     index ? `<span class="visually-hidden">Section </span>${index} <span aria-hidden="true">/</span> ` : ''
   }${text}</p>`;
 }
 
-/** Splits a line into per character spans for the kinetic passages. */
+/**
+ * Splits a line for the kinetic passages.
+ *
+ * Characters are addressable individually, but each word is wrapped in its own
+ * non-breaking box, so a headline can never split mid-word at a narrow width.
+ * The whole run is hidden from assistive technology; callers pair it with a
+ * plain-text copy of the same line.
+ */
 export function splitChars(text: string, className = 'char'): string {
+  let index = 0;
   return text
-    .split('')
-    .map((char, index) =>
-      char === ' '
-        ? ' '
-        : `<span class="${className}" style="--i:${index}" aria-hidden="true">${char}</span>`,
-    )
+    .split(/(\s+)/)
+    .map((token) => {
+      if (/^\s+$/.test(token)) return ' ';
+      const chars = token
+        .split('')
+        .map((char) => `<span class="${className}" style="--i:${index++}">${char}</span>`)
+        .join('');
+      return `<span class="word">${chars}</span>`;
+    })
     .join('');
 }
 
+/**
+ * Like `splitChars`, but keeps named groups of words on one line. Used where a
+ * headline has a natural break point that should be the only one available at
+ * narrow widths.
+ */
+export function splitPhrase(groups: readonly string[], className = 'char'): string {
+  return groups
+    .map((group) => `<span class="word-group">${splitChars(group, className)}</span>`)
+    .join(' ');
+}
+
 export function kineticLine(text: string, tag = 'span'): string {
-  return `<${tag} class="kinetic-line"><span class="visually-hidden">${text}</span>${splitChars(
+  return `<${tag} class="kinetic-line"><span class="visually-hidden">${text}</span><span aria-hidden="true">${splitChars(
     text,
-  )}</${tag}>`;
+  )}</span></${tag}>`;
 }

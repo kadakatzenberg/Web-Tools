@@ -1,4 +1,4 @@
-import { eyebrow } from '../ui';
+import { eyebrow, photo } from '../ui';
 import { RESPONSES, TESTIMONIALS } from '../content/testimonials';
 import { ticker } from '../core/ticker';
 import { elementProgress } from '../core/scroll';
@@ -66,6 +66,10 @@ export function voicesMarkup(): string {
           Accounts gathered from previous excursions. Experiences differ, and no particular
           response is assured.
         </p>
+        <figure class="voices__gathering" data-reveal="fade">
+          ${photo('group-temple', { crop: 'wide', sizes: '(max-width: 1023px) 90vw, 30vw' })}
+          <figcaption class="field-label">Previous excursion</figcaption>
+        </figure>
       </div>
       <ul class="voices" id="voices-list">${attributed}${responses}</ul>
     </div>

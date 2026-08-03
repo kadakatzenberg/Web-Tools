@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Joey Yap's China Excursion 2026 — Walk The Dragon",
+  "description": "Joey Yap's China Excursion 2026 \u2014 Walk The Dragon",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "plates": "node scripts/capture-plates.mjs && node scripts/process-plates.mjs",
     "social": "node scripts/build-social.mjs",
-    "zip": "node scripts/make-zip.mjs"
+    "zip": "node scripts/make-zip.mjs",
+    "photos": "node scripts/ingest-photos.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",

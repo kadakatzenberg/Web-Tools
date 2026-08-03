@@ -57,8 +57,8 @@
   --mono: 'Roboto Mono Variable', 'Roboto Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   /* Fluid type, tuned between 390px and 1440px viewports */
-  --step--2: clamp(0.688rem, 0.66rem + 0.11vw, 0.75rem);
-  --step--1: clamp(0.8rem, 0.76rem + 0.17vw, 0.9rem);
+  --step--2: clamp(0.72rem, 0.69rem + 0.12vw, 0.78rem);
+  --step--1: clamp(0.83rem, 0.79rem + 0.17vw, 0.92rem);
   --step-0: clamp(0.95rem, 0.9rem + 0.22vw, 1.075rem);
   --step-1: clamp(1.1rem, 1.02rem + 0.36vw, 1.32rem);
   --step-2: clamp(1.35rem, 1.19rem + 0.68vw, 1.75rem);

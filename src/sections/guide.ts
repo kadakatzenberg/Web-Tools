@@ -1,46 +1,11 @@
-import { eyebrow, plate } from '../ui';
+import { eyebrow, hasPhoto, photo, plate } from '../ui';
 import { onFirstView } from '../core/reveal';
-
-interface Mark {
-  value: number;
-  display: string;
-  prefix?: string;
-  label: string;
-  reading: string;
-}
-
-const MARKS: Mark[] = [
-  {
-    value: 1000000,
-    display: '1,000,000',
-    prefix: 'More than',
-    label: 'Students taught worldwide',
-    reading: 'across three decades of teaching',
-  },
-  {
-    value: 100,
-    display: '100',
-    prefix: 'More than',
-    label: 'Countries reached',
-    reading: 'classrooms, consultations and field study',
-  },
-  {
-    value: 30,
-    display: '30',
-    label: 'Years of mastery and research',
-    reading: 'Feng Shui, BaZi, Qi Men Dun Jia, Date Selection',
-  },
-  {
-    value: 198,
-    display: '198',
-    label: 'Books published',
-    reading: 'on classical Chinese metaphysics',
-  },
-];
+import { FIGURES, FIGURES_CONFIRMED, STANDING } from '../content/authority';
 
 export function guideMarkup(): string {
-  const marks = MARKS.map(
-    (mark, index) => `
+  const marks = FIGURES_CONFIRMED
+    ? FIGURES.map(
+        (mark, index) => `
     <li class="mark-stat" data-mark="${index}">
       <span class="mark-stat__rule" aria-hidden="true"></span>
       <p class="mark-stat__figure">
@@ -52,15 +17,31 @@ export function guideMarkup(): string {
       <p class="mark-stat__label">${mark.label}</p>
       <p class="mark-stat__reading">${mark.reading}</p>
     </li>`,
-  ).join('');
+      ).join('')
+    : STANDING.map(
+        (mark, index) => `
+    <li class="mark-stat mark-stat--standing" data-mark="${index}">
+      <span class="mark-stat__rule" aria-hidden="true"></span>
+      <p class="mark-stat__figure"><span class="mark-stat__mark">${mark.mark}</span></p>
+      <p class="mark-stat__label">${mark.label}</p>
+      <p class="mark-stat__reading">${mark.reading}</p>
+    </li>`,
+      ).join('');
 
   return `
   <section class="section section--guide" id="guide" aria-labelledby="guide-title">
-    <div class="scrim scrim--bottom" aria-hidden="true"></div>
+    <div class="scrim scrim--full" aria-hidden="true"></div>
 
     <div class="shell guide__scale">
       ${eyebrow('Your guide to the land', '07')}
-      <figure class="guide__figure" data-reveal="fade">
+      <figure class="guide__figure guide__figure--peopled" data-reveal="fade">
+        ${
+          hasPhoto('joey-figure')
+            ? `<div class="guide__standing">${photo('joey-figure', {
+                sizes: '(max-width: 899px) 42vw, 22vw',
+              })}</div>`
+            : ''
+        }
         ${plate(
           'guide-scale',
           'Ranges receding into mist, one behind another, with a faint column of light rising from the furthest of them.',

@@ -164,7 +164,7 @@
 
 .field-label {
   font-family: var(--mono);
-  font-size: clamp(0.56rem, 0.5rem + 0.2vw, 0.68rem);
+  font-size: clamp(0.64rem, 0.58rem + 0.2vw, 0.72rem);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--acc);
@@ -204,6 +204,19 @@
 .char {
   display: inline-block;
   will-change: transform, opacity;
+}
+
+/* Characters are addressable one by one, but a word is a single box, so a
+   kinetic headline can never break at an arbitrary character. */
+.word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* A group of words that must stay on the same line as each other. */
+.word-group {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -17,6 +17,9 @@ const VIEWPORTS = [
   { name: '768x1024', width: 768, height: 1024 },
   { name: '430x932', width: 430, height: 932 },
   { name: '390x844', width: 390, height: 844 },
+  { name: '375x812', width: 375, height: 812 },
+  { name: '360x800', width: 360, height: 800 },
+  { name: '320x568', width: 320, height: 568 },
 ];
 
 const MODES = [
@@ -80,6 +83,10 @@ for (const mode of MODES) {
       await page.waitForTimeout(mode.reduced ? 260 : 420);
 
       const measured = await page.evaluate(() => {
+        // Any word broken across two lines is a typography failure.
+        const brokenWords = [...document.querySelectorAll('.word')]
+          .filter((el) => el.getClientRects().length > 1)
+          .map((el) => el.textContent);
         const doc = document.documentElement;
         const wide = doc.scrollWidth > doc.clientWidth + 1;
         // Anything pushed outside the viewport horizontally.
@@ -94,8 +101,17 @@ for (const mode of MODES) {
             }
           });
         }
-        return { wide, scrollW: doc.scrollWidth, clientW: doc.clientWidth, offenders: offenders.slice(0, 4) };
+        return {
+          wide,
+          scrollW: doc.scrollWidth,
+          clientW: doc.clientWidth,
+          offenders: offenders.slice(0, 4),
+          brokenWords,
+        };
       });
+      if (measured.brokenWords.length) {
+        collisions.push(`${fraction.toFixed(2)}: split word ${measured.brokenWords.join(',')}`);
+      }
       if (measured.wide) {
         overflow.push(
           `${fraction.toFixed(2)}: ${measured.scrollW}>${measured.clientW} ${measured.offenders.join(' | ')}`,
@@ -142,7 +158,7 @@ for (const mode of MODES) {
       `\n### ${mode.name} @ ${vp.name}\n` +
         `  console/network: ${issues.length ? issues.join('\n    ') : 'clean'}\n` +
         `  overflow: ${overflow.length ? overflow.join('\n    ') : 'none'}\n` +
-        `  collisions: ${collisions.length ? collisions.join(', ') : 'none'}\n` +
+        `  split words: ${collisions.length ? collisions.join(', ') : 'none'}\n` +
         `  h1=${audit.h1} headingOrder=${audit.headingOrder} seq=${audit.headingSeq}\n` +
         `  ctas=${audit.ctaCount} hrefs=${JSON.stringify(audit.ctaHrefs)} unlabelled=${audit.ctaWithoutLabel}\n` +
         `  images=${audit.imageCount} noAlt=${audit.imagesWithoutAlt} broken=${audit.imagesBroken}\n` +

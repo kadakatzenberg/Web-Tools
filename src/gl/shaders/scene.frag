@@ -28,6 +28,7 @@ uniform float uFracture;
 uniform float uGoldPath;
 uniform float uEmbrace;    // highlights the surrounding formation
 uniform float uDawn;       // horizon light strength
+uniform float uCelestial;  // the red body rising behind the range
 
 // COMMON
 
@@ -81,6 +82,27 @@ vec3 skyColour(vec3 rd) {
   float horizon = exp(-abs(up) * 5.5);
   vec3 dawnCol = mix(vec3(0.52, 0.43, 0.30), vec3(0.68, 0.19, 0.11), uMood);
   col += dawnCol * horizon * 0.30 * uDawn;
+
+  // The Blood Goat body. It does not flash or pulse: it simply becomes
+  // larger, and everything else has to make room for it.
+  if (uCelestial > 0.001) {
+    vec3 toward = normalize(vec3(0.12, 0.30, 1.0));
+    float ang = acos(clamp(dot(rd, toward), -1.0, 1.0));
+    float radius = mix(0.05, 0.44, uCelestial);
+    float limb = smoothstep(radius, radius * 0.965, ang);
+    float centreward = clamp(1.0 - ang / max(radius, 1e-3), 0.0, 1.0);
+    // Darker toward the edge, so it reads as a body with a far side rather
+    // than a red sky.
+    vec3 body = mix(vec3(0.14, 0.012, 0.010), vec3(0.78, 0.115, 0.060), pow(centreward, 1.35));
+    // A slow turn across the surface, never fast enough to read as animation.
+    float surface = fbm(vec2(rd.x * 5.0, rd.y * 5.0) + uTime * 0.012, 4);
+    body *= 0.82 + 0.32 * surface;
+    col = mix(col, body, limb * uCelestial);
+    float rim = smoothstep(radius * 1.02, radius, ang) * smoothstep(radius * 0.94, radius, ang);
+    col += vec3(0.9, 0.22, 0.12) * rim * uCelestial * 0.5;
+    float corona = exp(-max(ang - radius, 0.0) * 6.5);
+    col += vec3(0.30, 0.040, 0.028) * corona * uCelestial * 0.85;
+  }
 
   // Stars, only in the upper reaches and only while the sky is still clean.
   if (up > 0.08) {
@@ -314,7 +336,11 @@ void main() {
   // the march sits on top of it.
   vec3 fogCol = mix(vec3(0.128, 0.146, 0.168), vec3(0.150, 0.058, 0.050), uMood);
   fogCol += mix(vec3(0.085, 0.072, 0.048), vec3(0.13, 0.045, 0.026), uMood) * uDawn * 0.42;
-  float fogAmt = 1.0 - exp(-t * 0.0026 * (0.6 + 0.8 * uMist));
+  // Distance fog belongs to the land. A sky ray travels to the far plane, so
+  // applying the same curve to it would erase the sky and everything in it.
+  float fogAmt = hit
+    ? 1.0 - exp(-t * 0.0026 * (0.6 + 0.8 * uMist))
+    : 0.20 * clamp(uMist * 0.6, 0.0, 1.0);
   col = mix(col, fogCol, clamp(fogAmt, 0.0, 1.0));
   col = mix(col, fogCol * 1.32, clamp(mist, 0.0, 0.92));
 
@@ -323,7 +349,7 @@ void main() {
   // Smoke replaces mist as the year turns.
   if (uMood > 0.01) {
     float smoke = fbm(vec2(rd.x * 3.0 + uTime * 0.03, rd.y * 3.0 - uTime * 0.018), 4);
-    col = mix(col, vec3(0.09, 0.045, 0.040), smoke * uMood * 0.30);
+    col = mix(col, vec3(0.09, 0.045, 0.040), smoke * uMood * (hit ? 0.30 : 0.14));
   }
 
   float ndc =

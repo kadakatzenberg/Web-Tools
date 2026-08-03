@@ -37,6 +37,7 @@ const keys: Array<keyof SceneState> = [
   'fracture',
   'goldPath',
   'dawn',
+  'celestial',
   'exposure',
   'bloom',
   'chroma',

@@ -76,6 +76,7 @@ export interface SceneState {
   fracture: number;
   goldPath: number;
   dawn: number;
+  celestial: number;
   exposure: number;
   bloom: number;
   chroma: number;
@@ -104,6 +105,7 @@ export function defaultState(): SceneState {
     fracture: 0,
     goldPath: 0,
     dawn: 1,
+    celestial: 0,
     exposure: 1.08,
     bloom: 0.55,
     chroma: 0.12,
@@ -405,6 +407,7 @@ export class Stage {
       uFracture: s.fracture,
       uGoldPath: s.goldPath,
       uDawn: s.dawn,
+      uCelestial: s.celestial,
     } satisfies Record<string, UniformValue>);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 3);

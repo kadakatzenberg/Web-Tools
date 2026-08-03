@@ -1,0 +1,5 @@
+{
+  "roles": [],
+  "generated": "2026-08-03",
+  "note": "Rewritten by `npm run photos`. Lists the photograph roles that have processed files in public/media/photos."
+}

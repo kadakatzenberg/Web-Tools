@@ -182,7 +182,7 @@
   flex-direction: column;
   gap: 0.14rem;
   font-family: var(--sans);
-  font-size: clamp(0.56rem, 0.5rem + 0.16vw, 0.66rem);
+  font-size: clamp(0.64rem, 0.58rem + 0.16vw, 0.72rem);
   letter-spacing: 0.28em;
   text-transform: uppercase;
   line-height: 1.1;
@@ -206,7 +206,7 @@
   gap: 0.55rem;
   padding: 0.62rem 0.95rem;
   font-family: var(--mono);
-  font-size: clamp(0.56rem, 0.5rem + 0.16vw, 0.66rem);
+  font-size: clamp(0.64rem, 0.58rem + 0.16vw, 0.72rem);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--fg-dim);
@@ -329,8 +329,8 @@
   flex-direction: column;
   gap: 0.2rem;
   font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.2em;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--fg-faint);
   line-height: 1.2;

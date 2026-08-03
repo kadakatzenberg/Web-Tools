@@ -1,3 +1,5 @@
+import { readFile, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
 /**
@@ -20,8 +22,63 @@ function htmlEnv(): Plugin {
   };
 }
 
+const PLACEHOLDER_CONTACT = 'REPLACE_WITH_CONTACT_TEAM_URL';
+
+/**
+ * A production build must never ship a call to action that goes nowhere. Every
+ * button on this page reads from one constant; if it is still the placeholder,
+ * the build stops. Preview builds can opt out with ALLOW_PLACEHOLDER_CONTACT.
+ */
+function contactGuard(): Plugin {
+  return {
+    name: 'contact-url-guard',
+    apply: 'build',
+    async buildStart() {
+      const source = await readFile(
+        fileURLToPath(new URL('./src/config.ts', import.meta.url)),
+        'utf8',
+      );
+      if (!source.includes(PLACEHOLDER_CONTACT)) return;
+      if (process.env.ALLOW_PLACEHOLDER_CONTACT === 'true') {
+        this.warn(
+          'CONTACT_TEAM_URL is still the placeholder. Building anyway because ' +
+            'ALLOW_PLACEHOLDER_CONTACT=true. Do not deploy this build to production.',
+        );
+        return;
+      }
+      this.error(
+        '\n\n  CONTACT_TEAM_URL has not been set.\n\n' +
+          '  Every call to action on this page points at src/config.ts. Replace\n' +
+          `  ${PLACEHOLDER_CONTACT} with the destination the China Excursion\n` +
+          '  team uses to take enquiries, then build again.\n\n' +
+          '  To build a preview with the placeholder in place, run:\n' +
+          '    ALLOW_PLACEHOLDER_CONTACT=true npm run build\n',
+      );
+    },
+  };
+}
+
+/**
+ * `public/photos/` is the drop folder for the client's original photographs, not
+ * a deploy folder. `npm run photos` reads from it and writes the processed sets
+ * into `public/media/photos/`. Vite copies `public/` verbatim, so the originals
+ * would otherwise be published at full size beside the versions the page uses.
+ */
+function stripPhotoSources(): Plugin {
+  return {
+    name: 'strip-photo-sources',
+    apply: 'build',
+    async closeBundle() {
+      await rm(fileURLToPath(new URL('./dist/photos', import.meta.url)), {
+        recursive: true,
+        force: true,
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [htmlEnv()],
+  plugins: [htmlEnv(), contactGuard(), stripPhotoSources()],
   build: {
     target: 'es2022',
     cssTarget: 'chrome100',

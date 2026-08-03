@@ -1,4 +1,4 @@
-import { cta, eyebrow } from '../ui';
+import { cta, eyebrow, photo } from '../ui';
 import { ticker } from '../core/ticker';
 import { stickyProgress } from '../core/scroll';
 import { clamp01, lerp, smoothstep } from '../gl/math';
@@ -180,6 +180,17 @@ export function timingMarkup(): string {
           bring their attention to something within their lives that must change.
         </p>
       </div>
+
+      <figure class="timing__witness" data-reveal="fade">
+        ${photo('meditation-stone', {
+          crop: 'wide',
+          sizes: '(max-width: 899px) 90vw, 42vw',
+        })}
+        <figcaption class="timing__witness-caption">
+          <span class="field-label">On the land</span>
+          At selected moments the group stops, and the place is allowed to do the rest.
+        </figcaption>
+      </figure>
 
       <ul class="responses" data-reveal>
         <li>Some people describe warmth moving through the body.</li>

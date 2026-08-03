@@ -47,6 +47,13 @@ export function initReveals(reducedMotion: boolean): void {
   });
 }
 
+/** Lights each photograph once, as it arrives. */
+export function initPhotoSweep(reducedMotion: boolean): void {
+  const photos = document.querySelectorAll<HTMLElement>('.photo');
+  if (reducedMotion) return;
+  photos.forEach((el) => onFirstView(el, () => el.classList.add('is-lit'), '0px'));
+}
+
 /** Runs a callback the first time an element is on screen. */
 export function onFirstView(el: Element, fn: () => void, rootMargin = '200px'): void {
   const io = new IntersectionObserver(

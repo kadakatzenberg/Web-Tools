@@ -4,11 +4,12 @@ import './styles/type.css';
 import './styles/components.css';
 import './styles/sections.css';
 
+import { warnIfContactUnset } from './config';
 import { detectCapabilities, onMotionPreferenceChange, pixelRatio } from './core/capabilities';
 import { ticker } from './core/ticker';
 import { initGrain } from './core/grain';
 import { initCursor, initMagnetic, initPointer } from './core/pointer';
-import { initReveals } from './core/reveal';
+import { initPhotoSweep, initReveals } from './core/reveal';
 import { initSmoothScroll, measureViewport, readScroll, viewport } from './core/scroll';
 import { Narrative } from './core/narrative';
 import { BEATS } from './core/beats';
@@ -73,6 +74,8 @@ document.body.innerHTML = `
   ${dockMarkup()}
 `;
 
+warnIfContactUnset();
+
 const preloader = initPreloader();
 let progress = 0;
 const advance = (to: number) => {
@@ -132,6 +135,7 @@ initWarning(capabilities.reducedMotion);
 initBloodGoat(narrative, capabilities.reducedMotion);
 initClosing(capabilities.reducedMotion);
 initReveals(capabilities.reducedMotion);
+initPhotoSweep(capabilities.reducedMotion);
 initMagnetic();
 if (capabilities.finePointer && !capabilities.reducedMotion) initCursor();
 initSmoothScroll(!capabilities.reducedMotion);

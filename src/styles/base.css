@@ -185,6 +185,10 @@ button {
 .page {
   position: relative;
   z-index: var(--z-content);
+  /* Instruments and annotations are allowed to paint past their boxes for the
+     sake of their glows. `clip` contains that horizontally without creating a
+     scroll container, so nothing can ever widen the document. */
+  overflow-x: clip;
 }
 
 .section {

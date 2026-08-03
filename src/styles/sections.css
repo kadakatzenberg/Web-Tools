@@ -215,7 +215,9 @@
 /* The range itself, rendered from the same shader as the live landscape. */
 .fallback__plate {
   position: absolute;
-  inset: -6% -4%;
+  /* Vertical headroom only. Horizontal movement comes from the scale below,
+     which paints wider without widening the document. */
+  inset: -8% 0;
   will-change: transform;
 }
 
@@ -513,7 +515,7 @@
 
 .annotation__label {
   font-family: var(--mono);
-  font-size: clamp(0.56rem, 0.5rem + 0.18vw, 0.68rem);
+  font-size: clamp(0.66rem, 0.6rem + 0.18vw, 0.74rem);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--acc-hi);
@@ -521,7 +523,7 @@
 
 .annotation__reading {
   font-family: var(--sans);
-  font-size: clamp(0.6rem, 0.55rem + 0.2vw, 0.72rem);
+  font-size: clamp(0.68rem, 0.62rem + 0.2vw, 0.78rem);
   font-stretch: 88%;
   color: var(--fg-faint);
   white-space: nowrap;
@@ -2236,5 +2238,357 @@
 
   .bloodgoat__stick {
     gap: clamp(2rem, 6vw, 3.5rem);
+  }
+}
+
+/* Standing marks, used while the numeric figures await confirmation. */
+.mark-stat__mark {
+  font-family: var(--serif);
+  font-size: var(--step-3);
+  font-weight: 300;
+  font-variation-settings: 'opsz' 40;
+  line-height: 1;
+  color: var(--acc-hi);
+  letter-spacing: -0.01em;
+}
+
+/* ===========================================================================
+   THE HUMAN LAYER
+   Photographs are never dropped into a plain rectangle. Each treatment gives
+   the image a different relationship to the page: torn from it, seen through
+   it, cut into it, or standing in front of it.
+   =========================================================================== */
+
+.photo {
+  position: relative;
+  display: block;
+}
+
+.photo .plate,
+.photo img {
+  display: block;
+  width: 100%;
+}
+
+/* A light that travels across the surface once as the image arrives. */
+.photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    104deg,
+    transparent 38%,
+    rgb(var(--acc-rgb) / 0.16) 48%,
+    rgb(255 255 255 / 0.12) 52%,
+    transparent 62%
+  );
+  opacity: 0;
+  translate: -18% 0;
+  transition:
+    opacity 900ms var(--ease-out),
+    translate 1900ms var(--ease-heavy);
+}
+
+.photo.is-lit::after {
+  opacity: 1;
+  translate: 18% 0;
+}
+
+/* --- ink: torn from the page ---------------------------------------------- */
+
+.photo--ink .plate {
+  /* A displaced edge, so the image reads as pulled off wet paper rather than
+     cut with a knife. */
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.022 0.05' numOctaves='4' seed='7'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='11'/%3E%3C/filter%3E%3Crect x='2' y='2' width='96' height='96' fill='%23fff' filter='url(%23t)'/%3E%3C/svg%3E");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.photo--ink::before {
+  content: '';
+  position: absolute;
+  inset: -6% 0;
+  z-index: -1;
+  background: radial-gradient(60% 50% at 50% 50%, rgb(var(--acc-rgb) / 0.08), transparent 72%);
+}
+
+/* --- aperture: seen through an opening ------------------------------------ */
+
+.photo--aperture .plate {
+  mask-image: radial-gradient(
+    68% 74% at 50% 48%,
+    #000 0%,
+    #000 56%,
+    rgb(0 0 0 / 0.55) 78%,
+    transparent 100%
+  );
+}
+
+.photo--aperture::before {
+  content: '';
+  position: absolute;
+  inset: 8% 6%;
+  border: 1px solid rgb(var(--acc-rgb) / 0.28);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+/* --- strip: a documentary fragment ---------------------------------------- */
+
+.photo--strip {
+  overflow: hidden;
+}
+
+.photo--strip .plate {
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
+.photo--strip::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgb(var(--acc-rgb) / 0.6), transparent);
+}
+
+/* --- field: an observation, framed like a plate in a notebook -------------- */
+
+.photo--field {
+  padding: clamp(0.4rem, 1vw, 0.7rem);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(9 11 16 / 0.4);
+}
+
+.photo--field::before {
+  content: '';
+  position: absolute;
+  inset: clamp(0.4rem, 1vw, 0.7rem);
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgb(var(--acc-rgb) / 0.14);
+}
+
+/* --- cutout: a person standing in the landscape --------------------------- */
+
+.photo--cutout {
+  filter: drop-shadow(0 30px 60px rgb(0 0 0 / 0.65));
+}
+
+.photo--cutout .plate,
+.photo--cutout img {
+  background: none;
+}
+
+.photo--cutout::after {
+  display: none;
+}
+
+/* --- stele: cut into the rock --------------------------------------------- */
+
+.photo--stele .plate {
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+}
+
+.photo--stele {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 24px 60px -30px rgb(0 0 0 / 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo::after {
+    transition: none;
+  }
+}
+
+/* Each chapter holds a different shape, so the passage never reads as six
+   variants of one frame. */
+.chapter--landscape .chapter__media {
+  aspect-ratio: 16 / 10;
+}
+
+.chapter--portrait .chapter__media {
+  aspect-ratio: 4 / 5;
+}
+
+.chapter--square .chapter__media {
+  aspect-ratio: 1;
+}
+
+.chapter--tall .chapter__media {
+  aspect-ratio: 3 / 4;
+}
+
+.chapter--portrait,
+.chapter--tall {
+  flex-basis: min(30vw, 24rem);
+}
+
+.chapter--square {
+  align-self: flex-end;
+}
+
+.chapter--tall {
+  align-self: flex-start;
+}
+
+.chapter__media .photo {
+  width: 100%;
+  height: 100%;
+}
+
+.chapter__media .photo .plate,
+.chapter__media .photo img {
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 899px) {
+  .chapter--portrait,
+  .chapter--tall,
+  .chapter--square {
+    flex-basis: auto;
+    align-self: auto;
+  }
+}
+
+/* Joey standing in the landscape, at the scale the range gives him. */
+.guide__figure--peopled {
+  position: relative;
+}
+
+.guide__standing {
+  position: absolute;
+  left: clamp(4%, 6vw, 10%);
+  bottom: -2%;
+  z-index: 2;
+  width: clamp(6rem, 15vw, 13rem);
+  pointer-events: none;
+}
+
+.guide__standing .photo {
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .guide__standing {
+    width: 6.5rem;
+    left: 4%;
+  }
+}
+
+/* The witness image at the spiritual centre. Quiet, wide, and set apart. */
+.timing__witness {
+  margin: clamp(1.4rem, 3vw, 2.4rem) 0 0;
+  max-width: 44rem;
+}
+
+.timing__witness-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  font-stretch: 90%;
+  color: var(--fg-dim);
+  max-width: 40ch;
+}
+
+.voices__gathering {
+  margin: clamp(1.2rem, 3vw, 2rem) 0 0;
+}
+
+.voices__gathering figcaption {
+  margin-top: 0.7rem;
+  color: var(--fg-faint);
+}
+
+/* The chapter passage carries dense reading, so it gets a controlled ground
+   rather than whatever the landscape happens to be doing behind it. */
+.experience__ground {
+  position: absolute;
+  /* No horizontal bleed: the sticky track drops its clip on mobile, so any
+     sideways overhang would become document overflow. */
+  inset: -10% 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 50% 50%, rgb(6 7 10 / 0.5) 0%, rgb(6 7 10 / 0.86) 70%),
+    linear-gradient(to bottom, rgb(6 7 10 / 0.88) 0%, rgb(6 7 10 / 0.62) 40%, rgb(6 7 10 / 0.9) 100%);
+}
+
+.chapter__text {
+  position: relative;
+}
+
+/* A short, soft backing directly under the chapter copy keeps it readable at
+   any point of the camera move without flattening the frame. */
+.chapter__text::before {
+  content: '';
+  position: absolute;
+  /* The sideways bleed is only safe while the chapters sit in the clipped
+     horizontal track. Once they stack it is removed, see below. */
+  inset: -0.6rem -1rem -1rem;
+  z-index: -1;
+  background: linear-gradient(to bottom, rgb(6 7 10 / 0.72), rgb(6 7 10 / 0.42));
+  border-radius: 2px;
+}
+
+/* Field annotations sit directly on the moving landscape, so each one carries
+   a small ground of its own rather than relying on whatever is behind it. */
+.annotation__text {
+  padding: 0.3rem 0.55rem;
+  background: linear-gradient(100deg, rgb(6 7 10 / 0.82), rgb(6 7 10 / 0.5));
+  border-left: 1px solid rgb(var(--acc-rgb) / 0.4);
+}
+
+/* The lede and the closing lines are the two places where type is largest and
+   the landscape busiest. A soft shadow keeps the edge of every letter. */
+.lede,
+.display--xl,
+.display--l,
+.turn__big,
+.timing__climax {
+  text-shadow: 0 2px 26px rgb(4 5 8 / 0.55);
+}
+
+@media (max-width: 767px) {
+  /* Mobile reads at arm's length in daylight. Everything over the landscape
+     gets a stronger ground than the desktop composition needs. */
+  .scrim--full {
+    background: radial-gradient(
+      ellipse 140% 100% at 50% 50%,
+      rgb(6 7 10 / 0.92) 0%,
+      rgb(6 7 10 / 0.78) 55%,
+      rgb(6 7 10 / 0.42) 100%
+    );
+  }
+
+  .scrim--bottom {
+    background: linear-gradient(
+      to top,
+      rgb(6 7 10 / 0.96) 0%,
+      rgb(6 7 10 / 0.78) 45%,
+      rgb(6 7 10 / 0.3) 90%
+    );
+  }
+
+  .prose,
+  .verse,
+  .responses li {
+    color: var(--fg-hi);
+  }
+
+  .note,
+  .cta-note {
+    color: var(--fg-dim);
+  }
+}
+
+@media (max-width: 899px) {
+  .chapter__text::before {
+    inset: -0.6rem 0 -1rem;
   }
 }

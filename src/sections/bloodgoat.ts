@@ -1,4 +1,4 @@
-import { cta, eyebrow, splitChars } from '../ui';
+import { cta, eyebrow, splitPhrase } from '../ui';
 import { ticker } from '../core/ticker';
 import { stickyProgress } from '../core/scroll';
 import { clamp01, lerp, smoothstep } from '../gl/math';
@@ -30,12 +30,13 @@ export function bloodgoatMarkup(): string {
       ${eyebrow('2027', '09')}
       <h2 class="display display--l bloodgoat__title" id="bloodgoat-title" data-reveal>
         <span class="visually-hidden">The Blood Goat is coming</span>
-        <span class="kinetic-line" aria-hidden="true" id="bloodgoat-kinetic">${splitChars(
-          'The Blood Goat',
-        )}</span>
-        <span class="kinetic-line kinetic-line--second" aria-hidden="true">${splitChars(
+        <span class="kinetic-line" aria-hidden="true" id="bloodgoat-kinetic">${splitPhrase([
+          'The',
+          'Blood Goat',
+        ])}</span>
+        <span class="kinetic-line kinetic-line--second" aria-hidden="true">${splitPhrase([
           'is coming',
-        )}</span>
+        ])}</span>
       </h2>
 
       <div class="prose bloodgoat__prose" data-reveal>

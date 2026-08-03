@@ -25,7 +25,19 @@ once wires all ten of them. When the value points at another origin the links
 automatically open in a new tab; while it is a placeholder they stay in the same
 tab.
 
-Nothing else is required to go live.
+**A production build refuses to run while the placeholder is in place.** The
+build stops with an explanation rather than shipping calls to action that lead
+nowhere. To build a preview anyway:
+
+```bash
+ALLOW_PLACEHOLDER_CONTACT=true npm run build
+```
+
+During development an unmissable red banner says the same thing. It never
+reaches a visitor, because the build guard stops that build first.
+
+Two other things are worth reviewing before launch, both covered below: the
+photographs, and the authority figures in the guide section.
 
 ---
 
@@ -41,6 +53,7 @@ npm run preview # serve the production build on http://127.0.0.1:4173
 Authoring commands, only needed when the artwork changes:
 
 ```bash
+npm run photos  # process client photographs in public/photos into the page
 npm run plates  # re-render the still plates and social card from the shader
 npm run zip     # package the project as china-excursion-2026.zip
 ```
@@ -157,10 +170,36 @@ nothing that carries meaning lives only on the canvas. Sound is off until asked
 for, and the toggle reports its state through `aria-pressed` and a text label.
 There are no rapid flashes anywhere on the page.
 
-### Imagery
+### Two layers of imagery
 
-Every image in `public/media` is generated from the project's own shader by
-`npm run plates`, then graded, grained and written as responsive AVIF and WebP.
+The page is built from a mythic layer and a human layer, and the relationship
+between them is the design.
+
+**The mythic layer** is the procedural landscape: the live shader, and the still
+plates in `public/media` captured from it by `npm run plates`, then graded,
+grained and written as responsive AVIF and WebP. It carries atmosphere and
+continuity.
+
+**The human layer** is photography, and it carries belief. `src/content/photos.ts`
+declares one role per photograph the page wants, with the crops, treatment and
+grade each position needs. Drop the source files into `public/photos/` and run
+`npm run photos`; the script produces every crop at every width, grades it to the
+page palette, lays in grain, and records what it found in
+`src/content/photo-manifest.json`.
+
+Roles with no source file fall back to the procedural plate declared beside
+them, so the page is complete at every stage of the shoot clearance process and
+never shows a broken image. `ASSET_SOURCES.md` lists the file names, what each
+photograph shows, and where it appears.
+
+Photographs are never dropped into a plain rectangle. Six treatments give each
+one a different relationship to the page: `ink` tears it from wet paper,
+`aperture` looks through an opening, `strip` is a documentary fragment, `field`
+frames it like a plate in a notebook, `cutout` composites a person into the
+landscape, and `stele` cuts it into rock. Each of the six journey chapters uses a
+different treatment, a different frame proportion and a different emotional
+register, alternating between the two layers.
+
 Nothing is fetched from another origin at runtime. Images below the first
 viewport are lazy loaded.
 
@@ -173,6 +212,15 @@ The wording follows the approved brief in British English. The page carries no
 price, no seat count, no deadline, no invented inclusions and no assured
 outcome. Where participant responses are described they are unattributed and
 qualified.
+
+**Authority figures.** `src/content/authority.ts` holds two tiers. The tier that
+renders by default describes Joey Yap's standing in terms that do not depend on a
+number: founder of the Mastery Academy, the conferred title, the body of
+published work, the field study behind it. The numeric tier — students taught,
+countries reached, years, books published — is present but switched off, because
+those figures could not be checked against an official page and independent
+sources carried materially different numbers. Confirm each one, correct any that
+have moved, then set `FIGURES_CONFIRMED` to true.
 
 `src/content/testimonials.ts` holds an empty, documented list for named
 accounts. Add entries there only when the exact wording and attribution have
