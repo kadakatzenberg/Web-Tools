@@ -1,0 +1,13 @@
+{
+  "name": "Joey Yap's China Excursion 2026",
+  "short_name": "China Excursion",
+  "description": "Walk The Dragon. Six days in the mountains of China with Dato' Joey Yap, 10 to 15 September 2026.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06070A",
+  "theme_color": "#06070A",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

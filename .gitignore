@@ -1,9 +1,6 @@
-node_modules/
-dist/
-.env
-.env.*
-!.env.example
-test-results/
-playwright-report/
+node_modules
 .DS_Store
 *.local
+.vite
+.netlify
+scripts/.cache

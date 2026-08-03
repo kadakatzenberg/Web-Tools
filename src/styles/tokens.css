@@ -1,251 +1,106 @@
-/**
- * Hei Mao — The Living War Table
- *
- * The interface is a lacquered campaign table seen by candlelight: black
- * ground, hairline metal inlay, carved panels, and vermilion seals. Colour is
- * pigment, not decoration — each hue means one thing and means it everywhere.
- *
- * Three rules hold the system together:
- *
- *   1. Material before ornament. Depth comes from carved edges (a light top
- *      rule, a dark bottom rule) rather than drop shadows or blur. Large
- *      blurred surfaces are avoided outright — they cost GPU on tablets and
- *      read as generic glass.
- *   2. Pigment carries one meaning. Jade is the player side, cinnabar the
- *      enemy side, candle the environment. Health bands, rank marks, and
- *      status severity each have their own scale that never borrows another's.
- *   3. Colour is never the only signal. Every state that matters also carries
- *      a glyph, a rule weight, a fill pattern, or a position change.
- */
+/* ---------------------------------------------------------------------------
+   Palette, type scale and rhythm.
+
+   Three palettes live in one system. `--acc-*` are the accent tokens that the
+   narrative moves through: ceremonial gold at the opening, crimson through the
+   Blood Goat passage, gold again at the resolution. Sections opt into the
+   contaminated palette with the `is-contaminated` class rather than by
+   overwriting the base tokens, so a section can never be left stranded in the
+   wrong palette.
+   --------------------------------------------------------------------------- */
 
 :root {
-  color-scheme: dark;
+  /* Opening palette */
+  --ink: #06070a;
+  --ink-2: #090b10;
+  --charcoal: #10131a;
+  --charcoal-2: #171b23;
+  --mineral: #262b33;
+  --mineral-2: #39414b;
+  --slate: #6d7681;
+  --mist: #c3cbd0;
+  --mist-hi: #eef2f3;
+  --parchment: #e5dbc7;
+  --parchment-2: #cbbfa6;
+  --parchment-dim: #9e937d;
+  --jade: #0d2a25;
+  --jade-2: #14453a;
+  --jade-lit: #2f7a66;
+  --gold: #c9a24a;
+  --gold-hi: #ecd396;
+  --gold-dim: #7f6a30;
 
-  /* ══ Ground: lacquer over ink ══
-     Six steps, each a real surface in the hierarchy rather than an arbitrary
-     shade. Named for what they are so usage stays honest. */
-  --void: #030308;        /* behind everything; the room the table sits in */
-  --table: #07070e;       /* the table itself */
-  --panel: #0c0c16;       /* a carved panel resting on the table */
-  --panel-high: #12121f;  /* a raised panel, or a panel under the cursor */
-  --inlay: #05050c;       /* recessed: inputs, wells, tracks */
-  --rail: #090911;        /* the command rails framing the workspace */
+  /* Blood Goat palette */
+  --blood: #5f0d11;
+  --blood-2: #38080b;
+  --crimson: #a3161d;
+  --crimson-lit: #cf3630;
+  --ember: #de5a20;
+  --ash: #bcb5aa;
+  --ash-dim: #6e6a63;
 
-  /* Legacy aliases — earlier stylesheets reference these names. */
-  --lacquer-900: var(--void);
-  --lacquer-850: var(--table);
-  --lacquer-800: var(--panel);
-  --lacquer-700: var(--panel-high);
-  --lacquer-600: #171726;
-  --lacquer-500: #1f1f32;
+  /* Narrative accent, swapped by the contamination pass */
+  --acc: var(--gold);
+  --acc-hi: var(--gold-hi);
+  --acc-dim: var(--gold-dim);
+  --acc-rgb: 201 162 74;
 
-  /* ══ Structure: brushed metal inlay ══ */
-  --metal-800: #17172a;
-  --metal-700: #21213a;
-  --metal-600: #2e2e4c;
-  --metal-500: #414166;
-  --metal-400: #5a5a80;
-  --metal-300: #7a7aa0;
+  /* Text */
+  --fg: #ddd8ce;
+  --fg-hi: #f4f1ea;
+  --fg-dim: #9aa1a8;
+  --fg-faint: #7d858e;
 
-  /* ══ Text: bone, ash, smoke ══ */
-  --bone: #f0ebe0;
-  --ash: #bdb8ae;
-  --smoke: #8b8794;
-  /* Raised from #63606e, which sat at 3.0–3.3:1 against the panel grounds and
-     failed AA everywhere it was used for text — rank labels, detail tabs, the
-     command-bar chips. It now clears 4.5:1 on every surface in the ramp. */
-  --faint: #817a90;
+  /* Type families */
+  --serif: 'Newsreader Variable', 'Newsreader', Georgia, 'Times New Roman', serif;
+  --sans: 'Archivo Variable', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Roboto Mono Variable', 'Roboto Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
-  /* ══ Pigments ══ */
-  --jade: #4ecf9a;
-  --jade-bright: #7ee8bc;
-  --jade-dim: #2f8f68;
-  --jade-deep: #124532;
-  --jade-glow: rgba(78, 207, 154, 0.32);
+  /* Fluid type, tuned between 390px and 1440px viewports */
+  --step--2: clamp(0.688rem, 0.66rem + 0.11vw, 0.75rem);
+  --step--1: clamp(0.8rem, 0.76rem + 0.17vw, 0.9rem);
+  --step-0: clamp(0.95rem, 0.9rem + 0.22vw, 1.075rem);
+  --step-1: clamp(1.1rem, 1.02rem + 0.36vw, 1.32rem);
+  --step-2: clamp(1.35rem, 1.19rem + 0.68vw, 1.75rem);
+  --step-3: clamp(1.65rem, 1.36rem + 1.24vw, 2.4rem);
+  --step-4: clamp(2rem, 1.5rem + 2.14vw, 3.3rem);
+  --step-5: clamp(2.4rem, 1.55rem + 3.63vw, 4.6rem);
+  --step-6: clamp(2.9rem, 1.5rem + 5.98vw, 6.5rem);
+  --step-7: clamp(3.4rem, 1.1rem + 9.83vw, 9.4rem);
 
-  --cinnabar: #e6584a;
-  --cinnabar-bright: #ff8375;
-  --cinnabar-dim: #9c2e24;
-  --cinnabar-deep: #4a1310;
-  --cinnabar-glow: rgba(230, 88, 74, 0.32);
+  /* Rhythm */
+  --gutter: clamp(1.25rem, 0.9rem + 1.5vw, 2.5rem);
+  --measure: 62ch;
+  --section-pad: clamp(5rem, 3rem + 9vw, 11rem);
+  --rule: 1px solid rgb(255 255 255 / 0.08);
 
-  --candle: #eeb043;
-  --candle-bright: #ffcd78;
-  --candle-dim: #9a6a1a;
-  --candle-deep: #452c07;
-  --candle-glow: rgba(238, 176, 67, 0.3);
-
-  /* ══ Supernatural accents ══ */
-  --moonlit: #74a9ea;
-  --moonlit-dim: #33598f;
-  --violet: #a487ea;
-  --violet-dim: #5a4494;
-  --seal: #cf3b30;        /* the vermilion of a stamped chop */
-  --seal-deep: #7d1e17;
-
-  /* ══ Semantic ══ */
-  --danger: var(--cinnabar);
-  --warn: var(--candle);
-  --ok: var(--jade);
-  --shield: var(--moonlit);
-  --shield-temp: #7fd0e8;
-
-  /* ══ Health bands ══
-     Four steps down a single warming ramp, so the direction of travel reads
-     even for a viewer who cannot separate the hues. Each band also carries a
-     glyph and a distinct bar fill pattern. */
-  --hp-healthy: #4ecf9a;
-  --hp-wounded: #eeb043;
-  --hp-critical: #f2762c;
-  --hp-down: #a63a30;
-
-  /* ══ Rank ══
-     Combatant standing. Players and enemies never share a mark, and the three
-     enemy tiers escalate in weight as well as hue. */
-  --rank-player: var(--jade);
-  --rank-ally: var(--moonlit);
-  --rank-normal: var(--cinnabar);
-  --rank-elite: var(--candle);
-  --rank-boss: var(--violet);
-  --rank-neutral: var(--smoke);
-  --rank-down: var(--faint);
-
-  /* ══ Phase pigment: reassigned wholesale on [data-phase] ══ */
-  --phase: var(--jade);
-  --phase-bright: var(--jade-bright);
-  --phase-dim: var(--jade-dim);
-  --phase-deep: var(--jade-deep);
-  --phase-glow: var(--jade-glow);
-
-  /* ══ Type ══
-     Carved display for ceremony, engineered sans for operation. The serif is
-     kept for prose only — it is a poor face for dense numeric data, which is
-     most of this interface. */
-  --font-display: "Cinzel", "Iowan Old Style", Georgia, serif;
-  --font-ui: "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif,
-    system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-prose: "Noto Serif", Georgia, "Times New Roman", serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --font-body: var(--font-ui); /* legacy alias */
-
-  --fs-2xs: 0.625rem;   /* 10px — eyebrow caps only, never prose */
-  --fs-xs: 0.6875rem;   /* 11px */
-  --fs-sm: 0.75rem;     /* 12px */
-  --fs-md: 0.8125rem;   /* 13px */
-  --fs-base: 0.875rem;  /* 14px */
-  --fs-lg: 1rem;
-  --fs-xl: 1.25rem;
-  --fs-2xl: 1.625rem;
-  --fs-3xl: 2.25rem;
-  --fs-hero: 3rem;
-
-  /* ══ Space: 4px rhythm ══ */
-  --s1: 0.25rem;
-  --s2: 0.5rem;
-  --s3: 0.75rem;
-  --s4: 1rem;
-  --s5: 1.5rem;
-  --s6: 2rem;
-  --s7: 3rem;
-
-  /* ══ Form ══
-     Small radii throughout. Lacquered panels have cut edges, not pillows. */
-  --r-sm: 3px;
-  --r-md: 5px;
-  --r-lg: 8px;
-  --r-xl: 12px;
-
-  --border: 1px solid var(--metal-700);
-  --border-strong: 1px solid var(--metal-500);
-  --hairline: 1px solid var(--metal-800);
-
-  /* ══ Depth ══
-     A carved edge is a light rule above and a dark rule below. Shadows are
-     used only where something genuinely floats. */
-  --carve: inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.6);
-  --carve-deep: inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    inset 0 2px 6px rgba(0, 0, 0, 0.7);
-  --inset-carve: var(--carve); /* legacy alias */
-
-  --lift-1: 0 1px 2px rgba(0, 0, 0, 0.6);
-  --lift-2: 0 6px 18px rgba(0, 0, 0, 0.5);
-  --lift-3: 0 18px 48px rgba(0, 0, 0, 0.62);
-
-  /* ══ Motion ══
-     Four intents. Anything that does not fit one of these should not animate. */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-snap: cubic-bezier(0.34, 1.4, 0.64, 1);
-  --ease-ink: cubic-bezier(0.16, 0.84, 0.28, 1);
+  --ease-heavy: cubic-bezier(0.22, 0.61, 0.24, 1);
+  --dur-1: 320ms;
+  --dur-2: 620ms;
+  --dur-3: 1100ms;
+  --dur-4: 1800ms;
 
-  --t-instant: 70ms;
-  --t-fast: 120ms;
-  --t-base: 200ms;
-  --t-slow: 380ms;
-  --t-phase: 620ms;
-  --t-meter: 520ms; /* health easing toward its new value */
-
-  /* ══ Layering ══ */
-  --z-atmos: 0;
-  --z-content: 1;
-  --z-rail: 15;
-  --z-sticky: 20;
-  --z-overlay: 60;
-  --z-modal: 100;
-  --z-toast: 140;
-
-  --tap: 44px;
-
-  /* ══ Shell metrics ══ */
-  --rail-w: 258px;
-  --context-w: 320px;
-  --bar-h: 56px;
+  /* Depth */
+  --z-gl: 0;
+  --z-content: 2;
+  --z-veil: 60;
+  --z-chrome: 70;
+  --z-cursor: 90;
+  --z-preloader: 100;
 }
 
-/* Phase pigment swaps every accent in one assignment. */
-[data-phase="0"] {
-  --phase: var(--jade);
-  --phase-bright: var(--jade-bright);
-  --phase-dim: var(--jade-dim);
-  --phase-deep: var(--jade-deep);
-  --phase-glow: var(--jade-glow);
-}
-[data-phase="1"] {
-  --phase: var(--cinnabar);
-  --phase-bright: var(--cinnabar-bright);
-  --phase-dim: var(--cinnabar-dim);
-  --phase-deep: var(--cinnabar-deep);
-  --phase-glow: var(--cinnabar-glow);
-}
-[data-phase="2"] {
-  --phase: var(--candle);
-  --phase-bright: var(--candle-bright);
-  --phase-dim: var(--candle-dim);
-  --phase-deep: var(--candle-deep);
-  --phase-glow: var(--candle-glow);
-}
-
-/**
- * Reduced motion collapses durations to nothing but leaves every state change
- * visible — the point is to remove movement, not feedback.
- */
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --t-instant: 1ms;
-    --t-fast: 1ms;
-    --t-base: 1ms;
-    --t-slow: 1ms;
-    --t-phase: 1ms;
-    --t-meter: 1ms;
-  }
-}
-
-[data-motion="reduced"] {
-  --t-instant: 1ms;
-  --t-fast: 1ms;
-  --t-base: 1ms;
-  --t-slow: 1ms;
-  --t-phase: 1ms;
-  --t-meter: 1ms;
+/* The contaminated palette. Applied to sections 10 and 11 and to the page
+   chrome while they hold the viewport. */
+.is-contaminated {
+  --acc: #e05a50;
+  --acc-hi: #f3796c;
+  --acc-dim: #6d1013;
+  --acc-rgb: 224 90 80;
+  --fg: #d9d1c9;
+  --fg-hi: #f6ece6;
+  --fg-dim: #aca097;
+  --fg-faint: #8b8079;
 }

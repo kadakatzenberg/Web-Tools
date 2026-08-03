@@ -1,0 +1,89 @@
+import { eyebrow } from '../ui';
+import { RESPONSES, TESTIMONIALS } from '../content/testimonials';
+import { ticker } from '../core/ticker';
+import { elementProgress } from '../core/scroll';
+import { clamp01 } from '../gl/math';
+
+/** A soft, slowly breathing trace behind each account. */
+function waveform(seed: number): string {
+  const points: string[] = [];
+  const steps = 96;
+  for (let i = 0; i <= steps; i++) {
+    const x = (i / steps) * 320;
+    const envelope = Math.sin((i / steps) * Math.PI);
+    const a = Math.sin(i * 0.31 + seed * 1.7) * 9;
+    const b = Math.sin(i * 0.71 + seed * 3.1) * 5;
+    const c = Math.sin(i * 1.43 + seed * 0.9) * 2.5;
+    const y = 20 + (a + b + c) * envelope * 0.55;
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  return points.join(' ');
+}
+
+export function voicesMarkup(): string {
+  const attributed = TESTIMONIALS.map((item, index) => {
+    const body = item.quote
+      ? `<blockquote class="voice__quote"><p>&ldquo;${item.quote}&rdquo;</p></blockquote>`
+      : `<p class="voice__quote voice__quote--account">${item.account ?? ''}</p>`;
+    return `
+      <li class="voice voice--named" data-voice="${index}">
+        <svg class="voice__wave" viewBox="0 0 320 40" aria-hidden="true" focusable="false">
+          <polyline points="${waveform(index)}" fill="none" stroke="currentColor" stroke-width="0.8" />
+        </svg>
+        <figure>
+          ${body}
+          <figcaption class="voice__by">
+            <span class="voice__name">${item.name}</span>
+            ${item.location ? `<span class="voice__place">${item.location}</span>` : ''}
+          </figcaption>
+        </figure>
+      </li>`;
+  }).join('');
+
+  const responses = RESPONSES.map(
+    (item, index) => `
+    <li class="voice" data-voice="${TESTIMONIALS.length + index}" style="--depth:${
+      (index % 3) / 2
+    }">
+      <svg class="voice__wave" viewBox="0 0 320 40" aria-hidden="true" focusable="false">
+        <polyline points="${waveform(index + 7)}" fill="none" stroke="currentColor" stroke-width="0.8" />
+      </svg>
+      <p class="voice__register field-label">${item.register}</p>
+      <p class="voice__line">${item.line}</p>
+    </li>`,
+  ).join('');
+
+  return `
+  <section class="section section--voices" id="voices" aria-labelledby="voices-title">
+    <div class="scrim scrim--full" aria-hidden="true"></div>
+    <div class="shell voices__grid">
+      <div class="voices__head">
+        ${eyebrow('On the land', '06')}
+        <h2 class="display display--m" id="voices-title" data-reveal>
+          What people felt on the land
+        </h2>
+        <p class="note" data-reveal>
+          Accounts gathered from previous excursions. Experiences differ, and no particular
+          response is assured.
+        </p>
+      </div>
+      <ul class="voices" id="voices-list">${attributed}${responses}</ul>
+    </div>
+  </section>`;
+}
+
+export function initVoices(reducedMotion: boolean): void {
+  const section = document.getElementById('voices');
+  const list = document.getElementById('voices-list');
+  if (!section || !list || reducedMotion) return;
+  const items = Array.from(list.querySelectorAll<HTMLElement>('.voice'));
+
+  ticker.add(() => {
+    const p = elementProgress(section);
+    items.forEach((item, index) => {
+      const start = 0.12 + index * 0.075;
+      const local = clamp01((p - start) / 0.2);
+      item.style.setProperty('--emerge', local.toFixed(3));
+    });
+  });
+}

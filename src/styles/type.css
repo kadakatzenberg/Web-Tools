@@ -1,0 +1,214 @@
+@font-face {
+  font-family: 'Newsreader Variable';
+  src: url('/fonts/newsreader-variable-latin.woff2') format('woff2-variations');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Archivo Variable';
+  src: url('/fonts/archivo-variable-latin.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Roboto Mono Variable';
+  src: url('/fonts/roboto-mono-variable-latin.woff2') format('woff2-variations');
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+
+/* --- Editorial display ---------------------------------------------------- */
+
+.display {
+  font-family: var(--serif);
+  font-weight: 300;
+  line-height: 0.94;
+  letter-spacing: -0.022em;
+  color: var(--fg-hi);
+  text-wrap: balance;
+  /* Optical size is driven upward on large display sizes so the serifs stay
+     fine rather than turning into text-grade slabs. */
+  font-variation-settings: 'opsz' 60;
+}
+
+.display--xl {
+  font-size: var(--step-7);
+  font-variation-settings: 'opsz' 72;
+}
+
+.display--l {
+  font-size: var(--step-6);
+  font-variation-settings: 'opsz' 66;
+}
+
+.display--m {
+  font-size: var(--step-5);
+  font-variation-settings: 'opsz' 52;
+}
+
+.display--s {
+  font-size: var(--step-4);
+  font-variation-settings: 'opsz' 40;
+  line-height: 1.02;
+}
+
+.display em {
+  font-style: normal;
+  color: var(--acc-hi);
+  font-variation-settings: 'opsz' 72, 'wght' 260;
+}
+
+/* --- Section labelling ---------------------------------------------------- */
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: var(--step--2);
+  font-weight: 400;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--acc);
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+}
+
+.eyebrow::before {
+  content: '';
+  width: clamp(1.5rem, 4vw, 3.5rem);
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+  flex: none;
+}
+
+.kicker {
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  font-weight: 500;
+  font-stretch: 88%;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+/* --- Body ----------------------------------------------------------------- */
+
+.prose {
+  max-width: var(--measure);
+  font-size: var(--step-1);
+  line-height: 1.68;
+  color: var(--fg);
+}
+
+.prose > * + * {
+  margin-top: 1.15em;
+}
+
+.prose--tight > * + * {
+  margin-top: 0.5em;
+}
+
+.prose strong {
+  font-weight: 500;
+  color: var(--fg-hi);
+}
+
+.lede {
+  font-size: var(--step-2);
+  line-height: 1.44;
+  color: var(--fg-hi);
+  font-weight: 300;
+  font-variation-settings: 'opsz' 32;
+  max-width: 34ch;
+}
+
+/* Verse-like passages: the brief's copy breaks to short lines in places, and
+   those breaks carry the pacing. */
+.verse {
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  line-height: 1.34;
+  color: var(--fg-hi);
+  font-weight: 300;
+  font-variation-settings: 'opsz' 36;
+}
+
+.verse span {
+  display: block;
+}
+
+.verse span + span {
+  margin-top: 0.18em;
+}
+
+.note {
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  font-stretch: 92%;
+  letter-spacing: 0.02em;
+  color: var(--fg-faint);
+  max-width: 44ch;
+}
+
+.field-label {
+  font-family: var(--mono);
+  font-size: clamp(0.56rem, 0.5rem + 0.2vw, 0.68rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+
+.numeral {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 72;
+  font-weight: 200;
+  line-height: 1;
+  color: var(--fg-hi);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* --- Character marks ------------------------------------------------------ */
+
+.glyph {
+  width: 1em;
+  height: 0.97em;
+  fill: currentColor;
+}
+
+.glyph-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--acc);
+}
+
+/* --- Kinetic type used through the contamination and climax --------------- */
+
+.kinetic {
+  display: inline-block;
+  will-change: transform, font-variation-settings;
+}
+
+.char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kinetic,
+  .char {
+    will-change: auto;
+  }
+}
