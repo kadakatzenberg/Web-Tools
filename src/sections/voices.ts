@@ -1,7 +1,7 @@
-import { eyebrow, photo } from '../ui';
+import { eyebrow, hasPhoto, photo } from '../ui';
 import { RESPONSES, TESTIMONIALS } from '../content/testimonials';
 import { ticker } from '../core/ticker';
-import { elementProgress } from '../core/scroll';
+import { viewport } from '../core/scroll';
 import { clamp01 } from '../gl/math';
 
 /** A soft, slowly breathing trace behind each account. */
@@ -34,7 +34,12 @@ export function voicesMarkup(): string {
           ${body}
           <figcaption class="voice__by">
             <span class="voice__name">${item.name}</span>
-            ${item.location ? `<span class="voice__place">${item.location}</span>` : ''}
+            ${
+              [item.location, item.excursion]
+                .filter(Boolean)
+                .map((part) => `<span class="voice__place">${part}</span>`)
+                .join('')
+            }
           </figcaption>
         </figure>
       </li>`;
@@ -66,10 +71,16 @@ export function voicesMarkup(): string {
           Accounts gathered from previous excursions. Experiences differ, and no particular
           response is assured.
         </p>
-        <figure class="voices__gathering" data-reveal="fade">
+        ${
+          // "Previous excursion" is a documentary claim. It may only sit under
+          // an actual photograph, never under the procedural stand-in.
+          hasPhoto('group-temple')
+            ? `<figure class="voices__gathering" data-reveal="fade">
           ${photo('group-temple', { crop: 'wide', sizes: '(max-width: 1023px) 90vw, 30vw' })}
           <figcaption class="field-label">Previous excursion</figcaption>
-        </figure>
+        </figure>`
+            : ''
+        }
       </div>
       <ul class="voices" id="voices-list">${attributed}${responses}</ul>
     </div>
@@ -77,16 +88,18 @@ export function voicesMarkup(): string {
 }
 
 export function initVoices(reducedMotion: boolean): void {
-  const section = document.getElementById('voices');
   const list = document.getElementById('voices-list');
-  if (!section || !list || reducedMotion) return;
+  if (!list || reducedMotion) return;
   const items = Array.from(list.querySelectorAll<HTMLElement>('.voice'));
 
   ticker.add(() => {
-    const p = elementProgress(section);
-    items.forEach((item, index) => {
-      const start = 0.12 + index * 0.075;
-      const local = clamp01((p - start) / 0.2);
+    // Each account emerges from where it is on screen rather than from a
+    // schedule across the section. The list changes length whenever an account
+    // is added, and a fixed schedule leaves the first entries dark while they
+    // are in full view.
+    items.forEach((item) => {
+      const rect = item.getBoundingClientRect();
+      const local = clamp01((viewport.height * 0.92 - rect.top) / (viewport.height * 0.3));
       item.style.setProperty('--emerge', local.toFixed(3));
     });
   });

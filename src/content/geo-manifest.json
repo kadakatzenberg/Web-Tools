@@ -1,0 +1,56 @@
+{
+  "range-atlas": {
+    "widths": [
+      640,
+      1024,
+      1600
+    ],
+    "ratio": "1600 / 1000",
+    "alt": "Topographic chart of the named mountain ranges, plateaux and basins of the region, with surveyed summit elevations marked."
+  },
+  "meridian-chart": {
+    "widths": [
+      640,
+      1024,
+      1600
+    ],
+    "ratio": "1400 / 1050",
+    "alt": "Analytical chart of watercourses and landform boundaries plotted against a two degree graticule."
+  },
+  "approach-chart": {
+    "widths": [
+      640,
+      1024,
+      1600
+    ],
+    "ratio": "1200 / 1500",
+    "alt": "Close survey of a river system threading between landform boundaries, drawn at one degree spacing."
+  },
+  "world-departure": {
+    "widths": [
+      640,
+      1024,
+      1600
+    ],
+    "ratio": "1600 / 900",
+    "alt": "World coastline with every built up area in the source dataset marked, drawn cool and quiet."
+  },
+  "world-systems": {
+    "widths": [
+      640,
+      1024,
+      1600
+    ],
+    "ratio": "1600 / 900",
+    "alt": "The same world coastline and built up areas, drawn under a red cast."
+  },
+  "orbital": {
+    "widths": [
+      640,
+      1024,
+      1600
+    ],
+    "ratio": "1200 / 1200",
+    "alt": "The planet drawn on an orthographic projection centred on the region, coastlines and built up areas picked out."
+  }
+}

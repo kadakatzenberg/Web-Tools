@@ -1,14 +1,22 @@
-import { cta, eyebrow, photo, plate } from '../ui';
+import { cta, eyebrow, geo, hasPhoto, photo, plate } from '../ui';
 import { ticker } from '../core/ticker';
 import { stickyProgress, viewport } from '../core/scroll';
 import { clamp01, lerp } from '../gl/math';
 
+/**
+ * Each chapter draws from a different layer, so the sequence never repeats a
+ * visual language: the measured layer for the four that are about reading real
+ * ground, the mythic layer for the two that are about what cannot be surveyed.
+ */
 interface Chapter {
   chapter: string;
   title: string;
   body: string;
-  /** A photograph role, or a procedural plate when the chapter is mythic. */
-  media: { kind: 'photo'; role: string; crop?: string } | { kind: 'plate'; name: string; alt: string };
+  media:
+    /** A photograph when one exists, otherwise the named survey chart. */
+    | { kind: 'photo'; role: string; crop?: string; instead: string }
+    | { kind: 'plate'; name: string; alt: string }
+    | { kind: 'geo'; name: string };
   /** Frame proportion, so no two chapters are the same shape. */
   shape: 'portrait' | 'landscape' | 'square' | 'tall';
   treatment?: 'ink' | 'aperture' | 'strip' | 'field' | 'stele';
@@ -19,7 +27,7 @@ const CHAPTERS: Chapter[] = [
     chapter: 'Leaving the modern world',
     title: 'Personally curated by Joey Yap',
     body: 'Joey selects the terrain, timing, and teachings that define the experience. Throughout the excursion, he reads the land in real time and shows how the classical principles appear across the mountains, waterways, and formations before the group.',
-    media: { kind: 'photo', role: 'joey-briefing', crop: 'wide' },
+    media: { kind: 'photo', role: 'joey-briefing', crop: 'wide', instead: 'world-departure' },
     shape: 'landscape',
     treatment: 'field',
   },
@@ -27,18 +35,15 @@ const CHAPTERS: Chapter[] = [
     chapter: 'First sight of the Dragon',
     title: 'Sacred ground away from the crowds',
     body: 'The experience reaches beyond conventional tourism routes. The exact sacred sites remain private. Each location is selected for what the land can reveal and what may be experienced there.',
-    media: {
-      kind: 'plate',
-      name: 'chapter-firstsight',
-      alt: 'A long mountain range emerging through mist, its crest running unbroken across the frame with light gathering along it.',
-    },
+    media: { kind: 'geo', name: 'range-atlas' },
     shape: 'tall',
+    treatment: 'stele',
   },
   {
     chapter: 'Reading the living terrain',
     title: 'Classical Feng Shui made visible',
     body: 'Mountains become Dragons. Valleys become channels of Qi. Water reveals how energy gathers, moves, or escapes. The land becomes the lesson.',
-    media: { kind: 'photo', role: 'terrain-reading', crop: 'portrait' },
+    media: { kind: 'photo', role: 'terrain-reading', crop: 'portrait', instead: 'meridian-chart' },
     shape: 'portrait',
     treatment: 'strip',
   },
@@ -46,7 +51,7 @@ const CHAPTERS: Chapter[] = [
     chapter: 'Entering sacred ground',
     title: 'Meditation and activation',
     body: 'At selected locations and moments, the group pauses. Participants may meditate, set an intention, perform an activation, or experience the environment without distraction.',
-    media: { kind: 'photo', role: 'group-temple', crop: 'square' },
+    media: { kind: 'photo', role: 'group-temple', crop: 'square', instead: 'approach-chart' },
     shape: 'square',
     treatment: 'ink',
   },
@@ -54,7 +59,7 @@ const CHAPTERS: Chapter[] = [
     chapter: 'Reaching the selected moment',
     title: 'A private international circle',
     body: 'The excursion brings together a small group of business owners, professionals, practitioners, and seekers from different parts of the world.',
-    media: { kind: 'photo', role: 'meditation-stone', crop: 'portrait' },
+    media: { kind: 'photo', role: 'meditation-stone', crop: 'portrait', instead: '' },
     shape: 'portrait',
     treatment: 'aperture',
   },
@@ -71,23 +76,35 @@ const CHAPTERS: Chapter[] = [
   },
 ];
 
+const CHAPTER_SIZES = '(max-width: 899px) 88vw, 34vw';
+
+function renderMedia(item: Chapter): string {
+  if (item.media.kind === 'photo') {
+    // The human layer wins wherever it exists. Until then the chapter shows the
+    // survey chart named beside it, which is real ground rather than a stand-in
+    // for a person, so nothing on the page implies a photograph that is absent.
+    if (!hasPhoto(item.media.role) && item.media.instead) {
+      return geo(item.media.instead, { sizes: CHAPTER_SIZES, treatment: item.treatment });
+    }
+    return photo(item.media.role, {
+      crop: item.media.crop,
+      sizes: CHAPTER_SIZES,
+      treatment: item.treatment,
+    });
+  }
+  if (item.media.kind === 'geo') {
+    return geo(item.media.name, { sizes: CHAPTER_SIZES, treatment: item.treatment });
+  }
+  return plate(item.media.name, item.media.alt, { sizes: CHAPTER_SIZES });
+}
+
 export function experienceMarkup(): string {
   const panels = CHAPTERS.map(
     (item, index) => `
     <li class="chapter chapter--${item.shape}" data-chapter="${index}">
       <div class="chapter__media">
         <span class="chapter__aperture" aria-hidden="true"></span>
-        ${
-          item.media.kind === 'photo'
-            ? photo(item.media.role, {
-                crop: item.media.crop,
-                sizes: '(max-width: 899px) 88vw, 34vw',
-                treatment: item.treatment,
-              })
-            : plate(item.media.name, item.media.alt, {
-                sizes: '(max-width: 899px) 88vw, 34vw',
-              })
-        }
+        ${renderMedia(item)}
       </div>
       <div class="chapter__text">
         <p class="chapter__index"><span class="field-label">Day ${index + 1}</span> ${

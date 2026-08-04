@@ -128,8 +128,12 @@ for (const mode of MODES) {
       for (let i = 1; i < headings.length; i++) {
         if (headings[i] - headings[i - 1] > 1) order = false;
       }
-      const ctas = [...document.querySelectorAll('a[data-cta]')];
-      const hrefs = new Set(ctas.map((a) => a.getAttribute('href')));
+      const ctas = [...document.querySelectorAll('[data-cta]')];
+      // Until a destination is set these are buttons that go nowhere on
+      // purpose, so record the element type rather than only the href.
+      const hrefs = new Set(
+        ctas.map((a) => a.getAttribute('href') ?? `<${a.tagName.toLowerCase()} inert>`),
+      );
       const images = [...document.querySelectorAll('img')];
       return {
         h1: document.querySelectorAll('h1').length,

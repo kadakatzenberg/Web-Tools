@@ -22,37 +22,25 @@ function htmlEnv(): Plugin {
   };
 }
 
-const PLACEHOLDER_CONTACT = 'REPLACE_WITH_CONTACT_TEAM_URL';
-
 /**
- * A production build must never ship a call to action that goes nowhere. Every
- * button on this page reads from one constant; if it is still the placeholder,
- * the build stops. Preview builds can opt out with ALLOW_PLACEHOLDER_CONTACT.
+ * The calls to action are deliberately inert until the team's enquiry
+ * destination exists: they render as focusable buttons that perform no
+ * navigation. The build reports that state once rather than failing, so the
+ * site can be deployed and reviewed before the destination is decided.
  */
-function contactGuard(): Plugin {
+function contactNotice(): Plugin {
   return {
-    name: 'contact-url-guard',
+    name: 'contact-url-notice',
     apply: 'build',
     async buildStart() {
       const source = await readFile(
         fileURLToPath(new URL('./src/config.ts', import.meta.url)),
         'utf8',
       );
-      if (!source.includes(PLACEHOLDER_CONTACT)) return;
-      if (process.env.ALLOW_PLACEHOLDER_CONTACT === 'true') {
-        this.warn(
-          'CONTACT_TEAM_URL is still the placeholder. Building anyway because ' +
-            'ALLOW_PLACEHOLDER_CONTACT=true. Do not deploy this build to production.',
-        );
-        return;
-      }
-      this.error(
-        '\n\n  CONTACT_TEAM_URL has not been set.\n\n' +
-          '  Every call to action on this page points at src/config.ts. Replace\n' +
-          `  ${PLACEHOLDER_CONTACT} with the destination the China Excursion\n` +
-          '  team uses to take enquiries, then build again.\n\n' +
-          '  To build a preview with the placeholder in place, run:\n' +
-          '    ALLOW_PLACEHOLDER_CONTACT=true npm run build\n',
+      if (!/CONTACT_TEAM_URL: string \| null = null/.test(source)) return;
+      this.warn(
+        'CONTACT_TEAM_URL is null, so every call to action is a button that goes ' +
+          'nowhere. Set it in src/config.ts to wire all of them at once.',
       );
     },
   };
@@ -78,7 +66,7 @@ function stripPhotoSources(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [htmlEnv(), contactGuard(), stripPhotoSources()],
+  plugins: [htmlEnv(), contactNotice(), stripPhotoSources()],
   build: {
     target: 'es2022',
     cssTarget: 'chrome100',

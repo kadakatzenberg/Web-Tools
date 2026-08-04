@@ -1,4 +1,4 @@
-import { eyebrow, hasPhoto, photo, plate } from '../ui';
+import { eyebrow, geo, hasPhoto, photo } from '../ui';
 import { onFirstView } from '../core/reveal';
 import { FIGURES, FIGURES_CONFIRMED, STANDING } from '../content/authority';
 
@@ -42,14 +42,10 @@ export function guideMarkup(): string {
               })}</div>`
             : ''
         }
-        ${plate(
-          'guide-scale',
-          'Ranges receding into mist, one behind another, with a faint column of light rising from the furthest of them.',
-          { sizes: '(max-width: 899px) 92vw, 62vw', ratio: '16 / 9' },
-        )}
+        ${geo('range-atlas', { sizes: '(max-width: 899px) 92vw, 62vw' })}
         <figcaption class="guide__figcaption">
           <span class="field-label">Scale</span>
-          The range that taught the method, read from the ground.
+          The ranges the classical texts describe, with their surveyed summits marked.
         </figcaption>
       </figure>
     </div>

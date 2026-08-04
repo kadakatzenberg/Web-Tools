@@ -2592,3 +2592,92 @@
     inset: -0.6rem 0 -1rem;
   }
 }
+
+/* --- The measured layer ---------------------------------------------------
+   Plates drawn from survey data rather than from the shader. They are charts,
+   so they want a flatter, cooler presentation than the photographic
+   treatments: no lift, no gloss, and a hairline that reads as a plate edge. */
+
+.photo--geo .plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo--geo::after {
+  /* The sweep that suits a photograph reads as glare on a chart. */
+  content: none;
+}
+
+.photo--geo .plate {
+  border: 1px solid rgb(var(--acc-rgb) / 0.16);
+}
+
+/* The chart treatments keep their shape but lose the paper warmth. */
+.photo--geo.photo--field::before,
+.photo--geo.photo--strip::before {
+  opacity: 0.5;
+}
+
+/* --- The world under the descent ------------------------------------------
+   Sits beneath the Blood Goat text at low opacity. Both layers are driven
+   from scroll progress in bloodgoat.ts, never on a timer. */
+
+.bloodgoat__world {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.bloodgoat__world-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+.bloodgoat__world-layer .photo {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.bloodgoat__world-layer .plate {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.bloodgoat__world-layer[data-world='flat'] .plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bloodgoat__world-layer[data-world='globe'] .plate img {
+  width: auto;
+  height: 100%;
+  max-width: none;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+/* The descent and the closing line stay above the world. */
+.bloodgoat__stick .descent,
+.bloodgoat__stick .turn {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloodgoat__world-layer {
+    /* No growth, no drift. The layers still appear, driven by position only. */
+    transform: none !important;
+  }
+}

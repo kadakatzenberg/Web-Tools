@@ -1,4 +1,4 @@
-import { cta, eyebrow, splitPhrase } from '../ui';
+import { cta, eyebrow, geo, splitPhrase } from '../ui';
 import { ticker } from '../core/ticker';
 import { stickyProgress } from '../core/scroll';
 import { clamp01, lerp, smoothstep } from '../gl/math';
@@ -58,6 +58,21 @@ export function bloodgoatMarkup(): string {
 
     <div class="bloodgoat__track" id="bloodgoat-track">
       <div class="bloodgoat__stick">
+        <!--
+          The world arrives underneath the descent and grows through it: first
+          the flat map of every recorded urban footprint, then the planet
+          itself. Both are drawn from survey data, so the pressure the passage
+          describes is represented by measured ground rather than illustration.
+        -->
+        <div class="bloodgoat__world" id="bloodgoat-world" aria-hidden="true">
+          <div class="bloodgoat__world-layer" data-world="flat">
+            ${geo('world-systems', { sizes: '100vw' })}
+          </div>
+          <div class="bloodgoat__world-layer" data-world="globe">
+            ${geo('orbital', { sizes: '(max-width: 899px) 96vw, 62vw' })}
+          </div>
+        </div>
+
         <ol class="descent" id="descent">${lines}</ol>
 
         <div class="turn" id="turn" aria-hidden="true">
@@ -83,6 +98,8 @@ export function initBloodGoat(narrative: Narrative, reducedMotion: boolean): voi
   if (!track || !section || !descent) return;
 
   const lines = Array.from(descent.querySelectorAll<HTMLElement>('.descent__line'));
+  const flat = document.querySelector<HTMLElement>('[data-world="flat"]');
+  const globe = document.querySelector<HTMLElement>('[data-world="globe"]');
   const chars = kinetic ? Array.from(kinetic.querySelectorAll<HTMLElement>('.char')) : [];
   let pulsed = false;
   let ducked = false;
@@ -105,6 +122,8 @@ export function initBloodGoat(narrative: Narrative, reducedMotion: boolean): voi
     section.classList.toggle('is-contaminated', p > 0.02 || elementInView(section));
 
     if (!inside) {
+      if (flat) flat.style.opacity = '0';
+      if (globe) globe.style.opacity = '0';
       if (ducked) {
         document.body.classList.remove('is-cursor-hidden');
         ducked = false;
@@ -133,6 +152,22 @@ export function initBloodGoat(narrative: Narrative, reducedMotion: boolean): voi
         ).toFixed(0)}, 'wdth' ${(100 - tension * 30 + phase * 6).toFixed(1)}`;
         char.style.transform = `translate3d(0, ${(phase * 4).toFixed(2)}px, 0)`;
       });
+    }
+
+    // The world contaminates the passage, then is taken by the black frame.
+    // Both layers are held well under the text so the reading never suffers.
+    const cleared = 1 - smoothstep(0.56, 0.64, p);
+    if (flat) {
+      const rise = smoothstep(0.06, 0.34, p);
+      flat.style.opacity = (rise * 0.42 * cleared).toFixed(3);
+      flat.style.transform = `scale(${(1.16 - rise * 0.12).toFixed(3)})`;
+    }
+    if (globe) {
+      const rise = smoothstep(0.24, 0.58, p);
+      globe.style.opacity = (rise * 0.6 * cleared).toFixed(3);
+      globe.style.transform = `scale(${(0.82 + rise * 0.26).toFixed(3)}) translate3d(0, ${(
+        (1 - rise) * 8
+      ).toFixed(1)}%, 0)`;
     }
 
     // The black frame.

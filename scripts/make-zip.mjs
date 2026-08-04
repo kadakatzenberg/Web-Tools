@@ -1,6 +1,6 @@
 /** Packages the deliverable, excluding installed dependencies and caches. */
 import archiver from 'archiver';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -32,8 +32,15 @@ const files = [
   'tsconfig.json',
   'netlify.toml',
   'README.md',
+  'ASSET_SOURCES.md',
+  'QA-REPORT.txt',
   '.gitignore',
 ];
+const missing = files.filter((file) => !existsSync(join(root, file)));
+if (missing.length) {
+  console.error(`Refusing to package. Missing: ${missing.join(', ')}`);
+  process.exit(1);
+}
 for (const file of files) archive.file(join(root, file), { name: file });
 
 const directories = ['src', 'public', 'scripts', 'dist'];

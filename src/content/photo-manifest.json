@@ -1,5 +1,6 @@
 {
   "roles": [],
-  "generated": "2026-08-03",
-  "note": "Rewritten by `npm run photos`. Lists the photograph roles that have processed files in public/media/photos."
+  "generated": "2026-08-04",
+  "note": "Rewritten by `npm run photos`. Lists the photograph roles that have processed files in public/media/photos. This file tracks photographs only; the survey charts in the same directory are listed in geo-manifest.json.",
+  "empty": "No photographs are in the project. They could not be reached from the build environment and none were substituted. Every role falls back to a plate. See ASSET_SOURCES.md."
 }

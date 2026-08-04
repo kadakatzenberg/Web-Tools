@@ -1,4 +1,4 @@
-# Walk The Dragon — Joey Yap's China Excursion 2026
+# Walk The Dragon. Joey Yap's China Excursion 2026
 
 A single page, scroll-driven sales experience for Joey Yap's China Excursion,
 10 to 15 September 2026. The visitor follows the movement of Qi through an
@@ -13,28 +13,20 @@ No price appears anywhere on the page.
 
 ## Before you deploy
 
-**One value must be set.** Open `src/config.ts` and replace the placeholder with
-the live destination the team uses to take enquiries:
+**The calls to action are deliberately inert.** Open `src/config.ts`:
 
 ```ts
-export const CONTACT_TEAM_URL = 'REPLACE_WITH_CONTACT_TEAM_URL';
+export const CONTACT_TEAM_URL: string | null = null;
 ```
 
-Every call to action on the page reads from this single constant, so setting it
-once wires all ten of them. When the value points at another origin the links
-automatically open in a new tab; while it is a placeholder they stay in the same
-tab.
+While this is `null`, all ten buttons render, take keyboard focus, and respond to
+a click, but they do not navigate anywhere. They carry `aria-disabled` so screen
+readers announce that nothing follows the press. Put a destination in and every
+one of them becomes a real link at once, opening in a new tab when it leaves this
+site. Nothing else needs changing.
 
-**A production build refuses to run while the placeholder is in place.** The
-build stops with an explanation rather than shipping calls to action that lead
-nowhere. To build a preview anyway:
-
-```bash
-ALLOW_PLACEHOLDER_CONTACT=true npm run build
-```
-
-During development an unmissable red banner says the same thing. It never
-reaches a visitor, because the build guard stops that build first.
+The build reports this state as a warning rather than failing, so the site can be
+deployed and reviewed before the destination is decided.
 
 Two other things are worth reviewing before launch, both covered below: the
 photographs, and the authority figures in the guide section.
@@ -48,19 +40,43 @@ npm install     # install dependencies
 npm run dev     # development server on http://127.0.0.1:5173
 npm run build   # type check, then production build into dist/
 npm run preview # serve the production build on http://127.0.0.1:4173
+npm run qa      # drive the built site through every viewport and mode
 ```
 
 Authoring commands, only needed when the artwork changes:
 
 ```bash
-npm run photos  # process client photographs in public/photos into the page
-npm run plates  # re-render the still plates and social card from the shader
-npm run zip     # package the project as china-excursion-2026.zip
+npm run plates   # re-render the shader plates (needs npm run dev running)
+npm run geo      # re-render the survey charts from vendored geodata
+npm run geodata  # refresh that geodata from Natural Earth (needs network)
+npm run social   # rebuild the Open Graph card
+npm run photos   # process client photographs dropped into public/photos
+npm run zip      # package the project as china-excursion-2026.zip
 ```
 
 `npm run plates` drives a real browser against the running dev server, captures
 frames from the same shader the live page uses, then grades them and writes the
 responsive AVIF and WebP sets into `public/media`. Start `npm run dev` first.
+
+`npm run geo` and `npm run social` both run standalone: no browser, no server.
+
+### Running QA
+
+Build first, then serve, then run the suite:
+
+```bash
+npm run build
+npm run preview &
+npm run qa
+```
+
+It opens the built site at nine viewports from 1440x900 down to 320x568, in
+three modes (default, reduced motion, WebGL disabled), scrolls through 27
+positions in each, and reports console errors, failed requests, HTTP 400 and
+above, horizontal overflow with the offending element named, any word broken
+across two lines, heading order, call to action wiring, and missing or broken
+image alternatives. Screenshots land in `/tmp/qa` by default; set `OUT` to
+change that and `URL` to point it somewhere else.
 
 ---
 
@@ -83,8 +99,8 @@ There is no server component, no API key, and no paid runtime service.
 
 Vite and TypeScript with no UI framework. The only runtime dependency is Lenis
 (about 5 kB) for smooth scrolling, which is skipped entirely when the visitor
-prefers reduced motion. Everything else — the landscape, the instruments, the
-soundscape, the motion system — is written for this page.
+prefers reduced motion. Everything else is written for this page: the
+landscape, the instruments, the soundscape, the motion system.
 
 ```
 src/
@@ -93,7 +109,11 @@ src/
   ui.ts                 calls to action, responsive plates, text splitting
   content/
     glyphs.ts           vector outlines for 天 地 人 龍 氣, so no CJK webfont loads
-    testimonials.ts     attributed accounts, and the approved response descriptions
+    testimonials.ts     attributed accounts with their sources, and the approved
+                        response descriptions
+    authority.ts        two tiers of standing, numeric one switched off
+    photos.ts           the human layer: one role per photograph, with fallbacks
+    geo.ts              the measured layer, rendered from survey data
   core/
     beats.ts            the camera script, one entry per narrative beat
     narrative.ts        turns scroll position into a camera and mood
@@ -170,15 +190,28 @@ nothing that carries meaning lives only on the canvas. Sound is off until asked
 for, and the toggle reports its state through `aria-pressed` and a text label.
 There are no rapid flashes anywhere on the page.
 
-### Two layers of imagery
+### Three layers of imagery
 
-The page is built from a mythic layer and a human layer, and the relationship
-between them is the design.
+The page is built from three layers, and the relationship between them is the
+design.
 
 **The mythic layer** is the procedural landscape: the live shader, and the still
 plates in `public/media` captured from it by `npm run plates`, then graded,
 grained and written as responsive AVIF and WebP. It carries atmosphere and
-continuity.
+continuity, and it is the connective tissue everything else sits inside.
+
+**The measured layer** is real geography. `scripts/build-geo.mjs` renders six
+plates from Natural Earth survey data: the named ranges, plateaux and basins of
+the region with their surveyed summit elevations, river centrelines against a
+graticule, world coastlines, and every recorded urban footprint on the planet,
+drawn both flat and on a globe. Nothing on these plates is invented. No
+coordinate is moved. They carry the claim that this is about real ground, and
+they appear in four of the six journey chapters, in the guide section, and
+underneath the Blood Goat descent, where the world grows through the text and is
+then taken by the black frame.
+
+Natural Earth is public domain and asks for no attribution. It is credited on the
+plates anyway.
 
 **The human layer** is photography, and it carries belief. `src/content/photos.ts`
 declares one role per photograph the page wants, with the crops, treatment and
@@ -187,10 +220,14 @@ grade each position needs. Drop the source files into `public/photos/` and run
 page palette, lays in grain, and records what it found in
 `src/content/photo-manifest.json`.
 
-Roles with no source file fall back to the procedural plate declared beside
-them, so the page is complete at every stage of the shoot clearance process and
-never shows a broken image. `ASSET_SOURCES.md` lists the file names, what each
-photograph shows, and where it appears.
+**No photographs are currently in the project.** They could not be obtained from
+the build environment: the egress policy blocks every Joey Yap and Mastery
+Academy domain, Instagram and Facebook, and every stock and archive host. Nothing
+was substituted, because a stock model standing in for Joey Yap, or for a past
+participant, would be a fabrication rather than a photograph. Every role falls
+back to a plate from one of the other two layers, so the page is complete and
+never shows a broken image. `ASSET_SOURCES.md` lists what each photograph should
+show and where it goes.
 
 Photographs are never dropped into a plain rectangle. Six treatments give each
 one a different relationship to the page: `ink` tears it from wet paper,
@@ -198,7 +235,14 @@ one a different relationship to the page: `ink` tears it from wet paper,
 frames it like a plate in a notebook, `cutout` composites a person into the
 landscape, and `stele` cuts it into rock. Each of the six journey chapters uses a
 different treatment, a different frame proportion and a different emotional
-register, alternating between the two layers.
+register, and the sequence alternates between the layers rather than repeating
+one of them: departure and first sight and the reading and the approach are drawn
+from survey data, the selected moment and the return from the shader.
+
+The four chapters currently showing charts each name a photograph they would
+rather have. The moment one is added it takes over that position automatically
+and the chart steps aside, so the page improves as the photography lands without
+any code changing.
 
 Nothing is fetched from another origin at runtime. Images below the first
 viewport are lazy loaded.
@@ -210,24 +254,33 @@ The five Chinese characters used as visual anchors ship as vector outlines in
 
 The wording follows the approved brief in British English. The page carries no
 price, no seat count, no deadline, no invented inclusions and no assured
-outcome. Where participant responses are described they are unattributed and
-qualified.
+outcome. Where responses are described rather than attributed they are
+deliberately unattributed and qualified.
+
+A caption that makes a documentary claim may only sit under a photograph. Both
+places that do so, the accounts section and sacred timing, omit their figure
+entirely rather than let "Previous excursion" caption a rendered landscape.
 
 **Authority figures.** `src/content/authority.ts` holds two tiers. The tier that
 renders by default describes Joey Yap's standing in terms that do not depend on a
 number: founder of the Mastery Academy, the conferred title, the body of
-published work, the field study behind it. The numeric tier — students taught,
-countries reached, years, books published — is present but switched off, because
+published work, the field study behind it. The numeric tier (students taught,
+countries reached, years, books published) is present but switched off, because
 those figures could not be checked against an official page and independent
 sources carried materially different numbers. Confirm each one, correct any that
 have moved, then set `FIGURES_CONFIRMED` to true.
 
-`src/content/testimonials.ts` holds an empty, documented list for named
-accounts. Add entries there only when the exact wording and attribution have
-been confirmed against an official source: use `quote` for wording reproduced
-exactly, which renders in quotation marks, and `account` for anything shortened
-or rephrased, which renders without them. The section renders named accounts
-ahead of the general descriptions as soon as the list is populated.
+**Testimonials.** `src/content/testimonials.ts` carries four sourced accounts
+from previous excursions: three reproduced word for word, one an attributed
+paraphrase. Each entry records where the wording was found in a `source` field
+that never renders, so any claim on the page can be traced without leaving the
+codebase. `quote` renders in quotation marks and must be exact; `account`
+renders without them and is for anything shortened or rephrased.
+
+The file also documents what was deliberately left out and why: the medical
+result account, an unattributed account that reads as an assured outcome, and
+five names from the brief whose wording appears in no reachable source. Nothing
+was invented to fill those gaps. Add them when the official wording is to hand.
 
 ---
 

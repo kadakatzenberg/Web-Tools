@@ -1,5 +1,6 @@
 import { CONTACT_LINK_ATTRS, CONTACT_TEAM_URL } from './config';
 import { hasPhoto, photoRole, PHOTO_WIDTHS, type Treatment } from './content/photos';
+import { geoPlateInfo, hasGeoPlate } from './content/geo';
 
 export interface CtaOptions {
   label: string;
@@ -29,15 +30,22 @@ export function cta({
   ]
     .filter(Boolean)
     .join(' ');
-  return `<a class="${classes}" href="${CONTACT_TEAM_URL}" ${CONTACT_LINK_ATTRS}${
-    id ? ` id="${id}"` : ''
-  }${describedBy ? ` aria-describedby="${describedBy}"` : ''}${
-    magnetic ? ' data-magnetic="0.2"' : ''
-  } data-cta="${label}">
+  const shared =
+    `${id ? ` id="${id}"` : ''}` +
+    `${describedBy ? ` aria-describedby="${describedBy}"` : ''}` +
+    `${magnetic ? ' data-magnetic="0.2"' : ''}` +
+    ` data-cta="${label}"`;
+  const inner = `
     <span class="cta__fill" aria-hidden="true"></span>
     <span class="cta__label">${label}</span>
-    <span class="cta__arrow" aria-hidden="true"></span>
-  </a>`;
+    <span class="cta__arrow" aria-hidden="true"></span>`;
+
+  // Until a destination exists the button is a real, focusable control that
+  // performs no navigation, rather than a link to nowhere.
+  if (!CONTACT_TEAM_URL) {
+    return `<button type="button" class="${classes}" aria-disabled="true"${shared}>${inner}</button>`;
+  }
+  return `<a class="${classes}" href="${CONTACT_TEAM_URL}" ${CONTACT_LINK_ATTRS}${shared}>${inner}</a>`;
 }
 
 const PLATE_WIDTHS = [640, 1024, 1600];
@@ -116,8 +124,47 @@ export function photo(id: string, options: PhotoOptions = {}): string {
   </div>`;
 }
 
+export interface GeoOptions {
+  sizes?: string;
+  className?: string;
+  eager?: boolean;
+  treatment?: Treatment;
+  /** Overrides the description written by the renderer. */
+  alt?: string;
+}
+
+/**
+ * A plate from the measured layer: real geography drawn from public domain
+ * survey data. Same call shape as `photo`, so a section can be composed from
+ * whichever layer serves the passage best.
+ */
+export function geo(name: string, options: GeoOptions = {}): string {
+  const info = geoPlateInfo(name);
+  if (!info) return '';
+  const sizes = options.sizes ?? '(max-width: 899px) 92vw, 46vw';
+  const srcset = (ext: string) =>
+    info.widths.map((w) => `/media/photos/${name}-${w}.${ext} ${w}w`).join(', ');
+  const wrapper = `photo photo--geo ${
+    options.treatment ? `photo--${options.treatment}` : ''
+  } ${options.className ?? ''}`.trim();
+
+  return `<div class="${wrapper}">
+    <picture class="plate">
+      <source type="image/avif" srcset="${srcset('avif')}" sizes="${sizes}" />
+      <source type="image/webp" srcset="${srcset('webp')}" sizes="${sizes}" />
+      <img
+        src="/media/photos/${name}-1024.webp"
+        alt="${options.alt ?? info.alt}"
+        loading="${options.eager ? 'eager' : 'lazy'}"
+        decoding="async"
+        style="aspect-ratio:${info.ratio}"
+      />
+    </picture>
+  </div>`;
+}
+
 /** True when a section should compose around a real photograph. */
-export { hasPhoto };
+export { hasPhoto, hasGeoPlate };
 
 export function eyebrow(text: string, index?: string): string {
   return `<p class="eyebrow" data-reveal="fade">${

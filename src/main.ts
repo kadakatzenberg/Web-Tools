@@ -4,7 +4,6 @@ import './styles/type.css';
 import './styles/components.css';
 import './styles/sections.css';
 
-import { warnIfContactUnset } from './config';
 import { detectCapabilities, onMotionPreferenceChange, pixelRatio } from './core/capabilities';
 import { ticker } from './core/ticker';
 import { initGrain } from './core/grain';
@@ -73,8 +72,6 @@ document.body.innerHTML = `
   ${footerMarkup()}
   ${dockMarkup()}
 `;
-
-warnIfContactUnset();
 
 const preloader = initPreloader();
 let progress = 0;

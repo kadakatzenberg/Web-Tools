@@ -1,4 +1,4 @@
-import { cta, eyebrow, photo } from '../ui';
+import { cta, eyebrow, hasPhoto, photo } from '../ui';
 import { ticker } from '../core/ticker';
 import { stickyProgress } from '../core/scroll';
 import { clamp01, lerp, smoothstep } from '../gl/math';
@@ -181,7 +181,11 @@ export function timingMarkup(): string {
         </p>
       </div>
 
-      <figure class="timing__witness" data-reveal="fade">
+      ${
+        // The caption describes what happens on the excursion, so it may only
+        // caption a photograph of it, not the procedural stand-in.
+        hasPhoto('meditation-stone')
+          ? `<figure class="timing__witness" data-reveal="fade">
         ${photo('meditation-stone', {
           crop: 'wide',
           sizes: '(max-width: 899px) 90vw, 42vw',
@@ -190,7 +194,9 @@ export function timingMarkup(): string {
           <span class="field-label">On the land</span>
           At selected moments the group stops, and the place is allowed to do the rest.
         </figcaption>
-      </figure>
+      </figure>`
+          : ''
+      }
 
       <ul class="responses" data-reveal>
         <li>Some people describe warmth moving through the body.</li>

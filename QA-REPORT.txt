@@ -1,0 +1,161 @@
+QA report, china-excursion-2026
+Run: npm run build && npm run preview && npm run qa
+Date: 2026-08-04
+
+13 runs: nine viewports in the default mode, plus 1440x900 and 430x932 in
+reduced-motion and with WebGL disabled. Each run scrolls 27 positions and
+screenshots the last.
+
+Result: clean on every run.
+
+  console/network   clean               x13
+  overflow          none                x13
+  split words       none                x13
+  headings          h1=1, order correct x13
+  calls to action   10, all labelled    x13
+  images            12, 0 broken        x13
+
+Notes
+
+  hrefs=["<button inert>"]  The calls to action are buttons with no destination
+                            by design. See src/config.ts.
+  noAlt=1                   The layered non-WebGL fallback plate, which carries
+                            alt="" inside an aria-hidden container. Correct for
+                            a decorative image.
+  canvas/fallback           canvas=true only in the default mode; both the
+                            reduced-motion and no-WebGL runs correctly drop the
+                            canvas and show the layered fallback.
+
+Per-run detail follows.
+
+### default @ 1440x900
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 1280x800
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 1024x768
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 768x1024
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 430x932
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 390x844
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 375x812
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 360x800
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### default @ 320x568
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=true fallbackVisible=false sound=true/false
+  skipLink=true lang=en-GB
+
+### reduced-motion @ 1440x900
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=false fallbackVisible=true sound=true/false
+  skipLink=true lang=en-GB
+
+### reduced-motion @ 430x932
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=false fallbackVisible=true sound=true/false
+  skipLink=true lang=en-GB
+
+### no-webgl @ 1440x900
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=false fallbackVisible=true sound=true/false
+  skipLink=true lang=en-GB
+
+### no-webgl @ 430x932
+  console/network: clean
+  overflow: none
+  split words: none
+  h1=1 headingOrder=true seq=1,2,2,3,3,2,2,2,3,3,3,3,3,3,2,2,2,2,2,2,2
+  ctas=10 hrefs=["<button inert>"] unlabelled=0
+  images=12 noAlt=1 broken=0
+  canvas=false fallbackVisible=true sound=true/false
+  skipLink=true lang=en-GB
+
+=== QA COMPLETE ===

@@ -8,7 +8,7 @@ Every asset shipped with this site is recorded here and in
 | Asset | How it was made | Licence |
 | --- | --- | --- |
 | `public/media/*.avif`, `public/media/*.webp` | Captured from the project's own GLSL terrain shader by `npm run plates`, then graded, grained and written as responsive AVIF and WebP | Part of this deliverable |
-| `public/media/social-card.jpg` | Same pipeline, cropped to 1200 x 630 | Part of this deliverable |
+| `public/media/social-card.jpg` | Composed from the ridge plate by `npm run social`, with the title, dates and 龍 outline laid over it | Part of this deliverable |
 | `public/favicon.svg`, `public/apple-touch-icon.png` | Drawn from the 龍 outline in the page palette | Part of this deliverable |
 
 ## Typefaces
@@ -26,26 +26,68 @@ The five Chinese characters used as visual anchors (天 地 人 龍 氣) are shi
 SVG path outlines extracted from Noto Serif TC (SIL Open Font License 1.1), so
 the page never downloads a CJK webfont.
 
+## The measured layer
+
+The charts and world plates on this page are not illustrations. Every line on
+them is survey data.
+
+| Asset | Source layer |
+| --- | --- |
+| `public/media/photos/range-atlas-*` | Named ranges, plateaux and basins of the region, with surveyed summit elevations |
+| `public/media/photos/meridian-chart-*` | River centrelines and landform boundaries against a two degree graticule |
+| `public/media/photos/approach-chart-*` | The same at one degree, closer in |
+| `public/media/photos/world-departure-*` | World coastline and recorded urban footprints, drawn cool |
+| `public/media/photos/world-systems-*` | The same data drawn under a red cast |
+| `public/media/photos/orbital-*` | The same data on an orthographic projection centred on the region |
+
+| Field | Value |
+| --- | --- |
+| Original URL | <https://github.com/nvkelso/natural-earth-vector> |
+| Layers used | `ne_10m_geography_regions_polys`, `ne_10m_geography_regions_elevation_points`, `ne_50m_rivers_lake_centerlines`, `ne_110m_land`, `ne_50m_urban_areas` |
+| Creator | Natural Earth. Primary authors Tom Patterson and Nathaniel Vaughn Kelso |
+| Licence | Public domain |
+| Attribution required | No. "No permission is needed to use Natural Earth. Crediting the authors is unnecessary." |
+| Attribution given | Credited on the plates anyway, and in the source |
+| Modifications | Filtered to the region, vertices decimated, coordinates rounded, projected, coloured to the page palette, graded, grained, written as responsive AVIF and WebP |
+| Where it appears | Journey chapters one to four, the guide section, both layers of the Blood Goat climax |
+
+Licence text: <https://www.naturalearthdata.com/about/terms-of-use/>
+
+`npm run geodata` refreshes the source data from GitHub and rewrites the trimmed
+files in `scripts/geodata/`. `npm run geo` renders the plates from those files
+and needs no network access.
+
 ## Photographs
 
-Photographs of the excursion, its participants and Dato' Joey Yap are supplied
-by the client and remain client owned. Confirm web clearance for each image
-before publishing, particularly for photographs in which participants are
+Photographs of the excursion, its participants and Dato' Joey Yap remain client
+owned.
+
+**None are currently in the project.** They could not be obtained from this
+build environment: the egress policy returns 403 for every Joey Yap and Mastery
+Academy domain, for Instagram and Facebook, and for every stock and archive host
+including Wikimedia Commons, Unsplash, Pexels, Flickr and NASA. No substitute was
+used, because a stock model presented as Joey Yap, or as a past participant,
+would be a fabrication rather than a photograph.
+
+Every photographic role therefore falls back to a plate from the mythic or
+measured layer, and the page is complete without them. Confirm web clearance
+before publishing any that are added, particularly where participants are
 identifiable.
 
 ### Adding them
 
 1. Drop the source files into `public/photos/` using these names:
 
-   | File | What it shows | Where it appears |
-   | --- | --- | --- |
-   | `joey-figure.png` | Joey mid-explanation, transparent background | Composited into the landscape in the hero and the guide section |
-   | `joey-briefing.jpg` | Joey briefing the group at the start of a day | Chapter one, and beside the curation claim |
-   | `terrain-reading.jpg` | Joey reading a formation with the group watching | Chapter three, beside the claim that he reads the land in real time |
-   | `group-temple.jpg` | The group gathered in a temple courtyard | Chapter four, and beside the private circle claim |
-   | `meditation-stone.jpg` | A participant meditating beside a stone carved with 龍 | Sacred timing, and chapter five |
+   | File | What it shows | Where it appears | Shown instead until then |
+   | --- | --- | --- | --- |
+   | `joey-figure.png` | Joey mid-explanation, transparent background | Composited into the landscape in the guide section | Nothing. The composite is omitted |
+   | `joey-briefing.jpg` | Joey briefing the group at the start of a day | Chapter one | `world-departure` chart |
+   | `terrain-reading.jpg` | Joey reading a formation with the group watching | Chapter three | `meridian-chart` |
+   | `group-temple.jpg` | The group gathered in a temple courtyard | Chapter four, and the accounts section | `approach-chart`. In the accounts section the figure is omitted, because its caption reads "Previous excursion" and that claim may only sit under a photograph |
+   | `meditation-stone.jpg` | A participant meditating beside a stone carved with 龍 | Chapter five, and sacred timing | The `chapter-moment` shader plate. In sacred timing the figure is omitted for the same reason |
 
-   Any common extension is accepted for the same stem.
+   Any common extension is accepted for the same stem. Adding a photograph
+   replaces whatever is standing in for it; nothing else needs changing.
 
 2. Run `npm run photos`.
 
@@ -62,7 +104,18 @@ a broken image.
 
 ## Third-party assets
 
-None at present. If any are added, record the local filename, source URL,
-creator, licence, required attribution and modifications both here and in
-`public/asset-sources.json`. Where a licence requires visible attribution, place
-it in the site footer rather than beside the image.
+Three families, all recorded above and in `public/asset-sources.json`:
+
+| Asset | Licence | Visible attribution required |
+| --- | --- | --- |
+| Natural Earth survey data | Public domain | No |
+| Newsreader, Archivo, Roboto Mono | OFL 1.1 and Apache 2.0 | No |
+| Noto Serif TC glyph outlines | OFL 1.1 | No |
+
+None of them require attribution on the page, so none is shown in the footer.
+Natural Earth is credited on the charts themselves regardless.
+
+If anything else is added, record the local filename, source URL, creator,
+licence, required attribution, modifications and placement both here and in
+`public/asset-sources.json`. Where a licence does require visible attribution,
+put it in the site footer rather than beside the image.
